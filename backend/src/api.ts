@@ -99,6 +99,39 @@ const ADMIN_VK_ID = '1'; // Замените на реальный VK ID адм�
  *       500:
  *         description: Ошибка сервера.
  */
+const calculateAuraCells = (rank: string, contracts: any[]) => {
+  const rankCellMap: { [key: string]: { small: number; medium: number; large: number } } = {
+    'F': { small: 2, medium: 0, large: 0 },
+    'E': { small: 4, medium: 0, large: 0 },
+    'D': { small: 6, medium: 1, large: 0 },
+    'C': { small: 10, medium: 2, large: 0 },
+    'B': { small: 15, medium: 3, large: 1 },
+    'A': { small: 20, medium: 4, large: 2 },
+    'S': { small: 30, medium: 6, large: 3 },
+    'SS': { small: 40, medium: 8, large: 4 },
+    'SSS': { small: 50, medium: 10, large: 5 },
+  };
+
+  const baseCells = rankCellMap[rank] || { small: 0, medium: 0, large: 0 };
+
+  const bonusCells = contracts.reduce(
+    (acc, contract) => {
+      const sync = contract.sync_level || 0;
+      acc.small += Math.floor(sync / 10);
+      acc.medium += Math.floor(sync / 25);
+      acc.large += sync >= 100 ? 1 : 0;
+      return acc;
+    },
+    { small: 0, medium: 0, large: 0 }
+  );
+
+  return {
+    "Малые (I)": baseCells.small + bonusCells.small,
+    "Значительные (II)": baseCells.medium + bonusCells.medium,
+    "Предельные (III)": baseCells.large + bonusCells.large,
+  };
+};
+
 router.post('/characters', async (req: Request, res: Response) => {
   const { character, contracts } = req.body;
   const db = await initDB();
@@ -108,12 +141,7 @@ router.post('/characters', async (req: Request, res: Response) => {
   }
 
   try {
-    const initialRank = 'F';
-    const auraCells = {
-      "Малые (I)": 2,
-      "Значительные (II)": 0,
-      "Предельные (III)": 0
-    };
+    const auraCells = calculateAuraCells(character.rank, contracts);
 
     const attributeCosts: { [key: string]: number } = {
       "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10

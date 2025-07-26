@@ -7,6 +7,7 @@ interface Item {
     description: string;
     type: 'Обычный' | 'Синки';
     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+    rank?: 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
 }
 
 interface InventoryManagerProps {
@@ -62,6 +63,26 @@ export const InventoryManager: FC<InventoryManagerProps> = ({ inventory, onInven
                                     { label: 'Осколок', value: 'Осколок' },
                                     { label: 'Фокус', value: 'Фокус' },
                                     { label: 'Эхо', value: 'Эхо' },
+                                ]}
+                            />
+                        </FormItem>
+                    )}
+                    {item.type === 'Синки' && (
+                        <FormItem top="Ранг Синки">
+                            <Select
+                                placeholder="Не выбрано"
+                                value={item.rank}
+                                onChange={(e) => handleItemChange(index, 'rank', e.target.value)}
+                                options={[
+                                    { label: 'F', value: 'F' },
+                                    { label: 'E', value: 'E' },
+                                    { label: 'D', value: 'D' },
+                                    { label: 'C', value: 'C' },
+                                    { label: 'B', value: 'B' },
+                                    { label: 'A', value: 'A' },
+                                    { label: 'S', value: 'S' },
+                                    { label: 'SS', value: 'SS' },
+                                    { label: 'SSS', value: 'SSS' },
                                 ]}
                             />
                         </FormItem>

@@ -23,6 +23,8 @@ import { ContractForm } from '../components/ContractForm';
 import { AttributeManager } from '../components/AttributeManager';
 import { ArchetypeSelector } from '../components/ArchetypeSelector';
 import { InventoryManager } from '../components/InventoryManager';
+import { AuraCellsCalculator } from '../components/AuraCellsCalculator';
+import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 
 export interface AnketaProps extends NavIdProps {
@@ -48,6 +50,16 @@ const getUnityStage = (syncLevel: number): string => {
   return 'Ступень I - Активация';
 };
 
+const attributesList = [
+  "Сила", "Реакция", "Ловкость", "Выносливость", "Меткость",
+  "Рукопашный Бой", "Холодное Оружие", "Техника", "Восприятие", "Скрытность"
+];
+
+const initialAttributes = attributesList.reduce((acc, attr) => {
+  acc[attr] = 'Дилетант';
+  return acc;
+}, {} as { [key: string]: string });
+
 export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
   const [popout, setPopout] = useState<ReactNode | null>(null);
@@ -57,14 +69,14 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     character_name: '',
     nickname: '',
     age: '',
-    rank: 'F',
+    rank: 'F' as Rank,
     faction: '',
     home_island: '',
     appearance: '',
     personality: '',
     biography: '',
     archetypes: [] as string[],
-    attributes: {} as { [key: string]: string },
+    attributes: initialAttributes,
     contracts: [emptyContract],
     inventory: [] as any[],
     currency: 0,
@@ -280,6 +292,10 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
           onAttributeChange={handleAttributeChange}
           totalPoints={20}
         />
+        <AuraCellsCalculator
+          rank={formData.rank}
+          contracts={formData.contracts}
+        />
       </Group>
 
       <Group header={<Header>IV. КОНТРАКТ(Ы)</Header>}>
@@ -291,6 +307,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
               index={index}
               onChange={handleContractChange}
               onRemove={removeContract}
+              characterRank={formData.rank}
             />
           </Div>
         ))}

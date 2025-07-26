@@ -1,11 +1,14 @@
 import { FC } from 'react';
 import { FormItem, Input, Textarea, Button, Select, Header, Div } from '@vkontakte/vkui';
 import { Icon24Delete, Icon24Add } from '@vkontakte/icons';
+import { AbilityBuilder, Tag, Rank } from './AbilityBuilder';
 
 interface Ability {
   name: string;
-  cell_type: string;
+  cell_type: 'Нулевая' | 'Малая (I)' | 'Значительная (II)' | 'Предельная (III)';
+  cell_cost: number;
   description: string;
+  tags: Tag[];
 }
 
 interface Contract {
@@ -25,27 +28,39 @@ interface ContractFormProps {
   index: number;
   onChange: (index: number, field: keyof Contract, value: any) => void;
   onRemove: (index: number) => void;
+  characterRank: Rank;
 }
 
-export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange, onRemove }) => {
+export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange, onRemove, characterRank }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const value = e.target.type === 'number' ? parseInt(e.target.value, 10) : e.target.value;
+    const value = e.target.type === 'number' ? parseInt(e.target.value, 10) || 0 : e.target.value;
     onChange(index, e.target.name as keyof Contract, value);
   };
 
-  const handleAbilityChange = (abilityIndex: number, field: keyof Ability, value: string) => {
+  const handleAbilityChange = (abilityIndex: number, field: keyof Ability, value: string | number) => {
     const newAbilities = [...contract.abilities];
     newAbilities[abilityIndex] = { ...newAbilities[abilityIndex], [field]: value };
     onChange(index, 'abilities', newAbilities);
   };
 
   const addAbility = () => {
-    const newAbility: Ability = { name: '', cell_type: 'Нулевая', description: '' };
+    const newAbility: Ability = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: [] };
     onChange(index, 'abilities', [...contract.abilities, newAbility]);
   };
 
   const removeAbility = (abilityIndex: number) => {
     const newAbilities = contract.abilities.filter((_, i) => i !== abilityIndex);
+    onChange(index, 'abilities', newAbilities);
+  };
+
+  const handleTagChange = (abilityIndex: number, tag: Tag, isSelected: boolean) => {
+    const newAbilities = [...contract.abilities];
+    const ability = newAbilities[abilityIndex];
+    const newTags = isSelected
+      ? [...ability.tags, tag]
+      : ability.tags.filter(t => !(t.name === tag.name && t.rank === tag.rank));
+    
+    newAbilities[abilityIndex] = { ...ability, tags: newTags };
     onChange(index, 'abilities', newAbilities);
   };
 
@@ -107,24 +122,43 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
               onChange={(e) => handleAbilityChange(abilityIndex, 'name', e.target.value)}
             />
           </FormItem>
-          <FormItem top="Тип Ячейки">
-            <Select
-              value={ability.cell_type}
-              onChange={(e) => handleAbilityChange(abilityIndex, 'cell_type', e.target.value)}
-              options={[
-                { label: 'Нулевая', value: 'Нулевая' },
-                { label: 'Малая (I)', value: 'Малая (I)' },
-                { label: 'Значительная (II)', value: 'Значительная (II)' },
-                { label: 'Предельная (III)', value: 'Предельная (III)' },
-              ]}
-            />
-          </FormItem>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <FormItem top="Тип Ячейки" style={{ flex: 1 }}>
+              <Select
+                value={ability.cell_type}
+                onChange={(e) => handleAbilityChange(abilityIndex, 'cell_type', e.target.value)}
+                options={[
+                  { label: 'Нулевая', value: 'Нулевая' },
+                  { label: 'Малая (I)', value: 'Малая (I)' },
+                  { label: 'Значительная (II)', value: 'Значительная (II)' },
+                  { label: 'Предельная (III)', value: 'Предельная (III)' },
+                ]}
+              />
+            </FormItem>
+            <FormItem top="Стоимость">
+              <Input
+                type="number"
+                value={String(ability.cell_cost)}
+                onChange={(e) => handleAbilityChange(abilityIndex, 'cell_cost', parseInt(e.target.value, 10) || 1)}
+                min="1"
+                style={{ width: '80px' }}
+              />
+            </FormItem>
+          </div>
           <FormItem top="Описание">
             <Textarea
               value={ability.description}
               onChange={(e) => handleAbilityChange(abilityIndex, 'description', e.target.value)}
             />
           </FormItem>
+          
+          <AbilityBuilder
+            cellType={ability.cell_type}
+            characterRank={characterRank}
+            selectedTags={ability.tags}
+            onTagChange={(tag, isSelected) => handleTagChange(abilityIndex, tag, isSelected)}
+          />
+
           <FormItem>
             <Button appearance="negative" onClick={() => removeAbility(abilityIndex)} before={<Icon24Delete />}>
               Удалить способность
