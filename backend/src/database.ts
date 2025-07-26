@@ -33,6 +33,46 @@ export async function initDB() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS CharacterVersions (
+        version_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        version_number INTEGER DEFAULT 1,
+        data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+
+      CREATE TRIGGER IF NOT EXISTS after_character_update
+      AFTER UPDATE ON Characters
+      BEGIN
+        INSERT INTO CharacterVersions (character_id, data, version_number)
+        VALUES (
+          OLD.id,
+          JSON_OBJECT(
+            'vk_id', OLD.vk_id,
+            'status', OLD.status,
+            'character_name', OLD.character_name,
+            'nickname', OLD.nickname,
+            'age', OLD.age,
+            'rank', OLD.rank,
+            'faction', OLD.faction,
+            'home_island', OLD.home_island,
+            'appearance', OLD.appearance,
+            'personality', OLD.personality,
+            'biography', OLD.biography,
+            'archetypes', OLD.archetypes,
+            'attributes', OLD.attributes,
+            'aura_cells', OLD.aura_cells,
+            'inventory', OLD.inventory,
+            'currency', OLD.currency,
+            'admin_note', OLD.admin_note
+          ),
+          (SELECT IFNULL(MAX(version_number), 0) + 1
+           FROM CharacterVersions
+           WHERE character_id = OLD.id)
+        );
+      END;
     `);
 
     await db.exec(`

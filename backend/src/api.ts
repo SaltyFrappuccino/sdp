@@ -243,6 +243,23 @@ router.get('/characters', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/characters/:id/versions', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+    
+    const versions = await db.all(
+      'SELECT version_id, version_number, created_at FROM CharacterVersions WHERE character_id = ? ORDER BY version_number DESC',
+      id
+    );
+    
+    res.json(versions);
+  } catch (error) {
+    console.error('Failed to fetch character versions:', error);
+    res.status(500).json({ error: 'Failed to fetch character history' });
+  }
+});
+
 /**
  * @swagger
  * /api/characters/{id}:
