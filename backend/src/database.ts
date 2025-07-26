@@ -9,16 +9,42 @@ export async function initDB() {
     });
 
     await db.exec(`
-      CREATE TABLE IF NOT EXISTS anketas (
+      CREATE TABLE IF NOT EXISTS Characters (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        first_name TEXT NOT NULL,
-        last_name TEXT NOT NULL,
+        vk_id INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        character_name TEXT NOT NULL,
+        nickname TEXT,
         age INTEGER,
-        gender TEXT,
-        city TEXT,
-        about TEXT,
-        photo_url TEXT
+        rank TEXT,
+        faction TEXT,
+        home_island TEXT,
+        appearance TEXT,
+        personality TEXT,
+        biography TEXT,
+        archetypes TEXT,
+        attributes TEXT,
+        inventory TEXT,
+        currency INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS Contracts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        contract_name TEXT,
+        creature_name TEXT,
+        creature_rank TEXT,
+        creature_spectrum TEXT,
+        creature_description TEXT,
+        gift TEXT,
+        sync_level INTEGER,
+        unity_stage TEXT,
+        abilities TEXT,
+        FOREIGN KEY (character_id) REFERENCES Characters(id)
       );
     `);
 

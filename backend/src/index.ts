@@ -20,14 +20,6 @@ app.use(express.json());
 app.use('/api', apiRouter);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Обслуживание статики фронтенда
-const frontendPath = path.join(__dirname, '..', 'frontend');
-app.use(express.static(frontendPath));
-
-// "Catch-all" маршрут для SPA
-app.get('*', (req, res) => {
-  res.sendFile(path.resolve(frontendPath, 'index.html'));
-});
 
 
 async function startServer() {
