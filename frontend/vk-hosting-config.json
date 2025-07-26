@@ -1,9 +1,12 @@
 {
   "static_path": "dist",
-  "app_id": 0,
+  "app_id": 53964840,
   "endpoints": {
     "mobile": "index.html",
     "mvk": "index.html",
     "web": "index.html"
+  },
+  "proxy": {
+    "/api/": "http://193.162.143.80:3000/"
   }
 }
