@@ -592,6 +592,17 @@ router.put('/market/items/:id', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
     const { id } = req.params;
+    const { name, description, price, item_type, item_data, image_url } = req.body;
+    const sql = `UPDATE MarketItems SET name = ?, description = ?, price = ?, item_type = ?, item_data = ?, image_url = ? WHERE id = ?`;
+    await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, id]);
+    res.json({ message: 'Market item updated successfully' });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to update market item ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось обновить предмет на рынке', details: errorMessage });
+  }
+});
+
 router.post('/market/purchase', async (req: Request, res: Response) => {
   try {
     const { character_id, item_id } = req.body;
@@ -629,16 +640,6 @@ router.post('/market/purchase', async (req: Request, res: Response) => {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Purchase failed:', error);
     res.status(500).json({ error: 'Не удалось совершить покупку', details: errorMessage });
-  }
-});
-    const { name, description, price, item_type, item_data, image_url } = req.body;
-    const sql = `UPDATE MarketItems SET name = ?, description = ?, price = ?, item_type = ?, item_data = ?, image_url = ? WHERE id = ?`;
-    await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, id]);
-    res.json({ message: 'Market item updated successfully' });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    console.error(`Failed to update market item ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Не удалось обновить предмет на рынке', details: errorMessage });
   }
 });
 
