@@ -21,3 +21,5 @@ pnpm-debug.log*
 # Vite specific
 .vite/
 .DS_Store
+
+*.zip
