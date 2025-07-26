@@ -14,7 +14,10 @@ const app = express();
 const port = 3000;
 
 app.use(cors({
-  origin: 'https://sdp-ten-sand.vercel.app'
+  origin: [
+    'https://sdp-ten-sand.vercel.app',
+    /https:\/\/prod-app53964840-.*\.pages-ac\.vk-apps\.com/
+  ]
 }));
 app.use(express.json());
 
