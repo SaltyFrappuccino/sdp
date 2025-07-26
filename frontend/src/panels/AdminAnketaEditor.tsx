@@ -15,6 +15,7 @@ import {
 } from '@vkontakte/vkui';
 import { Anketa, AnketaProps } from './Anketa';
 import { API_URL } from '../api';
+import { useParams } from '@vkontakte/vk-mini-apps-router';
 
 interface VersionHistory {
   version_id: number;
@@ -25,6 +26,8 @@ interface VersionHistory {
 
 const AdminAnketaEditor: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
+  const params = useParams<'id'>();
+  const characterId = params?.id;
   const [activeTab, setActiveTab] = useState('current');
   const [versions, setVersions] = useState<VersionHistory[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
@@ -32,7 +35,7 @@ const AdminAnketaEditor: FC<AnketaProps> = ({ id, fetchedUser }) => {
   useEffect(() => {
     const fetchVersions = async () => {
       try {
-        const response = await fetch(`${API_URL}/characters/${id}/versions`);
+        const response = await fetch(`${API_URL}/characters/${characterId}/versions`);
         const data = await response.json();
         setVersions(data);
       } catch (error) {
@@ -40,10 +43,10 @@ const AdminAnketaEditor: FC<AnketaProps> = ({ id, fetchedUser }) => {
       }
     };
     
-    if (id) {
+    if (characterId) {
       fetchVersions();
     }
-  }, [id]);
+  }, [characterId]);
 
   const handleVersionCompare = (versionId: number) => {
     setSelectedVersion(prev => prev === versionId ? null : versionId);
@@ -74,7 +77,7 @@ const AdminAnketaEditor: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
       <View activePanel={activeTab}>
         <Panel id="current">
-          <Anketa id="current-anketa" fetchedUser={fetchedUser} />
+          <Anketa id={characterId || 'new'} fetchedUser={fetchedUser} />
         </Panel>
 
         <Panel id="history">

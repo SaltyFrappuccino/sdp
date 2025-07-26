@@ -62,6 +62,7 @@ interface Character {
     age: number;
     rank: string;
     faction: string;
+    faction_position: string;
     home_island: string;
     appearance: string;
     personality: string;
@@ -147,6 +148,7 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                 <SimpleCell>Возраст: {character.age}</SimpleCell>
                 <SimpleCell>Ранг: {character.rank}</SimpleCell>
                 <SimpleCell>Фракция: {character.faction}</SimpleCell>
+                <SimpleCell>Позиция во фракции: {character.faction_position}</SimpleCell>
                 <SimpleCell>Родной остров: {character.home_island}</SimpleCell>
               </Group>
               <Group>

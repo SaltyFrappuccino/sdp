@@ -15,6 +15,7 @@ import {
   Avatar,
   SimpleCell,
   IconButton,
+  Search,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
@@ -33,6 +34,11 @@ interface MarketItem {
   description: string;
   price: number;
   image_url: string;
+  item_type: 'Обычный' | 'Синки';
+  item_data: {
+    sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+    rank?: 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
+  };
 }
 
 interface MarketPanelProps extends NavIdProps {
@@ -46,6 +52,7 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
   const [items, setItems] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+  const [search, setSearch] = useState('');
 
   // Fetch characters
   useEffect(() => {
@@ -139,13 +146,20 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
         Рынок - {selectedCharacter.character_name} (Баланс: {selectedCharacter.currency})
       </PanelHeader>
       <Group>
+        <Search value={search} onChange={(e) => setSearch(e.target.value)} />
         <CardGrid size="l">
-          {items.map(item => (
+          {items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())).map(item => (
             <Card key={item.id}>
               {item.image_url && <img src={item.image_url} alt={item.name} style={{ width: '100%', height: 150, objectFit: 'cover' }} />}
               <Div>
                 <Header>{item.name}</Header>
                 <p>{item.description}</p>
+                {item.item_type === 'Синки' && item.item_data && (
+                  <>
+                    <p><b>Тип Синки:</b> {item.item_data.sinki_type}</p>
+                    <p><b>Ранг Синки:</b> {item.item_data.rank}</p>
+                  </>
+                )}
                 <p><b>Цена: {item.price} кредитов</b></p>
                 <Button stretched onClick={() => handlePurchase(item.id)} disabled={selectedCharacter.currency < item.price}>
                   Купить

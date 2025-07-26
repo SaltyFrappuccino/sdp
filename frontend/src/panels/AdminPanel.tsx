@@ -21,7 +21,8 @@ import {
   Input,
   Textarea,
   FormItem,
-  Select
+  Select,
+  Search
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect, ReactNode } from 'react';
@@ -35,6 +36,7 @@ interface Character {
   status: string;
   rank: string;
   faction: string;
+  faction_position: string;
 }
 
 interface MarketItem {
@@ -61,6 +63,8 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<Partial<MarketItem> | null>(null);
+  const [characterSearch, setCharacterSearch] = useState('');
+  const [itemSearch, setItemSearch] = useState('');
 
   const fetchCharacters = async () => {
     try {
@@ -303,15 +307,17 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
       
       <Group>
         <Header>Реестр анкет</Header>
+        <Search value={characterSearch} onChange={(e) => setCharacterSearch(e.target.value)} />
         {loading.characters ? <Spinner /> : (
           <CardGrid size="l">
-            {characters.map((char) => (
+            {characters.filter(c => c.character_name.toLowerCase().includes(characterSearch.toLowerCase())).map((char) => (
               <Card key={char.id}>
                 <Header>{char.character_name}</Header>
                 <Div>
                   <p><b>Статус:</b> {char.status}</p>
                   <p><b>Ранг:</b> {char.rank}</p>
                   <p><b>Фракция:</b> {char.faction}</p>
+                  <p><b>Позиция:</b> {char.faction_position}</p>
                   <p><b>Автор:</b> <Link href={`https://vk.com/id${char.vk_id}`} target="_blank">{`ID: ${char.vk_id}`}</Link></p>
                 </Div>
                  <ButtonGroup mode="horizontal" gap="m" stretched style={{ padding: '0 16px 16px' }}>
@@ -346,9 +352,10 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           <Header>Товары на рынке</Header>
           <Button before={<Icon24Add />} onClick={() => openMarketItemModal(null)}>Добавить товар</Button>
         </Div>
+        <Search value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} />
         {loading.items ? <Spinner /> : (
           <CardGrid size="l">
-            {marketItems.map((item) => (
+            {marketItems.filter(i => i.name.toLowerCase().includes(itemSearch.toLowerCase())).map((item) => (
               <Card key={item.id}>
                 <Header>{item.name}</Header>
                 <Div>

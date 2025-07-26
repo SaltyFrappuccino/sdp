@@ -15,8 +15,8 @@ import {
   Header,
   Div,
 } from '@vkontakte/vkui';
-import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { FC, useState, ReactNode } from 'react';
+import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
+import { FC, useState, ReactNode, useEffect } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { Icon24ErrorCircle, Icon24CheckCircleOutline, Icon24Add } from '@vkontakte/icons';
 import { ContractForm } from '../components/ContractForm';
@@ -62,6 +62,10 @@ const initialAttributes = attributesList.reduce((acc, attr) => {
 
 export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
+  const params = useParams<'id'>();
+  const characterId = params?.id;
+  const isEditing = !!characterId;
+
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
 
@@ -71,6 +75,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     age: '',
     rank: 'F' as Rank,
     faction: '',
+    faction_position: '',
     home_island: '',
     appearance: '',
     personality: '',
@@ -83,12 +88,28 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     admin_note: '',
   });
 
+  useEffect(() => {
+    if (isEditing) {
+      setPopout(<ScreenSpinner />);
+      fetch(`${API_URL}/characters/${characterId}`)
+        .then(res => res.json())
+        .then(data => {
+          setFormData({ ...data, age: data.age.toString() });
+          setPopout(null);
+        })
+        .catch(err => {
+          console.error(err);
+          setPopout(null);
+          setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>Ошибка загрузки анкеты</Snackbar>);
+        });
+    }
+  }, [isEditing, characterId]);
+
   const [formErrors, setFormErrors] = useState<Partial<typeof formData>>({});
 
   const validateForm = () => {
     const errors: Partial<typeof formData> = {};
     if (!formData.character_name.trim()) errors.character_name = 'Имя и Фамилия обязательны';
-    // Добавьте другие правила валидации
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -105,10 +126,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     } else {
       newAttributes[name] = value;
     }
-    setFormData(prev => ({
-      ...prev,
-      attributes: newAttributes
-    }));
+    setFormData(prev => ({ ...prev, attributes: newAttributes }));
   };
 
   const handleArchetypeChange = (archetype: string, isSelected: boolean) => {
@@ -123,11 +141,9 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const handleContractChange = (index: number, field: string, value: any) => {
     const newContracts = [...formData.contracts];
     const contract = { ...newContracts[index], [field]: value };
-
     if (field === 'sync_level') {
       contract.unity_stage = getUnityStage(value);
     }
-    
     newContracts[index] = contract;
     setFormData(prev => ({ ...prev, contracts: newContracts }));
   };
@@ -144,41 +160,31 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
   const handleSubmit = async () => {
     if (!validateForm()) {
-      setSnackbar(<Snackbar
-        onClose={() => setSnackbar(null)}
-        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-      >Пожалуйста, заполните все обязательные поля.</Snackbar>);
+      setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>Пожалуйста, заполните все обязательные поля.</Snackbar>);
       return;
     }
 
-    if (!fetchedUser) {
-      setSnackbar(<Snackbar
-        onClose={() => setSnackbar(null)}
-        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-      >Не удалось получить данные пользователя.</Snackbar>);
+    if (!fetchedUser && !isEditing) {
+      setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>Не удалось получить данные пользователя.</Snackbar>);
       return;
     }
 
     setPopout(<ScreenSpinner />);
 
     const payload = {
-      character: {
-        ...formData,
-        vk_id: fetchedUser.id,
-        age: parseInt(formData.age, 10) || 0,
-        contracts: undefined, // Удаляем, так как контракты идут отдельным полем
-      },
-      contracts: formData.contracts,
+      ...formData,
+      vk_id: isEditing ? undefined : fetchedUser?.id,
+      age: parseInt(formData.age, 10) || 0,
     };
-    delete payload.character.contracts;
 
+    const url = isEditing ? `${API_URL}/characters/${characterId}` : `${API_URL}/characters`;
+    const method = isEditing ? 'PUT' : 'POST';
+    const adminId = localStorage.getItem('adminId');
 
     try {
-      const response = await fetch(`${API_URL}/characters`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(isEditing && adminId && { 'x-admin-id': adminId }) },
         body: JSON.stringify(payload),
       });
 
@@ -186,28 +192,22 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       const result = await response.json();
 
       if (response.ok) {
-        setSnackbar(<Snackbar
-          onClose={() => setSnackbar(null)}
-          before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
-        >Анкета успешно создана! ID: {result.characterId}</Snackbar>);
-        routeNavigator.push('/');
+        setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24CheckCircleOutline />}>{isEditing ? 'Анкета обновлена!' : `Анкета создана! ID: ${result.characterId}`}</Snackbar>);
+        routeNavigator.push(isEditing ? `/admin_panel` : '/');
       } else {
         throw new Error(result.error || 'Неизвестная ошибка сервера');
       }
     } catch (error) {
       setPopout(null);
       const errorMessage = error instanceof Error ? error.message : 'Сетевая ошибка';
-      setSnackbar(<Snackbar
-        onClose={() => setSnackbar(null)}
-        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-      >{errorMessage}</Snackbar>);
+      setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>{errorMessage}</Snackbar>);
     }
   };
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
-        Создание анкеты
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
+        {isEditing ? 'Редактирование анкеты' : 'Создание анкеты'}
       </PanelHeader>
       
       <Group header={<Header>I. ОБЩАЯ ИНФОРМАЦИЯ</Header>}>
@@ -220,15 +220,9 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
             value={formData.rank}
             onChange={handleChange}
             options={[
-              { label: 'F', value: 'F' },
-              { label: 'E', value: 'E' },
-              { label: 'D', value: 'D' },
-              { label: 'C', value: 'C' },
-              { label: 'B', value: 'B' },
-              { label: 'A', value: 'A' },
-              { label: 'S', value: 'S' },
-              { label: 'SS', value: 'SS' },
-              { label: 'SSS', value: 'SSS' },
+              { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
+              { label: 'C', value: 'C' }, { label: 'B', value: 'B' }, { label: 'A', value: 'A' },
+              { label: 'S', value: 'S' }, { label: 'SS', value: 'SS' }, { label: 'SSS', value: 'SSS' },
             ]}
           />
         </FormItem>
@@ -252,6 +246,9 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
             ]}
           />
         </FormItem>
+        <FormItem top="Позиция во фракции">
+          <Input name="faction_position" value={formData.faction_position} onChange={handleChange} />
+        </FormItem>
         <FormItem top="Родной остров">
           <Select
             name="home_island"
@@ -259,12 +256,9 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
             value={formData.home_island}
             onChange={handleChange}
             options={[
-              { label: 'Кага', value: 'Кага' },
-              { label: 'Хоши', value: 'Хоши' },
-              { label: 'Ичи', value: 'Ичи' },
-              { label: 'Куро', value: 'Куро' },
-              { label: 'Мидзу', value: 'Мидзу' },
-              { label: 'Сора', value: 'Сора' },
+              { label: 'Кага', value: 'Кага' }, { label: 'Хоши', value: 'Хоши' },
+              { label: 'Ичи', value: 'Ичи' }, { label: 'Куро', value: 'Куро' },
+              { label: 'Мидзу', value: 'Мидзу' }, { label: 'Сора', value: 'Сора' },
             ]}
           />
         </FormItem>
@@ -336,7 +330,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
       <Div>
         <Button size="l" stretched onClick={handleSubmit}>
-          Отправить анкету
+          {isEditing ? 'Сохранить изменения' : 'Отправить анкету'}
         </Button>
       </Div>
 

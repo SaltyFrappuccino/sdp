@@ -9,7 +9,8 @@ import {
   Spinner,
   Div,
   PanelHeaderBack,
-  Link
+  Link,
+  Search
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect } from 'react';
@@ -28,6 +29,7 @@ export const AnketaList: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const fetchCharacters = async () => {
@@ -54,8 +56,9 @@ export const AnketaList: FC<NavIdProps> = ({ id }) => {
         <Spinner size="l" style={{ margin: '20px 0' }} />
       ) : (
         <Group>
+          <Search value={search} onChange={(e) => setSearch(e.target.value)} />
           <CardGrid size="l">
-            {characters.map((char) => (
+            {characters.filter(c => c.character_name.toLowerCase().includes(search.toLowerCase())).map((char) => (
               <Card key={char.id} onClick={() => routeNavigator.push(`/anketa_detail/${char.id}`)}>
                 <Header>{char.character_name}</Header>
                 <Div>

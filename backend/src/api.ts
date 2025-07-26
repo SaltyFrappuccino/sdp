@@ -157,15 +157,15 @@ router.post('/characters', async (req: Request, res: Response) => {
 
     const characterSql = `
       INSERT INTO Characters (
-        vk_id, status, character_name, nickname, age, rank, faction, home_island,
+        vk_id, status, character_name, nickname, age, rank, faction, faction_position, home_island,
         appearance, personality, biography, archetypes, attributes,
         attribute_points_total, attribute_points_spent, aura_cells, inventory, currency, admin_note
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const characterParams = [
       character.vk_id, 'на рассмотрении', character.character_name, character.nickname, character.age,
-      character.rank, character.faction, character.home_island,
+      character.rank, character.faction, character.faction_position, character.home_island,
       character.appearance, character.personality, character.biography,
       JSON.stringify(character.archetypes || []),
       JSON.stringify(character.attributes || {}),
@@ -227,7 +227,7 @@ router.get('/characters', async (req: Request, res: Response) => {
     const db = await initDB();
     const { status } = req.query;
 
-    let query = 'SELECT id, character_name, vk_id, status, rank, faction FROM Characters';
+    let query = 'SELECT id, character_name, vk_id, status, rank, faction, faction_position FROM Characters';
     const params = [];
 
     if (status === 'Принято') {
