@@ -20,6 +20,7 @@ import { FC, useState, ReactNode } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { Icon24ErrorCircle, Icon24CheckCircleOutline, Icon24Add } from '@vkontakte/icons';
 import { ContractForm } from '../components/ContractForm';
+import { API_URL } from '../api';
 
 export interface AnketaProps extends NavIdProps {
   fetchedUser?: UserInfo;
@@ -108,8 +109,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL;
-      const response = await fetch(`${apiUrl}/characters`, {
+      const response = await fetch(`${API_URL}/characters`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

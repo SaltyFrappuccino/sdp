@@ -16,6 +16,7 @@ import {
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
+import { API_URL } from '../api';
 
 interface Character {
     id: number;
@@ -52,8 +53,7 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
   useEffect(() => {
     const fetchCharacter = async () => {
       try {
-        const apiUrl = process.env.REACT_APP_API_URL;
-        const response = await fetch(`${apiUrl}/characters/${characterId}`);
+        const response = await fetch(`${API_URL}/characters/${characterId}`);
         const data = await response.json();
         setCharacter(data);
         setStatus(data.status);
@@ -71,8 +71,7 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
 
   const handleStatusChange = async () => {
     try {
-      const apiUrl = process.env.REACT_APP_API_URL;
-      await fetch(`${apiUrl}/characters/${characterId}`, {
+      await fetch(`${API_URL}/characters/${characterId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

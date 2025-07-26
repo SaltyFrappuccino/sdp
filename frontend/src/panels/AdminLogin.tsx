@@ -14,6 +14,7 @@ import {
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, ReactNode } from 'react';
 import { Icon24ErrorCircle } from '@vkontakte/icons';
+import { API_URL } from '../api';
 
 export const AdminLogin: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -24,8 +25,7 @@ export const AdminLogin: FC<NavIdProps> = ({ id }) => {
   const handleLogin = async () => {
     setPopout(<ScreenSpinner />);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL;
-      const response = await fetch(`${apiUrl}/admin/login`, {
+      const response = await fetch(`${API_URL}/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

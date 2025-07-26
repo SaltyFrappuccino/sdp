@@ -12,6 +12,7 @@ import {
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect } from 'react';
+import { API_URL } from '../api';
 
 interface Character {
   id: number;
@@ -30,8 +31,7 @@ export const AnketaList: FC<NavIdProps> = ({ id }) => {
   useEffect(() => {
     const fetchCharacters = async () => {
       try {
-        const apiUrl = process.env.REACT_APP_API_URL;
-        const response = await fetch(`${apiUrl}/characters`);
+        const response = await fetch(`${API_URL}/characters`);
         const data = await response.json();
         setCharacters(data);
       } catch (error) {
