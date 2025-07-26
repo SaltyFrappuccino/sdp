@@ -6,6 +6,10 @@ const router = Router();
 const ADMIN_PASSWORD = 'heartattack';
 const ADMIN_VK_ID = '1'; // Замените на реальный VK ID администратора
 
+router.get('/health-check', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 /**
  * @swagger
  * components:
