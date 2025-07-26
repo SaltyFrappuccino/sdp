@@ -24,6 +24,9 @@ export async function initDB() {
         biography TEXT,
         archetypes TEXT,
         attributes TEXT,
+        attribute_points_total INTEGER DEFAULT 7,
+        attribute_points_spent INTEGER DEFAULT 0,
+        aura_cells TEXT,
         inventory TEXT,
         currency INTEGER,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -44,7 +47,7 @@ export async function initDB() {
         sync_level INTEGER,
         unity_stage TEXT,
         abilities TEXT,
-        FOREIGN KEY (character_id) REFERENCES Characters(id)
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE
       );
     `);
 

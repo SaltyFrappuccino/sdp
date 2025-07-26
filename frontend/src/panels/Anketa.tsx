@@ -20,6 +20,8 @@ import { FC, useState, ReactNode } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { Icon24ErrorCircle, Icon24CheckCircleOutline, Icon24Add } from '@vkontakte/icons';
 import { ContractForm } from '../components/ContractForm';
+import { AttributeManager } from '../components/AttributeManager';
+import { ArchetypeSelector } from '../components/ArchetypeSelector';
 import { API_URL } from '../api';
 
 export interface AnketaProps extends NavIdProps {
@@ -35,7 +37,7 @@ const emptyContract = {
   gift: '',
   sync_level: 0,
   unity_stage: 'Ступень I - Активация',
-  abilities: {},
+  abilities: [],
 };
 
 export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
@@ -55,8 +57,8 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     personality: '',
     biography: '',
     // III. БОЕВЫЕ ХАРАКТЕРИСТИКИ
-    archetypes: '',
-    attributes: {},
+    archetypes: [] as string[],
+    attributes: {} as { [key: string]: string },
     // IV. КОНТРАКТ
     contracts: [emptyContract],
     // V. ИНВЕНТАРЬ И РЕСУРСЫ
@@ -67,6 +69,28 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAttributeChange = (name: string, value: string) => {
+    const newAttributes = { ...formData.attributes };
+    if (value === 'none') {
+      delete newAttributes[name];
+    } else {
+      newAttributes[name] = value;
+    }
+    setFormData(prev => ({
+      ...prev,
+      attributes: newAttributes
+    }));
+  };
+
+  const handleArchetypeChange = (archetype: string, isSelected: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      archetypes: isSelected
+        ? [...prev.archetypes, archetype]
+        : prev.archetypes.filter(a => a !== archetype)
+    }));
   };
 
   const handleContractChange = (index: number, field: string, value: any) => {
@@ -200,12 +224,15 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       </Group>
 
       <Group header={<Header>III. БОЕВЫЕ ХАРАКТЕРИСТИКИ</Header>}>
-        <FormItem top="Архетип(ы)">
-          <Input name="archetypes" value={formData.archetypes} onChange={handleChange} placeholder="[Дуэлянт], [Тактик]..." />
-        </FormItem>
-        <FormItem top="Атрибуты">
-          <Textarea name="attributes" value={formData.attributes as string} onChange={handleChange} placeholder="Сила: Дилетант (1) ..." />
-        </FormItem>
+        <ArchetypeSelector
+          selectedArchetypes={formData.archetypes}
+          onArchetypeChange={handleArchetypeChange}
+        />
+        <AttributeManager
+          attributes={formData.attributes}
+          onAttributeChange={handleAttributeChange}
+          totalPoints={7}
+        />
       </Group>
 
       <Group header={<Header>IV. КОНТРАКТ(Ы)</Header>}>

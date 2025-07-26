@@ -38,7 +38,7 @@ export const AdminLogin: FC<NavIdProps> = ({ id }) => {
 
       if (data.success) {
         localStorage.setItem('adminId', data.adminId);
-        routeNavigator.push('admin_panel');
+        routeNavigator.replace('/admin_panel');
       } else {
         throw new Error(data.error || 'Неверный пароль');
       }

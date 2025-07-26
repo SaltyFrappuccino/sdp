@@ -58,11 +58,19 @@ const ADMIN_VK_ID = '1'; // Замените на реальный VK ID адм�
  *         biography:
  *           type: string
  *         archetypes:
- *           type: string
+ *           type: array
+ *           items:
+ *             type: string
  *         attributes:
  *           type: object
- *         inventory:
+ *         attribute_points_total:
+ *           type: integer
+ *         attribute_points_spent:
+ *           type: integer
+ *         aura_cells:
  *           type: object
+ *         inventory:
+ *           type: string
  *         currency:
  *           type: integer
  *
@@ -95,21 +103,49 @@ router.post('/characters', async (req: Request, res: Response) => {
   const { character, contracts } = req.body;
   const db = await initDB();
 
-  // Валидация входных данных (упрощенная)
   if (!character || !character.vk_id || !character.character_name || !Array.isArray(contracts)) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
-    // Вставляем основного персонажа
+    const initialRank = 'F';
+    const auraCells = {
+      "Малые (I)": 2,
+      "Значительные (II)": 0,
+      "Предельные (III)": 0
+    };
+
+    const attributeCosts: { [key: string]: number } = {
+      "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
+    };
+
+    let spentPoints = 0;
+    if (character.attributes) {
+        for (const level of Object.values(character.attributes)) {
+            spentPoints += attributeCosts[level as string] || 0;
+        }
+    }
+
+
     const characterSql = `
-      INSERT INTO Characters (vk_id, status, character_name, nickname, age, rank, faction, home_island, appearance, personality, biography, archetypes, attributes, inventory, currency)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO Characters (
+        vk_id, status, character_name, nickname, age, rank, faction, home_island,
+        appearance, personality, biography, archetypes, attributes,
+        attribute_points_total, attribute_points_spent, aura_cells, inventory, currency
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const characterParams = [
-      character.vk_id, 'на рассмотрении', character.character_name, character.nickname, character.age, character.rank, character.faction, character.home_island,
-      character.appearance, character.personality, character.biography, character.archetypes,
-      JSON.stringify(character.attributes), JSON.stringify(character.inventory), character.currency
+      character.vk_id, 'на рассмотрении', character.character_name, character.nickname, character.age,
+      initialRank, character.faction, character.home_island,
+      character.appearance, character.personality, character.biography,
+      JSON.stringify(character.archetypes || []),
+      JSON.stringify(character.attributes || {}),
+      7, // attribute_points_total
+      spentPoints, // attribute_points_spent
+      JSON.stringify(auraCells),
+      character.inventory,
+      character.currency
     ];
 
     const result = await db.run(characterSql, characterParams);
@@ -160,7 +196,17 @@ router.post('/characters', async (req: Request, res: Response) => {
 router.get('/characters', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
-    const characters = await db.all('SELECT id, character_name, vk_id, status, rank, faction FROM Characters');
+    const { status } = req.query;
+
+    let query = 'SELECT id, character_name, vk_id, status, rank, faction FROM Characters';
+    const params = [];
+
+    if (status === 'approved') {
+      query += ' WHERE status = ?';
+      params.push('approved');
+    }
+    
+    const characters = await db.all(query, params);
     res.json(characters);
   } catch (error) {
     console.error('Error fetching characters:', error);
@@ -193,7 +239,17 @@ router.get('/characters/:id', async (req: Request, res: Response) => {
     if (!character) {
       return res.status(404).json({ error: 'Character not found' });
     }
+
+    // Парсим JSON поля
+    character.archetypes = JSON.parse(character.archetypes || '[]');
+    character.attributes = JSON.parse(character.attributes || '{}');
+    character.aura_cells = JSON.parse(character.aura_cells || '{}');
+    
     const contracts = await db.all('SELECT * FROM Contracts WHERE character_id = ?', id);
+    contracts.forEach(contract => {
+      contract.abilities = JSON.parse(contract.abilities || '[]');
+    });
+
     res.json({ ...character, contracts });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch character' });
@@ -292,17 +348,86 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
  *         description: Персонаж не найден.
  */
 router.delete('/characters/:id', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   try {
     const db = await initDB();
     const { id } = req.params;
+    await db.run('DELETE FROM Contracts WHERE character_id = ?', id);
     const result = await db.run('DELETE FROM Characters WHERE id = ?', id);
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Character not found' });
     }
-    res.json({ message: 'Character deleted successfully' });
+    res.json({ message: 'Character and associated contracts deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete character' });
   }
 });
+
+/**
+ * @swagger
+ * /api/characters/{id}/status:
+ *   post:
+ *     summary: Обновить статус персонажа
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [approved, rejected]
+ *     responses:
+ *       200:
+ *         description: Статус успешно обновлен.
+ *       400:
+ *         description: Неверный статус.
+ *       403:
+ *         description: Запрещено.
+ *       404:
+ *         description: Персонаж не найден.
+ */
+router.post('/characters/:id/status', async (req: Request, res: Response) => {
+    const adminId = req.headers['x-admin-id'];
+    if (adminId !== ADMIN_VK_ID) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['approved', 'rejected', 'на рассмотрении'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status value' });
+    }
+
+    try {
+        const db = await initDB();
+        const result = await db.run('UPDATE Characters SET status = ? WHERE id = ?', [status, id]);
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Character not found' });
+        }
+
+        res.json({ message: `Character status updated to ${status}` });
+    } catch (error) {
+        console.error('Failed to update character status:', error);
+        res.status(500).json({ error: 'Failed to update character status' });
+    }
+});
+
 
 export default router;

@@ -8,7 +8,8 @@ import {
   Header,
   Spinner,
   Div,
-  PanelHeaderBack
+  PanelHeaderBack,
+  Link
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect } from 'react';
@@ -31,7 +32,7 @@ export const AnketaList: FC<NavIdProps> = ({ id }) => {
   useEffect(() => {
     const fetchCharacters = async () => {
       try {
-        const response = await fetch(`${API_URL}/characters`);
+        const response = await fetch(`${API_URL}/characters?status=approved`);
         const data = await response.json();
         setCharacters(data);
       } catch (error) {
@@ -58,9 +59,9 @@ export const AnketaList: FC<NavIdProps> = ({ id }) => {
               <Card key={char.id} onClick={() => routeNavigator.push(`/anketa/${char.id}`)}>
                 <Header>{char.character_name}</Header>
                 <Div>
-                  <p>Статус: {char.status}</p>
-                  <p>Ранг: {char.rank}</p>
-                  <p>Фракция: {char.faction}</p>
+                  <p><b>Ранг:</b> {char.rank}</p>
+                  <p><b>Фракция:</b> {char.faction}</p>
+                  <p><b>Автор:</b> <Link href={`https://vk.com/id${char.vk_id}`} target="_blank">{`ID: ${char.vk_id}`}</Link></p>
                 </Div>
               </Card>
             ))}
