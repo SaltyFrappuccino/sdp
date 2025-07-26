@@ -136,8 +136,27 @@ router.post('/characters', async (req: Request, res: Response) => {
   const { character, contracts } = req.body;
   const db = await initDB();
 
-  if (!character || !character.vk_id || !character.character_name || !Array.isArray(contracts)) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  if (!character || !character.vk_id || !Array.isArray(contracts)) {
+    return res.status(400).json({ error: 'Invalid request structure' });
+  }
+
+  const requiredFields = ['character_name', 'age', 'faction', 'rank', 'faction_position', 'home_island'];
+  const missingFields = requiredFields.filter(field => {
+    const value = character[field];
+    // Проверяем на null, undefined и пустую строку
+    return value === null || value === undefined || String(value).trim() === '';
+  });
+
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      error: 'Отсутствуют или не заполнены обязательные поля',
+      missing: missingFields
+    });
+  }
+
+  // Устанавливаем валюту по умолчанию, если она не указана
+  if (character.currency === undefined || character.currency === null) {
+    character.currency = 0;
   }
 
   try {
@@ -202,8 +221,9 @@ router.post('/characters', async (req: Request, res: Response) => {
     res.status(201).json({ message: 'Character created successfully', characterId });
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Failed to create character:', error);
-    res.status(500).json({ error: 'Failed to create character' });
+    res.status(500).json({ error: 'Не удалось создать персонажа', details: errorMessage });
   }
 });
 
@@ -238,8 +258,9 @@ router.get('/characters', async (req: Request, res: Response) => {
     const characters = await db.all(query, params);
     res.json(characters);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Error fetching characters:', error);
-    res.status(500).json({ error: 'Failed to fetch characters' });
+    res.status(500).json({ error: 'Не удалось получить персонажей', details: errorMessage });
   }
 });
 router.get('/characters/by-vk/:vk_id', async (req: Request, res: Response) => {
@@ -249,8 +270,9 @@ router.get('/characters/by-vk/:vk_id', async (req: Request, res: Response) => {
     const characters = await db.all('SELECT id, character_name, currency FROM Characters WHERE vk_id = ? AND status = ?', [vk_id, 'Принято']);
     res.json(characters);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Error fetching characters by vk_id:', error);
-    res.status(500).json({ error: 'Failed to fetch characters' });
+    res.status(500).json({ error: 'Не удалось получить персонажей по vk_id', details: errorMessage });
   }
 });
 
@@ -266,8 +288,9 @@ router.get('/characters/:id/versions', async (req: Request, res: Response) => {
     
     res.json(versions);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Failed to fetch character versions:', error);
-    res.status(500).json({ error: 'Failed to fetch character history' });
+    res.status(500).json({ error: 'Не удалось получить историю персонажа', details: errorMessage });
   }
 });
 
@@ -310,7 +333,9 @@ router.get('/characters/:id', async (req: Request, res: Response) => {
 
     res.json({ ...character, contracts });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch character' });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to fetch character ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось получить персонажа', details: errorMessage });
   }
 });
 
@@ -418,8 +443,9 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
 
     res.json({ message: 'Character updated successfully' });
   } catch (error) {
-    console.error('Failed to update character:', error);
-    res.status(500).json({ error: 'Failed to update character' });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to update character ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось обновить персонажа', details: errorMessage });
   }
 });
 
@@ -455,7 +481,9 @@ router.delete('/characters/:id', async (req: Request, res: Response) => {
     }
     res.json({ message: 'Character and associated contracts deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete character' });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to delete character ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось удалить персонажа', details: errorMessage });
   }
 });
 
@@ -517,8 +545,9 @@ router.post('/characters/:id/status', async (req: Request, res: Response) => {
 
         res.json({ message: `Character status updated to ${status}` });
     } catch (error) {
-        console.error('Failed to update character status:', error);
-        res.status(500).json({ error: 'Failed to update character status' });
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        console.error(`Failed to update character status for id ${req.params.id}:`, error);
+        res.status(500).json({ error: 'Не удалось обновить статус персонажа', details: errorMessage });
     }
 });
 // Market Items CRUD
@@ -534,7 +563,9 @@ router.post('/market/items', async (req: Request, res: Response) => {
     const result = await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url]);
     res.status(201).json({ id: result.lastID });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create market item' });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Failed to create market item:', error);
+    res.status(500).json({ error: 'Не удалось создать предмет для рынка', details: errorMessage });
   }
 });
 
@@ -547,7 +578,9 @@ router.get('/market/items', async (req: Request, res: Response) => {
     });
     res.json(items);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch market items' });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Failed to fetch market items:', error);
+    res.status(500).json({ error: 'Не удалось получить предметы с рынка', details: errorMessage });
   }
 });
 
@@ -593,8 +626,9 @@ router.post('/market/purchase', async (req: Request, res: Response) => {
 
     res.json({ message: 'Purchase successful' });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Purchase failed:', error);
-    res.status(500).json({ error: 'Purchase failed' });
+    res.status(500).json({ error: 'Не удалось совершить покупку', details: errorMessage });
   }
 });
     const { name, description, price, item_type, item_data, image_url } = req.body;
@@ -602,7 +636,9 @@ router.post('/market/purchase', async (req: Request, res: Response) => {
     await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, id]);
     res.json({ message: 'Market item updated successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update market item' });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to update market item ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось обновить предмет на рынке', details: errorMessage });
   }
 });
 
@@ -617,7 +653,9 @@ router.delete('/market/items/:id', async (req: Request, res: Response) => {
     await db.run('DELETE FROM MarketItems WHERE id = ?', id);
     res.json({ message: 'Market item deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete market item' });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to delete market item ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось удалить предмет с рынка', details: errorMessage });
   }
 });
 

@@ -7,7 +7,6 @@ const attributesList = [
 ];
 
 const attributeLevels = [
-  { label: 'Не выбрано', value: 'none', cost: 0 },
   { label: 'Дилетант (1 очко)', value: 'Дилетант', cost: 1 },
   { label: 'Новичок (2 очка)', value: 'Новичок', cost: 2 },
   { label: 'Опытный (4 очка)', value: 'Опытный', cost: 4 },
@@ -54,7 +53,7 @@ export const AttributeManager: FC<AttributeManagerProps> = ({ attributes, onAttr
         <FormItem top={attr} key={attr}>
           <Select
             placeholder="Выберите уровень"
-            value={attributes[attr] || 'none'}
+            value={attributes[attr] || 'Дилетант'}
             onChange={(e) => onAttributeChange(attr, e.target.value)}
             options={attributeLevels.map(level => ({ label: level.label, value: level.value }))}
           />

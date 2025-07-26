@@ -108,8 +108,18 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const [formErrors, setFormErrors] = useState<Partial<typeof formData>>({});
 
   const validateForm = () => {
-    const errors: Partial<typeof formData> = {};
-    if (!formData.character_name.trim()) errors.character_name = 'Имя и Фамилия обязательны';
+    const errors: { [key: string]: string } = {};
+    const requiredFields: (keyof typeof formData)[] = [
+      'character_name', 'age', 'faction', 'rank', 'faction_position', 'home_island'
+    ];
+
+    requiredFields.forEach(field => {
+      const value = formData[field];
+      if (value === null || value === undefined || String(value).trim() === '') {
+        errors[field] = 'Это поле обязательно для заполнения';
+      }
+    });
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -195,7 +205,9 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24CheckCircleOutline />}>{isEditing ? 'Анкета обновлена!' : `Анкета создана! ID: ${result.characterId}`}</Snackbar>);
         routeNavigator.push(isEditing ? `/admin_panel` : '/');
       } else {
-        throw new Error(result.error || 'Неизвестная ошибка сервера');
+        const errorData = result.error || 'Неизвестная ошибка сервера';
+        const missingFields = result.missing ? ` (${result.missing.join(', ')})` : '';
+        throw new Error(`${errorData}${missingFields}`);
       }
     } catch (error) {
       setPopout(null);
@@ -229,10 +241,10 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         <FormItem top="Прозвище/Позывной">
           <Input name="nickname" value={formData.nickname} onChange={handleChange} />
         </FormItem>
-        <FormItem top="Возраст">
+        <FormItem top="Возраст" status={formErrors.age ? 'error' : 'default'} bottom={formErrors.age}>
           <Input name="age" type="number" value={formData.age} onChange={handleChange} />
         </FormItem>
-        <FormItem top="Фракция">
+        <FormItem top="Фракция" status={formErrors.faction ? 'error' : 'default'} bottom={formErrors.faction}>
           <Select
             name="faction"
             placeholder="Выберите фракцию"
@@ -246,10 +258,10 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
             ]}
           />
         </FormItem>
-        <FormItem top="Позиция во фракции">
+        <FormItem top="Позиция во фракции" status={formErrors.faction_position ? 'error' : 'default'} bottom={formErrors.faction_position}>
           <Input name="faction_position" value={formData.faction_position} onChange={handleChange} />
         </FormItem>
-        <FormItem top="Родной остров">
+        <FormItem top="Родной остров" status={formErrors.home_island ? 'error' : 'default'} bottom={formErrors.home_island}>
           <Select
             name="home_island"
             placeholder="Выберите родной остров"
