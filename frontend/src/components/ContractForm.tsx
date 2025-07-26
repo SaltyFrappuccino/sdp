@@ -1,14 +1,14 @@
 import { FC } from 'react';
 import { FormItem, Input, Textarea, Button, Select, Header, Div } from '@vkontakte/vkui';
 import { Icon24Delete, Icon24Add } from '@vkontakte/icons';
-import { AbilityBuilder, Tag, Rank } from './AbilityBuilder';
+import { AbilityBuilder, Rank, SelectedTags } from './AbilityBuilder';
 
 interface Ability {
   name: string;
   cell_type: 'Нулевая' | 'Малая (I)' | 'Значительная (II)' | 'Предельная (III)';
   cell_cost: number;
   description: string;
-  tags: Tag[];
+  tags: SelectedTags;
 }
 
 interface Contract {
@@ -44,7 +44,7 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
   };
 
   const addAbility = () => {
-    const newAbility: Ability = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: [] };
+    const newAbility: Ability = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: {} };
     onChange(index, 'abilities', [...contract.abilities, newAbility]);
   };
 
@@ -53,12 +53,16 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
     onChange(index, 'abilities', newAbilities);
   };
 
-  const handleTagChange = (abilityIndex: number, tag: Tag, isSelected: boolean) => {
+  const handleTagChange = (abilityIndex: number, tagName: string, rank: Rank | '-') => {
     const newAbilities = [...contract.abilities];
     const ability = newAbilities[abilityIndex];
-    const newTags = isSelected
-      ? [...ability.tags, tag]
-      : ability.tags.filter(t => !(t.name === tag.name && t.rank === tag.rank));
+    const newTags = { ...ability.tags };
+
+    if (rank === '-') {
+      delete newTags[tagName];
+    } else {
+      newTags[tagName] = rank;
+    }
     
     newAbilities[abilityIndex] = { ...ability, tags: newTags };
     onChange(index, 'abilities', newAbilities);
@@ -154,9 +158,10 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
           
           <AbilityBuilder
             cellType={ability.cell_type}
+            cellCost={ability.cell_cost}
             characterRank={characterRank}
             selectedTags={ability.tags}
-            onTagChange={(tag, isSelected) => handleTagChange(abilityIndex, tag, isSelected)}
+            onTagChange={(tagName, rank) => handleTagChange(abilityIndex, tagName, rank)}
           />
 
           <FormItem>
