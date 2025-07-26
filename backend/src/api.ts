@@ -624,11 +624,12 @@ router.post('/market/purchase', async (req: Request, res: Response) => {
     const inventory = JSON.parse(character.inventory || '[]');
     
     // Создаем новый предмет для инвентаря
+    const itemData = JSON.parse(item.item_data || '{}');
     const newItem = {
         name: item.name,
         description: item.description,
         type: item.item_type,
-        data: JSON.parse(item.item_data || '{}')
+        ...itemData
     };
 
     inventory.push(newItem);
