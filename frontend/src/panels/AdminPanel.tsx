@@ -74,7 +74,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     );
   };
   
-  const handleStatusChange = async (characterId: number, status: 'approved' | 'rejected') => {
+  const handleStatusChange = async (characterId: number, status: 'Принято' | 'Отклонено') => {
     const adminId = localStorage.getItem('adminId');
     try {
       const response = await fetch(`${API_URL}/characters/${characterId}/status`, {
@@ -165,18 +165,18 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
                  <ButtonGroup mode="horizontal" gap="m" stretched style={{ padding: '0 16px 16px' }}>
                    {char.status === 'на рассмотрении' && (
                      <>
-                        <Button size="m" appearance="positive" onClick={() => handleStatusChange(char.id, 'approved')}>
+                        <Button size="m" appearance="positive" onClick={() => handleStatusChange(char.id, 'Принято')}>
                           Принять
                         </Button>
-                        <Button size="m" appearance="negative" onClick={() => handleStatusChange(char.id, 'rejected')}>
+                        <Button size="m" appearance="negative" onClick={() => handleStatusChange(char.id, 'Отклонено')}>
                           Отклонить
                         </Button>
                      </>
                    )}
-                  <Button size="m" onClick={() => routeNavigator.push(`/anketa_edit/${char.id}`)}>
-                    Редактировать
+                  <Button size="m" onClick={() => routeNavigator.push(`/anketa_detail/${char.id}`)}>
+                    Открыть
                   </Button>
-                   <Button size="m" appearance="negative" onClick={() => handleDelete(char.id)}>
+                  <Button size="m" appearance="negative" onClick={() => handleDelete(char.id)}>
                     Удалить
                   </Button>
                 </ButtonGroup>

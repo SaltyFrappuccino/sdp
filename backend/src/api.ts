@@ -131,21 +131,22 @@ router.post('/characters', async (req: Request, res: Response) => {
       INSERT INTO Characters (
         vk_id, status, character_name, nickname, age, rank, faction, home_island,
         appearance, personality, biography, archetypes, attributes,
-        attribute_points_total, attribute_points_spent, aura_cells, inventory, currency
+        attribute_points_total, attribute_points_spent, aura_cells, inventory, currency, admin_note
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const characterParams = [
       character.vk_id, 'на рассмотрении', character.character_name, character.nickname, character.age,
-      initialRank, character.faction, character.home_island,
+      character.rank, character.faction, character.home_island,
       character.appearance, character.personality, character.biography,
       JSON.stringify(character.archetypes || []),
       JSON.stringify(character.attributes || {}),
-      7, // attribute_points_total
+      20, // attribute_points_total
       spentPoints, // attribute_points_spent
       JSON.stringify(auraCells),
       character.inventory,
-      character.currency
+      character.currency,
+      character.admin_note
     ];
 
     const result = await db.run(characterSql, characterParams);
@@ -201,9 +202,9 @@ router.get('/characters', async (req: Request, res: Response) => {
     let query = 'SELECT id, character_name, vk_id, status, rank, faction FROM Characters';
     const params = [];
 
-    if (status === 'approved') {
+    if (status === 'Принято') {
       query += ' WHERE status = ?';
-      params.push('approved');
+      params.push('Принято');
     }
     
     const characters = await db.all(query, params);
@@ -410,8 +411,8 @@ router.post('/characters/:id/status', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!status || !['approved', 'rejected', 'на рассмотрении'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status value' });
+    if (!status || !['Принято', 'Отклонено', 'на рассмотрении'].includes(status)) {
+        return res.status(400).json({ error: 'Неверное значение статуса' });
     }
 
     try {

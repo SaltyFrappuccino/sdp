@@ -95,17 +95,7 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
         />
       </FormItem>
       <FormItem top="Ступень Единения">
-        <Select
-          name="unity_stage"
-          value={contract.unity_stage}
-          onChange={handleChange}
-          options={[
-            { label: 'Ступень I - Активация', value: 'Ступень I - Активация' },
-            { label: 'Ступень II - Воплощение', value: 'Ступень II - Воплощение' },
-            { label: 'Ступень III - Манифестация', value: 'Ступень III - Манифестация' },
-            { label: 'Ступень IV - Доминион', value: 'Ступень IV - Доминион' },
-          ]}
-        />
+        <Input name="unity_stage" value={contract.unity_stage} readOnly />
       </FormItem>
 
       <Header>Способности Контракта</Header>

@@ -32,7 +32,7 @@ export const AnketaList: FC<NavIdProps> = ({ id }) => {
   useEffect(() => {
     const fetchCharacters = async () => {
       try {
-        const response = await fetch(`${API_URL}/characters?status=approved`);
+        const response = await fetch(`${API_URL}/characters?status=Принято`);
         const data = await response.json();
         setCharacters(data);
       } catch (error) {
@@ -56,7 +56,7 @@ export const AnketaList: FC<NavIdProps> = ({ id }) => {
         <Group>
           <CardGrid size="l">
             {characters.map((char) => (
-              <Card key={char.id} onClick={() => routeNavigator.push(`/anketa/${char.id}`)}>
+              <Card key={char.id} onClick={() => routeNavigator.push(`/anketa_detail/${char.id}`)}>
                 <Header>{char.character_name}</Header>
                 <Div>
                   <p><b>Ранг:</b> {char.rank}</p>

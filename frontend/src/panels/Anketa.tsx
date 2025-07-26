@@ -40,31 +40,45 @@ const emptyContract = {
   abilities: [],
 };
 
+const getUnityStage = (syncLevel: number): string => {
+  if (syncLevel >= 100) return 'Ступень IV - Доминион';
+  if (syncLevel >= 75) return 'Ступень III - Манифестация';
+  if (syncLevel >= 25) return 'Ступень II - Воплощение';
+  return 'Ступень I - Активация';
+};
+
 export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
 
   const [formData, setFormData] = useState({
-    // I. ОБЩАЯ ИНФОРМАЦИЯ
     character_name: '',
     nickname: '',
     age: '',
+    rank: 'F',
     faction: '',
     home_island: '',
-    // II. ЛИЧНОСТЬ И ВНЕШНОСТЬ
     appearance: '',
     personality: '',
     biography: '',
-    // III. БОЕВЫЕ ХАРАКТЕРИСТИКИ
     archetypes: [] as string[],
     attributes: {} as { [key: string]: string },
-    // IV. КОНТРАКТ
     contracts: [emptyContract],
-    // V. ИНВЕНТАРЬ И РЕСУРСЫ
     inventory: '',
     currency: 0,
+    admin_note: '',
   });
+
+  const [formErrors, setFormErrors] = useState<Partial<typeof formData>>({});
+
+  const validateForm = () => {
+    const errors: Partial<typeof formData> = {};
+    if (!formData.character_name.trim()) errors.character_name = 'Имя и Фамилия обязательны';
+    // Добавьте другие правила валидации
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -95,7 +109,13 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
   const handleContractChange = (index: number, field: string, value: any) => {
     const newContracts = [...formData.contracts];
-    newContracts[index] = { ...newContracts[index], [field]: value };
+    const contract = { ...newContracts[index], [field]: value };
+
+    if (field === 'sync_level') {
+      contract.unity_stage = getUnityStage(value);
+    }
+    
+    newContracts[index] = contract;
     setFormData(prev => ({ ...prev, contracts: newContracts }));
   };
 
@@ -110,6 +130,14 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   };
 
   const handleSubmit = async () => {
+    if (!validateForm()) {
+      setSnackbar(<Snackbar
+        onClose={() => setSnackbar(null)}
+        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+      >Пожалуйста, заполните все обязательные поля.</Snackbar>);
+      return;
+    }
+
     if (!fetchedUser) {
       setSnackbar(<Snackbar
         onClose={() => setSnackbar(null)}
@@ -170,8 +198,26 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       </PanelHeader>
       
       <Group header={<Header>I. ОБЩАЯ ИНФОРМАЦИЯ</Header>}>
-        <FormItem top="Имя и Фамилия">
+        <FormItem top="Имя и Фамилия" status={formErrors.character_name ? 'error' : 'default'} bottom={formErrors.character_name}>
           <Input name="character_name" value={formData.character_name} onChange={handleChange} />
+        </FormItem>
+        <FormItem top="Ранг Проводника">
+          <Select
+            name="rank"
+            value={formData.rank}
+            onChange={handleChange}
+            options={[
+              { label: 'F', value: 'F' },
+              { label: 'E', value: 'E' },
+              { label: 'D', value: 'D' },
+              { label: 'C', value: 'C' },
+              { label: 'B', value: 'B' },
+              { label: 'A', value: 'A' },
+              { label: 'S', value: 'S' },
+              { label: 'SS', value: 'SS' },
+              { label: 'SSS', value: 'SSS' },
+            ]}
+          />
         </FormItem>
         <FormItem top="Прозвище/Позывной">
           <Input name="nickname" value={formData.nickname} onChange={handleChange} />
@@ -231,7 +277,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         <AttributeManager
           attributes={formData.attributes}
           onAttributeChange={handleAttributeChange}
-          totalPoints={7}
+          totalPoints={20}
         />
       </Group>
 
@@ -260,6 +306,12 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         </FormItem>
          <FormItem top="Валюта (Кредиты ₭)">
           <Input name="currency" type="number" value={formData.currency} onChange={handleChange} />
+        </FormItem>
+      </Group>
+
+      <Group header={<Header>VI. ПРИМЕЧАНИЕ ДЛЯ АДМИНИСТРАЦИИ</Header>}>
+        <FormItem>
+          <Textarea name="admin_note" value={formData.admin_note} onChange={handleChange} />
         </FormItem>
       </Group>
 

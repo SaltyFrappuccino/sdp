@@ -24,11 +24,12 @@ export async function initDB() {
         biography TEXT,
         archetypes TEXT,
         attributes TEXT,
-        attribute_points_total INTEGER DEFAULT 7,
+        attribute_points_total INTEGER DEFAULT 20,
         attribute_points_spent INTEGER DEFAULT 0,
         aura_cells TEXT,
         inventory TEXT,
         currency INTEGER,
+        admin_note TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
