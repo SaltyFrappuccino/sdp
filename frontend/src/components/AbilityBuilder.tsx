@@ -14,7 +14,7 @@ const tagCosts: Record<Rank, number> = {
 const cellSpecs: Record<CellType, { budget: number; maxTagRank: Rank }> = {
   'Нулевая': { budget: 2, maxTagRank: 'F' },
   'Малая (I)': { budget: 10, maxTagRank: 'C' },
-  'Значительная (II)': { budget: 15, maxTagRank: 'S' }, // Обновлено до S
+  'Значительная (II)': { budget: 15, maxTagRank: 'A' }, 
   'Предельная (III)': { budget: 30, maxTagRank: 'SSS' },
 };
 
@@ -48,8 +48,9 @@ export const AbilityBuilder: FC<AbilityBuilderProps> = ({
   // 3. Определяем максимально допустимый ранг
   const maxAllowedRankIndex = useMemo(() => {
     const maxCellRankIndex = rankOrder.indexOf(spec.maxTagRank);
-    const characterRankIndex = rankOrder.indexOf(characterRank);
-    return Math.min(maxCellRankIndex, characterRankIndex);
+    //const characterRankIndex = rankOrder.indexOf(characterRank);
+    //return Math.min(maxCellRankIndex, characterRankIndex);
+    return maxCellRankIndex
   }, [spec.maxTagRank, characterRank]);
 
   // Генерируем опции для Select на основе макс. ранга

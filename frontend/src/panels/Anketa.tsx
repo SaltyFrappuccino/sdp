@@ -190,7 +190,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
           onClose={() => setSnackbar(null)}
           before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
         >Анкета успешно создана! ID: {result.characterId}</Snackbar>);
-        routeNavigator.back();
+        routeNavigator.push('/');
       } else {
         throw new Error(result.error || 'Неизвестная ошибка сервера');
       }
@@ -206,7 +206,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
         Создание анкеты
       </PanelHeader>
       
