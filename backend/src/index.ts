@@ -13,7 +13,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = 3000;
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://sdp-ten-sand.vercel.app'
+}));
 app.use(express.json());
 
 // Обслуживание API
