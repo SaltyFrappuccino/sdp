@@ -1,74 +1,112 @@
-import { FC, useMemo } from 'react';
-import { Header, Group, RichCell, Text } from '@vkontakte/vkui';
+import { FC } from 'react';
+import { Div, Title } from '@vkontakte/vkui';
+
+interface AuraCellData {
+  rank: string;
+  small: number;
+  significant: number;
+  ultimate: number;
+}
 
 interface Contract {
-  sync_level: number;
+    sync_level?: number;
+    // другие поля контракта...
 }
 
-interface AuraCellsCalculatorProps {
-  rank: string;
+interface Props {
   contracts: Contract[];
+  currentRank: string;
 }
 
-const rankCellMap: { [key: string]: { small: number; medium: number; large: number } } = {
-  'F': { small: 2, medium: 0, large: 0 },
-  'E': { small: 4, medium: 0, large: 0 },
-  'D': { small: 6, medium: 1, large: 0 },
-  'C': { small: 10, medium: 2, large: 0 },
-  'B': { small: 15, medium: 3, large: 1 },
-  'A': { small: 20, medium: 4, large: 2 },
-  'S': { small: 30, medium: 6, large: 3 },
-  'SS': { small: 40, medium: 8, large: 4 },
-  'SSS': { small: 50, medium: 10, large: 5 },
+const tableStyle: React.CSSProperties = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  margin: '16px 0',
+  backgroundColor: 'var(--background_content)'
 };
 
-export const AuraCellsCalculator: FC<AuraCellsCalculatorProps> = ({ rank, contracts }) => {
-  const totalCells = useMemo(() => {
-    const baseCells = rankCellMap[rank] || { small: 0, medium: 0, large: 0 };
+const headerStyle: React.CSSProperties = {
+  backgroundColor: 'var(--background_secondary)',
+  padding: '12px',
+  textAlign: 'left',
+  borderBottom: '2px solid var(--field_border)'
+};
 
-    const bonusCells = contracts.reduce(
-      (acc, contract) => {
-        const sync = contract.sync_level || 0;
-        acc.small += Math.floor(sync / 10);
-        acc.medium += Math.floor(sync / 25);
-        acc.large += sync >= 100 ? 1 : 0;
-        return acc;
-      },
-      { small: 0, medium: 0, large: 0 }
-    );
+const cellStyle: React.CSSProperties = {
+  padding: '12px',
+  borderBottom: '1px solid var(--field_border)'
+};
 
-    return {
-      small: baseCells.small + bonusCells.small,
-      medium: baseCells.medium + bonusCells.medium,
-      large: baseCells.large + bonusCells.large,
-    };
-  }, [rank, contracts]);
+const highlightedRowStyle: React.CSSProperties = {
+  backgroundColor: 'var(--background_secondary)'
+};
+
+const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank }) => {
+  const auraCellsData: AuraCellData[] = [
+    { rank: 'F', small: 2, significant: 0, ultimate: 0 },
+    { rank: 'E', small: 4, significant: 0, ultimate: 0 },
+    { rank: 'D', small: 6, significant: 1, ultimate: 0 },
+    { rank: 'C', small: 10, significant: 2, ultimate: 0 },
+    { rank: 'B', small: 15, significant: 3, ultimate: 1 },
+    { rank: 'A', small: 20, significant: 4, ultimate: 2 },
+    { rank: 'S', small: 30, significant: 6, ultimate: 3 },
+    { rank: 'SS', small: 40, significant: 8, ultimate: 4 },
+    { rank: 'SSS', small: 50, significant: 10, ultimate: 5 },
+  ];
+
+  const totalSynchronization = contracts.reduce((acc, contract) => acc + (contract.sync_level || 0), 0);
+
+  const bonusSmallCells = Math.floor(totalSynchronization / 10);
+  const bonusSignificantCells = Math.floor(totalSynchronization / 25);
+  const bonusUltimateCells = Math.floor(totalSynchronization / 100);
+
+  const getCalculatedCells = (rankData: AuraCellData) => {
+      return {
+          small: rankData.small + bonusSmallCells,
+          significant: rankData.significant + bonusSignificantCells,
+          ultimate: rankData.ultimate + bonusUltimateCells
+      }
+  }
 
   return (
-    <Group header={<Header>Ячейки Ауры</Header>}>
-      <RichCell
-        subtitle="Мелкие, атмосферные эффекты без реальной мощи. Безграничны."
-      >
-        Нулевые Ячейки
-      </RichCell>
-      <RichCell
-        subtitle="Основные тактические способности."
-        after={<Text>{totalCells.small}</Text>}
-      >
-        Малые Ячейки (I)
-      </RichCell>
-      <RichCell
-        subtitle="Мощные способности, меняющие ход боя."
-        after={<Text>{totalCells.medium}</Text>}
-      >
-        Значительные Ячейки (II)
-      </RichCell>
-      <RichCell
-        subtitle="Ультимативные техники, козырь в рукаве."
-        after={<Text>{totalCells.large}</Text>}
-      >
-        Предельные Ячейки (III)
-      </RichCell>
-    </Group>
+    <Div>
+      <Title level="2" style={{ marginBottom: 16 }}>Ячейки Ауры</Title>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={headerStyle}>Ранг</th>
+              <th style={headerStyle}>Малые (I)</th>
+              <th style={headerStyle}>Значительные (II)</th>
+              <th style={headerStyle}>Предельные (III)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {auraCellsData.map((row) => {
+              const calculated = getCalculatedCells(row);
+              return (
+                <tr 
+                  key={row.rank} 
+                  style={row.rank === currentRank ? highlightedRowStyle : undefined}
+                >
+                  <td style={cellStyle}>{row.rank}</td>
+                  <td style={cellStyle}>
+                    {row.rank === currentRank ? `${calculated.small} (${row.small} + ${bonusSmallCells})` : row.small}
+                  </td>
+                  <td style={cellStyle}>
+                    {row.rank === currentRank ? `${calculated.significant} (${row.significant} + ${bonusSignificantCells})` : row.significant}
+                  </td>
+                  <td style={cellStyle}>
+                    {row.rank === currentRank ? `${calculated.ultimate} (${row.ultimate} + ${bonusUltimateCells})` : row.ultimate}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Div>
   );
 };
+
+export default AuraCellsCalculator;

@@ -23,7 +23,7 @@ import { ContractForm } from '../components/ContractForm';
 import { AttributeManager } from '../components/AttributeManager';
 import { ArchetypeSelector } from '../components/ArchetypeSelector';
 import { InventoryManager } from '../components/InventoryManager';
-import { AuraCellsCalculator } from '../components/AuraCellsCalculator';
+import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 
@@ -293,8 +293,8 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
           totalPoints={20}
         />
         <AuraCellsCalculator
-          rank={formData.rank}
           contracts={formData.contracts}
+          currentRank={formData.rank}
         />
       </Group>
 

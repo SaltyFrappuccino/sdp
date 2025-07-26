@@ -346,33 +346,68 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
     const { id } = req.params;
-    const fields = req.body;
+    const { contracts, ...characterFields } = req.body;
+
+    // Пересчет очков атрибутов
+    const attributeCosts: { [key: string]: number } = {
+      "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
+    };
+    let spentPoints = 0;
+    if (characterFields.attributes) {
+        for (const level of Object.values(characterFields.attributes)) {
+            spentPoints += attributeCosts[level as string] || 0;
+        }
+    }
+    characterFields.attribute_points_spent = spentPoints;
+
+    // Пересчет ячеек ауры
+    if (contracts) {
+        characterFields.aura_cells = calculateAuraCells(characterFields.rank, contracts);
+    }
 
     // Удаляем поля, которые не должны обновляться напрямую
-    delete fields.id;
-    delete fields.vk_id;
-    delete fields.created_at;
-    delete fields.updated_at;
+    delete characterFields.id;
+    delete characterFields.vk_id;
+    delete characterFields.created_at;
+    delete characterFields.updated_at;
 
-    const keys = Object.keys(fields);
+    const keys = Object.keys(characterFields);
     if (keys.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
     const setClause = keys.map(key => `${key} = ?`).join(', ');
     const values = keys.map(key => {
-      const value = fields[key];
+      const value = characterFields[key];
       return typeof value === 'object' ? JSON.stringify(value) : value;
     });
 
-    const sql = `UPDATE Characters SET ${setClause} WHERE id = ?`;
+    const sql = `UPDATE Characters SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
     const result = await db.run(sql, [...values, id]);
 
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Character not found' });
     }
+
+    // Обновление контрактов
+    if (Array.isArray(contracts)) {
+        await db.run('DELETE FROM Contracts WHERE character_id = ?', id);
+        const contractSql = `
+            INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, gift, sync_level, unity_stage, abilities)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        for (const contract of contracts) {
+            const contractParams = [
+              id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
+              contract.creature_description, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
+            ];
+            await db.run(contractSql, contractParams);
+        }
+    }
+
     res.json({ message: 'Character updated successfully' });
   } catch (error) {
+    console.error('Failed to update character:', error);
     res.status(500).json({ error: 'Failed to update character' });
   }
 });

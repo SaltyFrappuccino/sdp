@@ -176,6 +176,9 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
                   <Button size="m" onClick={() => routeNavigator.push(`/anketa_detail/${char.id}`)}>
                     Открыть
                   </Button>
+                  <Button size="m" appearance="neutral" onClick={() => routeNavigator.push(`/admin_anketa_edit/${char.id}`)}>
+                    Редактировать
+                  </Button>
                   <Button size="m" appearance="negative" onClick={() => handleDelete(char.id)}>
                     Удалить
                   </Button>

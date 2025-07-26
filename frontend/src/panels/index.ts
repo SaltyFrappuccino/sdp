@@ -5,3 +5,4 @@ export { AnketaList } from './AnketaList';
 export { AnketaDetail } from './AnketaDetail';
 export { AdminLogin } from './AdminLogin';
 export { AdminPanel } from './AdminPanel';
+export { AnketaEditor } from './AnketaEditor';

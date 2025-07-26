@@ -18,6 +18,7 @@ export const DEFAULT_VIEW_PANELS = {
   ANKETA_DETAIL: 'anketa_detail',
   ADMIN_LOGIN: 'admin_login',
   ADMIN_PANEL: 'admin_panel',
+  ADMIN_ANKETA_EDIT: 'admin_anketa_edit',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -30,6 +31,7 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.ANKETA_DETAIL, `/${DEFAULT_VIEW_PANELS.ANKETA_DETAIL}/:id`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_LOGIN, `/${DEFAULT_VIEW_PANELS.ADMIN_LOGIN}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_PANEL, `/${DEFAULT_VIEW_PANELS.ADMIN_PANEL}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_ANKETA_EDIT, `/${DEFAULT_VIEW_PANELS.ADMIN_ANKETA_EDIT}/:id`, []),
     ]),
   ]),
 ]);
