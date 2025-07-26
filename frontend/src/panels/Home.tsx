@@ -25,14 +25,14 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
     <Panel id={id}>
       <PanelHeader>Главная</PanelHeader>
       {fetchedUser && (
-        <Group header={<Header size="s">User Data Fetched with VK Bridge</Header>}>
+        <Group header={<Header size="s">Информация о  профиле ВК:</Header>}>
           <Cell before={photo_200 && <Avatar src={photo_200} />} subtitle={city?.title}>
             {`${first_name} ${last_name}`}
           </Cell>
         </Group>
       )}
 
-      <Group header={<Header size="s">Анкетница</Header>}>
+      <Group header={<Header size="s">Salty's Dream Project</Header>}>
         <Div>
           <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('anketa')}>
             Создать анкету
@@ -41,6 +41,16 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
         <Div>
           <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('anketa_list')}>
             Реестр анкет
+          </Button>
+        </Div>
+        <Div>
+          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('calculator')}>
+            Калькулятор
+          </Button>
+        </Div>
+        <Div>
+          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('market')}>
+            Рынок
           </Button>
         </Div>
         <Div>

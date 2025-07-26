@@ -3,7 +3,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { View, SplitLayout, SplitCol, ScreenSpinner } from '@vkontakte/vkui';
 import { useActiveVkuiLocation } from '@vkontakte/vk-mini-apps-router';
 
-import { Persik, Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, AnketaEditor } from './panels';
+import { Persik, Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, AnketaEditor, Calculator, MarketPanel } from './panels';
 import { DEFAULT_VIEW_PANELS } from './routes';
 
 export const App = () => {
@@ -39,6 +39,8 @@ export const App = () => {
           <AdminLogin id="admin_login" />
           <AdminPanel id="admin_panel" />
           <AnketaEditor id="admin_anketa_edit" />
+          <Calculator id="calculator" />
+          <MarketPanel id="market" fetchedUser={fetchedUser} />
         </View>
       </SplitCol>
       {popout}

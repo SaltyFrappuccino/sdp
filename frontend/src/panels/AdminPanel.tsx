@@ -13,12 +13,20 @@ import {
   ButtonGroup,
   Link,
   Snackbar,
-  Alert
+  Alert,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader,
+  FormLayoutGroup,
+  Input,
+  Textarea,
+  FormItem,
+  Select
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect, ReactNode } from 'react';
 import { API_URL } from '../api';
-import { Icon24CheckCircleOutline, Icon24ErrorCircle } from '@vkontakte/icons';
+import { Icon24CheckCircleOutline, Icon24ErrorCircle, Icon24Add } from '@vkontakte/icons';
 
 interface Character {
   id: number;
@@ -29,23 +37,54 @@ interface Character {
   faction: string;
 }
 
+interface MarketItem {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  item_type: 'Обычный' | 'Синки';
+  item_data: {
+    sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+    rank?: 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
+  };
+  image_url: string;
+}
+
+const MODAL_PAGE_MARKET_ITEM = 'market_item';
+
 export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
+  const [loading, setLoading] = useState({ characters: true, items: true });
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
   const [popout, setPopout] = useState<ReactNode | null>(null);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<Partial<MarketItem> | null>(null);
 
   const fetchCharacters = async () => {
     try {
-      setLoading(true);
       const response = await fetch(`${API_URL}/characters`);
       const data = await response.json();
       setCharacters(data);
     } catch (error) {
       console.error('Failed to fetch characters:', error);
+      showResultSnackbar('Не удалось загрузить анкеты', false);
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, characters: false }));
+    }
+  };
+
+  const fetchMarketItems = async () => {
+    try {
+      const response = await fetch(`${API_URL}/market/items`);
+      const data = await response.json();
+      setMarketItems(data);
+    } catch (error) {
+      console.error('Failed to fetch market items:', error);
+      showResultSnackbar('Не удалось загрузить товары', false);
+    } finally {
+      setLoading(prev => ({ ...prev, items: false }));
     }
   };
 
@@ -56,6 +95,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
       return;
     }
     fetchCharacters();
+    fetchMarketItems();
   }, [routeNavigator]);
 
   const handleLogout = () => {
@@ -79,15 +119,12 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     try {
       const response = await fetch(`${API_URL}/characters/${characterId}/status`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-id': adminId || ''
-        },
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': adminId || '' },
         body: JSON.stringify({ status }),
       });
       if (response.ok) {
         showResultSnackbar(`Статус анкеты #${characterId} обновлен на "${status}"`, true);
-        fetchCharacters(); // Refresh the list
+        fetchCharacters();
       } else {
         const result = await response.json();
         throw new Error(result.error || 'Не удалось обновить статус');
@@ -98,38 +135,28 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     }
   };
 
-  const handleDelete = async (characterId: number) => {
+  const handleDeleteCharacter = async (characterId: number) => {
      setPopout(
       <Alert
-        actions={[
-          {
-            title: 'Отмена',
-            mode: 'cancel',
-          },
-          {
-            title: 'Удалить',
-            mode: 'destructive',
-            action: async () => {
-              const adminId = localStorage.getItem('adminId');
-               try {
-                  const response = await fetch(`${API_URL}/characters/${characterId}`, {
-                    method: 'DELETE',
-                    headers: { 'x-admin-id': adminId || '' }
-                  });
-                  if (response.ok) {
-                    showResultSnackbar(`Анкета #${characterId} удалена`, true);
-                    fetchCharacters();
-                  } else {
-                    const result = await response.json();
-                    throw new Error(result.error || 'Не удалось удалить анкету');
-                  }
-                } catch (error) {
-                  const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
-                  showResultSnackbar(message, false);
-                }
-            },
-          },
-        ]}
+        actions={[{ title: 'Отмена', mode: 'cancel' }, { title: 'Удалить', mode: 'destructive', action: async () => {
+          const adminId = localStorage.getItem('adminId');
+           try {
+              const response = await fetch(`${API_URL}/characters/${characterId}`, {
+                method: 'DELETE',
+                headers: { 'x-admin-id': adminId || '' }
+              });
+              if (response.ok) {
+                showResultSnackbar(`Анкета #${characterId} удалена`, true);
+                fetchCharacters();
+              } else {
+                const result = await response.json();
+                throw new Error(result.error || 'Не удалось удалить анкету');
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+              showResultSnackbar(message, false);
+            }
+        }}]}
         actionsLayout="vertical"
         onClose={() => setPopout(null)}
       >
@@ -138,7 +165,133 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
       </Alert>
     );
   };
-  
+
+  const openMarketItemModal = (item: Partial<MarketItem> | null) => {
+    setEditingItem(item ? { ...item, item_data: item.item_data || {} } : { item_type: 'Обычный', item_data: {} });
+    setActiveModal(MODAL_PAGE_MARKET_ITEM);
+  };
+
+  const handleSaveMarketItem = async () => {
+    const adminId = localStorage.getItem('adminId');
+    const url = editingItem?.id ? `${API_URL}/market/items/${editingItem.id}` : `${API_URL}/market/items`;
+    const method = editingItem?.id ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': adminId || '' },
+        body: JSON.stringify(editingItem),
+      });
+      if (response.ok) {
+        showResultSnackbar('Товар сохранен', true);
+        setActiveModal(null);
+        fetchMarketItems();
+      } else {
+        const result = await response.json();
+        throw new Error(result.error || 'Не удалось сохранить товар');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      showResultSnackbar(message, false);
+    }
+  };
+
+  const handleDeleteMarketItem = async (itemId: number) => {
+    setPopout(
+      <Alert
+        actions={[{ title: 'Отмена', mode: 'cancel' }, { title: 'Удалить', mode: 'destructive', action: async () => {
+          const adminId = localStorage.getItem('adminId');
+          try {
+            const response = await fetch(`${API_URL}/market/items/${itemId}`, {
+              method: 'DELETE',
+              headers: { 'x-admin-id': adminId || '' },
+            });
+            if (response.ok) {
+              showResultSnackbar(`Товар #${itemId} удален`, true);
+              fetchMarketItems();
+            } else {
+              const result = await response.json();
+              throw new Error(result.error || 'Не удалось удалить товар');
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+            showResultSnackbar(message, false);
+          }
+        }}]}
+        actionsLayout="vertical"
+        onClose={() => setPopout(null)}
+      >
+        <p>Подтверждение удаления</p>
+        <p>{`Вы уверены, что хотите удалить товар ID ${itemId}?`}</p>
+      </Alert>
+    );
+  };
+
+  const modal = (
+    <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
+      <ModalPage
+        id={MODAL_PAGE_MARKET_ITEM}
+        header={<ModalPageHeader>{editingItem?.id ? 'Редактировать товар' : 'Добавить товар'}</ModalPageHeader>}
+        onClose={() => setActiveModal(null)}
+      >
+        <FormLayoutGroup onSubmit={(e: React.FormEvent) => { e.preventDefault(); handleSaveMarketItem(); }}>
+          <FormItem top="Название">
+            <Input value={editingItem?.name || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, name: e.target.value }))} />
+          </FormItem>
+          <FormItem top="Описание">
+            <Textarea value={editingItem?.description || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, description: e.target.value }))} />
+          </FormItem>
+          <FormItem top="Цена">
+            <Input type="number" value={editingItem?.price || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, price: Number(e.target.value) }))} />
+          </FormItem>
+          <FormItem top="URL изображения">
+            <Input value={editingItem?.image_url || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, image_url: e.target.value }))} />
+          </FormItem>
+          <FormItem top="Тип предмета">
+            <Select
+              value={editingItem?.item_type}
+              onChange={(e) => setEditingItem(prev => ({ ...prev, item_type: e.target.value as any }))}
+              options={[
+                { label: 'Обычный', value: 'Обычный' },
+                { label: 'Синки', value: 'Синки' },
+              ]}
+            />
+          </FormItem>
+          {editingItem?.item_type === 'Синки' && (
+            <>
+              <FormItem top="Тип Синки">
+                <Select
+                  value={editingItem.item_data?.sinki_type}
+                  onChange={(e) => setEditingItem(prev => ({ ...prev, item_data: { ...prev?.item_data, sinki_type: e.target.value as any } }))}
+                  options={[
+                    { label: 'Осколок', value: 'Осколок' },
+                    { label: 'Фокус', value: 'Фокус' },
+                    { label: 'Эхо', value: 'Эхо' },
+                  ]}
+                />
+              </FormItem>
+              <FormItem top="Ранг Синки">
+                <Select
+                  placeholder="Не выбрано"
+                  value={editingItem.item_data?.rank}
+                  onChange={(e) => setEditingItem(prev => ({ ...prev, item_data: { ...prev?.item_data, rank: e.target.value as any } }))}
+                  options={[
+                    { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
+                    { label: 'C', value: 'C' }, { label: 'B', value: 'B' }, { label: 'A', value: 'A' },
+                    { label: 'S', value: 'S' }, { label: 'SS', value: 'SS' }, { label: 'SSS', value: 'SSS' },
+                  ]}
+                />
+              </FormItem>
+            </>
+          )}
+          <FormItem>
+            <Button size="l" stretched onClick={handleSaveMarketItem}>Сохранить</Button>
+          </FormItem>
+        </FormLayoutGroup>
+      </ModalPage>
+    </ModalRoot>
+  );
+
   return (
     <Panel id={id}>
       <PanelHeader
@@ -147,11 +300,10 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
       >
         Админ-панель
       </PanelHeader>
-      {loading ? (
-        <Spinner size="l" style={{ margin: '20px 0' }} />
-      ) : (
-        <Group>
-          <Header>Реестр анкет</Header>
+      
+      <Group>
+        <Header>Реестр анкет</Header>
+        {loading.characters ? <Spinner /> : (
           <CardGrid size="l">
             {characters.map((char) => (
               <Card key={char.id}>
@@ -179,17 +331,43 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
                   <Button size="m" appearance="neutral" onClick={() => routeNavigator.push(`/admin_anketa_edit/${char.id}`)}>
                     Редактировать
                   </Button>
-                  <Button size="m" appearance="negative" onClick={() => handleDelete(char.id)}>
+                  <Button size="m" appearance="negative" onClick={() => handleDeleteCharacter(char.id)}>
                     Удалить
                   </Button>
                 </ButtonGroup>
               </Card>
             ))}
           </CardGrid>
-        </Group>
-      )}
+        )}
+      </Group>
+
+      <Group>
+        <Div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Header>Товары на рынке</Header>
+          <Button before={<Icon24Add />} onClick={() => openMarketItemModal(null)}>Добавить товар</Button>
+        </Div>
+        {loading.items ? <Spinner /> : (
+          <CardGrid size="l">
+            {marketItems.map((item) => (
+              <Card key={item.id}>
+                <Header>{item.name}</Header>
+                <Div>
+                  <p>{item.description}</p>
+                  <p><b>Цена: {item.price}</b></p>
+                </Div>
+                <ButtonGroup mode="horizontal" gap="m" stretched style={{ padding: '0 16px 16px' }}>
+                  <Button size="m" onClick={() => openMarketItemModal(item)}>Редактировать</Button>
+                  <Button size="m" appearance="negative" onClick={() => handleDeleteMarketItem(item.id)}>Удалить</Button>
+                </ButtonGroup>
+              </Card>
+            ))}
+          </CardGrid>
+        )}
+      </Group>
+      
       {snackbar}
       {popout}
+      {modal}
     </Panel>
   );
 };

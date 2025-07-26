@@ -242,6 +242,17 @@ router.get('/characters', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch characters' });
   }
 });
+router.get('/characters/by-vk/:vk_id', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { vk_id } = req.params;
+    const characters = await db.all('SELECT id, character_name, currency FROM Characters WHERE vk_id = ? AND status = ?', [vk_id, 'Принято']);
+    res.json(characters);
+  } catch (error) {
+    console.error('Error fetching characters by vk_id:', error);
+    res.status(500).json({ error: 'Failed to fetch characters' });
+  }
+});
 
 router.get('/characters/:id/versions', async (req: Request, res: Response) => {
   try {
@@ -509,6 +520,105 @@ router.post('/characters/:id/status', async (req: Request, res: Response) => {
         console.error('Failed to update character status:', error);
         res.status(500).json({ error: 'Failed to update character status' });
     }
+});
+// Market Items CRUD
+router.post('/market/items', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const db = await initDB();
+    const { name, description, price, item_type, item_data, image_url } = req.body;
+    const sql = `INSERT INTO MarketItems (name, description, price, item_type, item_data, image_url) VALUES (?, ?, ?, ?, ?, ?)`;
+    const result = await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url]);
+    res.status(201).json({ id: result.lastID });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create market item' });
+  }
+});
+
+router.get('/market/items', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const items = await db.all('SELECT * FROM MarketItems');
+    items.forEach(item => {
+      item.item_data = JSON.parse(item.item_data || '{}');
+    });
+    res.json(items);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch market items' });
+  }
+});
+
+router.put('/market/items/:id', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+router.post('/market/purchase', async (req: Request, res: Response) => {
+  try {
+    const { character_id, item_id } = req.body;
+    const db = await initDB();
+
+    // Получаем информацию о товаре и персонаже в одном запросе
+    const item = await db.get('SELECT * FROM MarketItems WHERE id = ?', item_id);
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', character_id);
+
+    if (!item || !character) {
+      return res.status(404).json({ error: 'Item or character not found' });
+    }
+
+    if (character.currency < item.price) {
+      return res.status(400).json({ error: 'Not enough currency' });
+    }
+
+    const newCurrency = character.currency - item.price;
+    const inventory = JSON.parse(character.inventory || '[]');
+    
+    // Создаем новый предмет для инвентаря
+    const newItem = {
+        name: item.name,
+        description: item.description,
+        type: item.item_type,
+        data: JSON.parse(item.item_data || '{}')
+    };
+
+    inventory.push(newItem);
+
+    await db.run('UPDATE Characters SET currency = ?, inventory = ? WHERE id = ?', [newCurrency, JSON.stringify(inventory), character_id]);
+
+    res.json({ message: 'Purchase successful' });
+  } catch (error) {
+    console.error('Purchase failed:', error);
+    res.status(500).json({ error: 'Purchase failed' });
+  }
+});
+    const { name, description, price, item_type, item_data, image_url } = req.body;
+    const sql = `UPDATE MarketItems SET name = ?, description = ?, price = ?, item_type = ?, item_data = ?, image_url = ? WHERE id = ?`;
+    await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, id]);
+    res.json({ message: 'Market item updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update market item' });
+  }
+});
+
+router.delete('/market/items/:id', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+    await db.run('DELETE FROM MarketItems WHERE id = ?', id);
+    res.json({ message: 'Market item deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete market item' });
+  }
 });
 
 

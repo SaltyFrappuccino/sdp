@@ -19,6 +19,8 @@ export const DEFAULT_VIEW_PANELS = {
   ADMIN_LOGIN: 'admin_login',
   ADMIN_PANEL: 'admin_panel',
   ADMIN_ANKETA_EDIT: 'admin_anketa_edit',
+  CALCULATOR: 'calculator',
+  MARKET: 'market',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -32,6 +34,8 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_LOGIN, `/${DEFAULT_VIEW_PANELS.ADMIN_LOGIN}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_PANEL, `/${DEFAULT_VIEW_PANELS.ADMIN_PANEL}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_ANKETA_EDIT, `/${DEFAULT_VIEW_PANELS.ADMIN_ANKETA_EDIT}/:id`, []),
+      createPanel(DEFAULT_VIEW_PANELS.CALCULATOR, `/${DEFAULT_VIEW_PANELS.CALCULATOR}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.MARKET, `/${DEFAULT_VIEW_PANELS.MARKET}`, []),
     ]),
   ]),
 ]);

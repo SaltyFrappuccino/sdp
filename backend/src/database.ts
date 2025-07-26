@@ -92,6 +92,18 @@ export async function initDB() {
       );
     `);
 
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS MarketItems (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        price INTEGER NOT NULL,
+        item_type TEXT NOT NULL,
+        item_data TEXT,
+        image_url TEXT
+      );
+    `);
+
     return db;
   } catch (error) {
     console.error('Error initializing database:', error);
