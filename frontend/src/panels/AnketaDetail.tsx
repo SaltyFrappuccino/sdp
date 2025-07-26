@@ -18,6 +18,13 @@ import { FC, useState, useEffect } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
 
+interface Item {
+    name: string;
+    description: string;
+    type: 'Обычный' | 'Синки';
+    sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+}
+
 interface Character {
     id: number;
     vk_id: number;
@@ -31,11 +38,12 @@ interface Character {
     appearance: string;
     personality: string;
     biography: string;
-    archetypes: string;
-    attributes: string;
-    inventory: string;
+    archetypes: string[];
+    attributes: { [key: string]: string };
+    inventory: Item[];
     currency: number;
     contracts: any[];
+    admin_note: string;
 }
 
 export interface AnketaDetailProps extends NavIdProps {
@@ -111,8 +119,10 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
           </Group>
           <Group>
             <Header>III. БОЕВЫЕ ХАРАКТЕРИСТИКИ</Header>
-            <SimpleCell>Архетип(ы): {character.archetypes}</SimpleCell>
-            <Div>{character.attributes}</Div>
+            <SimpleCell>Архетип(ы): {character.archetypes.join(', ')}</SimpleCell>
+            {Object.entries(character.attributes).map(([key, value]) => (
+              <SimpleCell key={key}>{key}: {value}</SimpleCell>
+            ))}
           </Group>
           <Group>
             <Header>IV. КОНТРАКТ(Ы)</Header>
@@ -126,28 +136,17 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
           </Group>
           <Group>
             <Header>V. ИНВЕНТАРЬ И РЕСУРСЫ</Header>
-            <Div>{character.inventory}</Div>
+            {character.inventory.map((item, index) => (
+                <SimpleCell key={index} subtitle={item.description}>
+                    {item.name} ({item.type === 'Синки' ? `${item.type} (${item.sinki_type})` : item.type})
+                </SimpleCell>
+            ))}
             <SimpleCell>Валюта: {character.currency} ₭</SimpleCell>
           </Group>
-          {fetchedUser?.id === 1 && (
+          {character.admin_note && (
             <Group>
-              <Header>Администрирование</Header>
-              <FormItem top="Статус анкеты">
-                <Select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  options={[
-                    { label: 'На рассмотрении', value: 'на рассмотрении' },
-                    { label: 'Принята', value: 'принята' },
-                    { label: 'Отклонена', value: 'отклонена' },
-                  ]}
-                />
-              </FormItem>
-              <Div>
-                <Button size="l" stretched onClick={handleStatusChange}>
-                  Сохранить статус
-                </Button>
-              </Div>
+                <Header>Примечание для администрации</Header>
+                <Div>{character.admin_note}</Div>
             </Group>
           )}
         </>

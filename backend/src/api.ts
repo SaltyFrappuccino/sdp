@@ -144,7 +144,7 @@ router.post('/characters', async (req: Request, res: Response) => {
       20, // attribute_points_total
       spentPoints, // attribute_points_spent
       JSON.stringify(auraCells),
-      character.inventory,
+      JSON.stringify(character.inventory || []),
       character.currency,
       character.admin_note
     ];
@@ -245,6 +245,7 @@ router.get('/characters/:id', async (req: Request, res: Response) => {
     character.archetypes = JSON.parse(character.archetypes || '[]');
     character.attributes = JSON.parse(character.attributes || '{}');
     character.aura_cells = JSON.parse(character.aura_cells || '{}');
+    character.inventory = JSON.parse(character.inventory || '[]');
     
     const contracts = await db.all('SELECT * FROM Contracts WHERE character_id = ?', id);
     contracts.forEach(contract => {

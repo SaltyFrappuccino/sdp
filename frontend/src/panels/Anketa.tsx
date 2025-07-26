@@ -22,6 +22,7 @@ import { Icon24ErrorCircle, Icon24CheckCircleOutline, Icon24Add } from '@vkontak
 import { ContractForm } from '../components/ContractForm';
 import { AttributeManager } from '../components/AttributeManager';
 import { ArchetypeSelector } from '../components/ArchetypeSelector';
+import { InventoryManager } from '../components/InventoryManager';
 import { API_URL } from '../api';
 
 export interface AnketaProps extends NavIdProps {
@@ -65,7 +66,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     archetypes: [] as string[],
     attributes: {} as { [key: string]: string },
     contracts: [emptyContract],
-    inventory: '',
+    inventory: [] as any[],
     currency: 0,
     admin_note: '',
   });
@@ -300,10 +301,11 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         </FormItem>
       </Group>
 
-      <Group header={<Header>V. ИНВЕНТАРЬ И РЕСУРСЫ</Header>}>
-        <FormItem top="Инвентарь">
-          <Textarea name="inventory" value={formData.inventory} onChange={handleChange} />
-        </FormItem>
+      <InventoryManager
+        inventory={formData.inventory}
+        onInventoryChange={(newInventory) => setFormData(prev => ({ ...prev, inventory: newInventory}))}
+      />
+      <Group>
          <FormItem top="Валюта (Кредиты ₭)">
           <Input name="currency" type="number" value={formData.currency} onChange={handleChange} />
         </FormItem>
