@@ -12,9 +12,7 @@ import {
   Button,
   PanelHeaderBack,
   Snackbar,
-  Avatar,
   SimpleCell,
-  IconButton,
   Search,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';

@@ -25,7 +25,6 @@ import { FC, useState, useEffect } from 'react';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
-import { Icon24Live, Icon24Flash, Icon24Gift, Icon24BombOutline, Icon12Stars, Icon24Fire } from '@vkontakte/icons';
 
 interface Item {
     name: string;

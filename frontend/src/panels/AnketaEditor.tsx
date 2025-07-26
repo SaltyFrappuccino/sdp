@@ -17,7 +17,6 @@ import {
 } from '@vkontakte/vkui';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, ReactNode, useEffect } from 'react';
-import { UserInfo } from '@vkontakte/vk-bridge';
 import { Icon24ErrorCircle, Icon24CheckCircleOutline, Icon24Add } from '@vkontakte/icons';
 import { ContractForm } from '../components/ContractForm';
 import { AttributeManager } from '../components/AttributeManager';

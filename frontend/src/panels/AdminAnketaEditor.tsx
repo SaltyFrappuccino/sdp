@@ -1,5 +1,4 @@
-import { FC, useState, useEffect, useMemo } from 'react';
-import ReactDiffViewer from 'react-diff-viewer-continued';
+import { FC, useState, useEffect } from 'react';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { 
   Panel, 
