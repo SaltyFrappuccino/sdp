@@ -133,7 +133,7 @@ const calculateAuraCells = (rank: string, contracts: any[]) => {
 };
 
 router.post('/characters', async (req: Request, res: Response) => {
-  const { character, contracts } = req.body;
+  const { contracts, ...character } = req.body;
   const db = await initDB();
 
   if (!character || !character.vk_id || !Array.isArray(contracts)) {
@@ -142,7 +142,7 @@ router.post('/characters', async (req: Request, res: Response) => {
 
   const requiredFields = ['character_name', 'age', 'faction', 'rank', 'faction_position', 'home_island'];
   const missingFields = requiredFields.filter(field => {
-    const value = character[field];
+    const value = (character as any)[field];
     // Проверяем на null, undefined и пустую строку
     return value === null || value === undefined || String(value).trim() === '';
   });
@@ -155,12 +155,12 @@ router.post('/characters', async (req: Request, res: Response) => {
   }
 
   // Устанавливаем валюту по умолчанию, если она не указана
-  if (character.currency === undefined || character.currency === null) {
-    character.currency = 0;
+  if ((character as any).currency === undefined || (character as any).currency === null) {
+    (character as any).currency = 0;
   }
 
   try {
-    const auraCells = calculateAuraCells(character.rank, contracts);
+    const auraCells = calculateAuraCells((character as any).rank, contracts);
 
     const attributeCosts: { [key: string]: number } = {
       "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
