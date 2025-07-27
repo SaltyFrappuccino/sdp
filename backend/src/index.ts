@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = 3001;
+const port = 3000;
 
 app.use(cors({
   origin: [
@@ -30,7 +30,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 async function startServer() {
   try {
     await initDB();
-    app.listen(port, () => {
+    app.listen(port, '0.0.0.0', () => {
       console.log(`Server is running at http://localhost:${port}`);
       console.log(`API is available at http://localhost:${port}/api`);
       console.log(`Swagger UI is available at http://localhost:${port}/api-docs`);
