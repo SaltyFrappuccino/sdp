@@ -596,9 +596,9 @@ router.post('/market/items', async (req: Request, res: Response) => {
   }
   try {
     const db = await initDB();
-    const { name, description, price, item_type, item_data, image_url } = req.body;
-    const sql = `INSERT INTO MarketItems (name, description, price, item_type, item_data, image_url) VALUES (?, ?, ?, ?, ?, ?)`;
-    const result = await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url]);
+    const { name, description, price, item_type, item_data, image_url, quantity } = req.body;
+    const sql = `INSERT INTO MarketItems (name, description, price, item_type, item_data, image_url, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    const result = await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, quantity]);
     res.status(201).json({ id: result.lastID });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -630,9 +630,9 @@ router.put('/market/items/:id', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
     const { id } = req.params;
-    const { name, description, price, item_type, item_data, image_url } = req.body;
-    const sql = `UPDATE MarketItems SET name = ?, description = ?, price = ?, item_type = ?, item_data = ?, image_url = ? WHERE id = ?`;
-    await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, id]);
+    const { name, description, price, item_type, item_data, image_url, quantity } = req.body;
+    const sql = `UPDATE MarketItems SET name = ?, description = ?, price = ?, item_type = ?, item_data = ?, image_url = ?, quantity = ? WHERE id = ?`;
+    await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, quantity, id]);
     res.json({ message: 'Market item updated successfully' });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -658,7 +658,12 @@ router.post('/market/purchase', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Not enough currency' });
     }
 
+    if (item.quantity <= 0) {
+      return res.status(400).json({ error: 'Item out of stock' });
+    }
+
     const newCurrency = character.currency - item.price;
+    const newQuantity = item.quantity - 1;
     const inventory = JSON.parse(character.inventory || '[]');
     
     // Создаем новый предмет для инвентаря
@@ -673,6 +678,7 @@ router.post('/market/purchase', async (req: Request, res: Response) => {
     inventory.push(newItem);
 
     await db.run('UPDATE Characters SET currency = ?, inventory = ? WHERE id = ?', [newCurrency, JSON.stringify(inventory), character_id]);
+    await db.run('UPDATE MarketItems SET quantity = ? WHERE id = ?', [newQuantity, item_id]);
 
     res.json({ message: 'Purchase successful' });
   } catch (error) {

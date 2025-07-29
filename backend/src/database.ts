@@ -106,6 +106,15 @@ export async function initDB() {
       );
     `);
 
+    try {
+      await db.exec('ALTER TABLE MarketItems ADD COLUMN quantity INTEGER NOT NULL DEFAULT 0');
+    } catch (error) {
+      // Игнорируем ошибку, если колонка уже существует
+      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
+        throw error;
+      }
+    }
+
     await db.exec(`
       CREATE TABLE IF NOT EXISTS ai_analysis (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
