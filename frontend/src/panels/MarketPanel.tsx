@@ -14,6 +14,8 @@ import {
   Snackbar,
   SimpleCell,
   Search,
+  Checkbox,
+  FormLayoutGroup,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
@@ -32,6 +34,7 @@ interface MarketItem {
   description: string;
   price: number;
   image_url: string;
+  quantity: number;
   item_type: 'Обычный' | 'Синки';
   item_data: {
     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
@@ -51,6 +54,8 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
   const [search, setSearch] = useState('');
+  const [filterInStock, setFilterInStock] = useState(false);
+  const [filterCanAfford, setFilterCanAfford] = useState(false);
 
   // Fetch characters
   useEffect(() => {
@@ -101,12 +106,18 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
         throw new Error(result.error);
       }
       showResultSnackbar('Покупка совершена успешно!', true);
-      // Refresh character data
-      const updatedCharacters = characters.map(c => 
-        c.id === selectedCharacter.id ? { ...c, currency: result.newCurrency } : c
+      // Refresh character data and item quantity
+      const newCurrency = selectedCharacter.currency - items.find(i => i.id === itemId)!.price;
+      const updatedCharacters = characters.map(c =>
+        c.id === selectedCharacter.id ? { ...c, currency: newCurrency } : c
       );
       setCharacters(updatedCharacters);
-      setSelectedCharacter(prev => prev ? { ...prev, currency: result.newCurrency } : null);
+      setSelectedCharacter(prev => prev ? { ...prev, currency: newCurrency } : null);
+
+      const updatedItems = items.map(i =>
+        i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
+      );
+      setItems(updatedItems);
     })
     .catch(error => {
       const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
@@ -145,8 +156,20 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
       </PanelHeader>
       <Group>
         <Search value={search} onChange={(e) => setSearch(e.target.value)} />
+        <FormLayoutGroup mode="horizontal" style={{ margin: '0 16px' }}>
+          <Checkbox checked={filterInStock} onChange={(e) => setFilterInStock(e.target.checked)}>
+            Есть в наличии
+          </Checkbox>
+          <Checkbox checked={filterCanAfford} onChange={(e) => setFilterCanAfford(e.target.checked)}>
+            Могу позволить
+          </Checkbox>
+        </FormLayoutGroup>
         <CardGrid size="l">
-          {items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())).map(item => (
+          {items
+            .filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+            .filter(i => !filterInStock || i.quantity > 0)
+            .filter(i => !filterCanAfford || selectedCharacter.currency >= i.price)
+            .map(item => (
             <Card key={item.id}>
               {item.image_url && <img src={item.image_url} alt={item.name} style={{ width: '100%', height: 150, objectFit: 'cover' }} />}
               <Div>
@@ -159,7 +182,8 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
                   </>
                 )}
                 <p><b>Цена: {item.price} кредитов</b></p>
-                <Button stretched onClick={() => handlePurchase(item.id)} disabled={selectedCharacter.currency < item.price}>
+                <p><b>В наличии: {item.quantity}</b></p>
+                <Button stretched onClick={() => handlePurchase(item.id)} disabled={selectedCharacter.currency < item.price || item.quantity <= 0}>
                   Купить
                 </Button>
               </Div>

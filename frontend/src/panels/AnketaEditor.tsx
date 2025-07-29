@@ -14,10 +14,16 @@ import {
   Separator,
   Header,
   Div,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader,
 } from '@vkontakte/vkui';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, ReactNode, useEffect } from 'react';
+import { UserInfo } from '@vkontakte/vk-bridge';
 import { Icon24ErrorCircle, Icon24CheckCircleOutline, Icon24Add } from '@vkontakte/icons';
+import ReactMarkdown from 'react-markdown';
+import { AI_API_URL } from '../api';
 import { ContractForm } from '../components/ContractForm';
 import { AttributeManager } from '../components/AttributeManager';
 import { ArchetypeSelector } from '../components/ArchetypeSelector';
@@ -83,7 +89,7 @@ const getUnityStage = (syncLevel: number): string => {
   return 'Ступень I - Активация';
 };
 
-export const AnketaEditor: FC<NavIdProps> = ({ id }) => {
+export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null) => void; fetchedUser?: UserInfo }> = ({ id, setModal, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
   const params = useParams<'id'>();
   const characterId = params?.id;
@@ -91,6 +97,8 @@ export const AnketaEditor: FC<NavIdProps> = ({ id }) => {
   const [character, setCharacter] = useState<CharacterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<string>('');
 
   useEffect(() => {
     const fetchCharacter = async () => {
@@ -175,6 +183,138 @@ export const AnketaEditor: FC<NavIdProps> = ({ id }) => {
       setCharacter(prev => prev ? ({ ...prev, inventory: newInventory }) : null);
   }
 
+  const pollTaskResult = (taskId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${AI_API_URL}/tasks/${taskId}`);
+        const data = await response.json();
+
+        if (data.status === 'completed') {
+          clearInterval(interval);
+          setLoading(false);
+          setModal(
+            <ModalRoot activeModal="ai-result">
+              <ModalPage
+                id="ai-result"
+                onClose={() => setModal(null)}
+                header={<ModalPageHeader>Результат проверки ИИ</ModalPageHeader>}
+              >
+                <Div>
+                  <ReactMarkdown>{data.result}</ReactMarkdown>
+                </Div>
+              </ModalPage>
+            </ModalRoot>
+          );
+        } else if (data.status === 'error') {
+          clearInterval(interval);
+          setLoading(false);
+          throw new Error(data.detail || 'AI check failed');
+        }
+      } catch (error) {
+        clearInterval(interval);
+        setLoading(false);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        setSnackbar(<Snackbar
+          onClose={() => setSnackbar(null)}
+          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+        >{`Ошибка проверки ИИ: ${message}`}</Snackbar>);
+      }
+    }, 3000);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      if (loading) {
+        setLoading(false);
+        setSnackbar(<Snackbar
+          onClose={() => setSnackbar(null)}
+          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+        >Проверка ИИ заняла слишком много времени.</Snackbar>);
+      }
+    }, 120000); // 2 minutes timeout
+  };
+
+  const handleAICheck = async () => {
+    if (!character) return;
+    setLoading(true);
+    setSnackbar(<Snackbar
+      onClose={() => setSnackbar(null)}
+    >Проверка ИИ запущена...</Snackbar>);
+
+    try {
+      const response = await fetch(`${AI_API_URL}/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_data: character,
+          vk_id: fetchedUser?.id || 0,
+          admin_id: localStorage.getItem('adminId'),
+          character_id: characterId,
+        }),
+      });
+
+      if (response.status !== 200) {
+        const errorText = await response.text();
+        try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.detail || 'Failed to start AI check');
+        } catch (e) {
+            throw new Error(errorText || 'Failed to start AI check');
+        }
+      }
+
+      const data = await response.json();
+      pollTaskResult(data.task_id);
+
+    } catch (error) {
+      setLoading(false);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setSnackbar(<Snackbar
+        onClose={() => setSnackbar(null)}
+        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+      >{`Ошибка запуска проверки ИИ: ${message}`}</Snackbar>);
+    }
+  };
+
+  const handleShowHistory = async () => {
+    if (!characterId) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/characters/${characterId}/ai-analysis`);
+      const data = await response.json();
+      setModal(
+        <ModalRoot activeModal="ai-history">
+          <ModalPage
+            id="ai-history"
+            onClose={() => setModal(null)}
+            header={<ModalPageHeader>История проверок ИИ</ModalPageHeader>}
+          >
+            <Div>
+              {data.length > 0 ? (
+                data.map((item: any) => (
+                  <div key={item.id}>
+                    <p><strong>{new Date(item.timestamp).toLocaleString()}</strong></p>
+                    <ReactMarkdown>{item.result}</ReactMarkdown>
+                    <Separator />
+                  </div>
+                ))
+              ) : (
+                <p>История проверок пуста.</p>
+              )}
+            </Div>
+          </ModalPage>
+        </ModalRoot>
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setSnackbar(<Snackbar
+        onClose={() => setSnackbar(null)}
+        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+      >{`Ошибка загрузки истории: ${message}`}</Snackbar>);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     const adminId = localStorage.getItem('adminId');
     if (!character || !adminId) return;
@@ -212,7 +352,7 @@ export const AnketaEditor: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
         Редактировать анкету
       </PanelHeader>
       {loading ? (
@@ -334,9 +474,15 @@ export const AnketaEditor: FC<NavIdProps> = ({ id }) => {
             </FormItem>
           </Group>
 
-          <Div>
+          <Div style={{ display: 'flex', gap: '8px' }}>
             <Button size="l" stretched onClick={handleSave}>
-              Сохранить изменения
+              Сохранить
+            </Button>
+            <Button size="l" stretched mode="secondary" onClick={handleAICheck}>
+              Проверить ИИ
+            </Button>
+            <Button size="l" stretched mode="secondary" onClick={handleShowHistory}>
+              История проверок ИИ
             </Button>
           </Div>
           {snackbar}

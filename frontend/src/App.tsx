@@ -3,7 +3,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { View, SplitLayout, SplitCol, ScreenSpinner, ModalRoot, ModalPage, ModalPageHeader, Div, Group, Panel } from '@vkontakte/vkui';
 import { useActiveVkuiLocation } from '@vkontakte/vk-mini-apps-router';
 
-import { Persik, Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, AnketaEditor, Calculator, MarketPanel } from './panels';
+import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, AnketaEditor, Calculator, MarketPanel } from './panels';
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { API_URL } from './api';
 
@@ -12,7 +12,7 @@ export const App = () => {
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
   const [popout, setPopout] = useState<ReactNode | null>(<ScreenSpinner />);
   const [serverStatus, setServerStatus] = useState<'loading' | 'ok' | 'error'>('loading');
-  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [modal, setModal] = useState<ReactNode | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -31,7 +31,22 @@ export const App = () => {
       } catch (error) {
         console.error("Initialization failed:", error);
         setServerStatus('error');
-        setActiveModal('maintenance');
+        setModal(
+          <ModalRoot activeModal="maintenance">
+            <ModalPage
+              id="maintenance"
+              settlingHeight={100}
+              header={<ModalPageHeader>Техническое обслуживание</ModalPageHeader>}
+            >
+              <Group>
+                <Div>
+                  <p>SDP Mini App находится на обновлении.</p>
+                  <p>Пожалуйста, попробуйте зайти позже.</p>
+                </Div>
+              </Group>
+            </ModalPage>
+          </ModalRoot>
+        );
         setUser(undefined);
       } finally {
         setPopout(null);
@@ -40,40 +55,23 @@ export const App = () => {
     fetchData();
   }, []);
 
-  const maintenanceModal = (
-    <ModalRoot activeModal={activeModal}>
-      <ModalPage
-        id="maintenance"
-        settlingHeight={100}
-        header={<ModalPageHeader>Техническое обслуживание</ModalPageHeader>}
-      >
-        <Group>
-          <Div>
-            <p>SDP Mini App находится на обновлении.</p>
-            <p>Пожалуйста, попробуйте зайти позже.</p>
-          </Div>
-        </Group>
-      </ModalPage>
-    </ModalRoot>
-  );
 
   if (serverStatus === 'loading') {
     return <ScreenSpinner />;
   }
 
   return (
-    <SplitLayout popout={popout} modal={maintenanceModal}>
+    <SplitLayout popout={popout} modal={modal}>
       <SplitCol>
         {serverStatus === 'ok' ? (
           <View activePanel={activePanel}>
             <Home id="home" fetchedUser={fetchedUser} />
-            <Persik id="persik" />
             <Anketa id="anketa" fetchedUser={fetchedUser} />
             <AnketaList id="anketa_list" />
             <AnketaDetail id="anketa_detail" fetchedUser={fetchedUser} />
             <AdminLogin id="admin_login" />
             <AdminPanel id="admin_panel" />
-            <AnketaEditor id="admin_anketa_edit" />
+            <AnketaEditor id="admin_anketa_edit" setModal={setModal} fetchedUser={fetchedUser} />
             <Calculator id="calculator" />
             <MarketPanel id="market" fetchedUser={fetchedUser} />
           </View>

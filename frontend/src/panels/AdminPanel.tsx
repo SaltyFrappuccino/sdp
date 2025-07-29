@@ -50,6 +50,7 @@ interface MarketItem {
     rank?: 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
   };
   image_url: string;
+  quantity: number;
 }
 
 const MODAL_PAGE_MARKET_ITEM = 'market_item';
@@ -171,7 +172,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   };
 
   const openMarketItemModal = (item: Partial<MarketItem> | null) => {
-    setEditingItem(item ? { ...item, item_data: item.item_data || {} } : { item_type: 'Обычный', item_data: {} });
+    setEditingItem(item ? { ...item, item_data: item.item_data || {} } : { item_type: 'Обычный', item_data: {}, quantity: 1 });
     setActiveModal(MODAL_PAGE_MARKET_ITEM);
   };
 
@@ -251,6 +252,9 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           <FormItem top="URL изображения">
             <Input value={editingItem?.image_url || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, image_url: e.target.value }))} />
           </FormItem>
+          <FormItem top="Количество">
+            <Input type="number" value={editingItem?.quantity || 0} onChange={(e) => setEditingItem(prev => ({ ...prev, quantity: Number(e.target.value) }))} />
+          </FormItem>
           <FormItem top="Тип предмета">
             <Select
               value={editingItem?.item_type}
@@ -299,7 +303,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   return (
     <Panel id={id}>
       <PanelHeader
-        before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}
+        before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}
         after={<Button onClick={handleLogout}>Выйти</Button>}
       >
         Админ-панель
@@ -361,6 +365,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
                 <Div>
                   <p>{item.description}</p>
                   <p><b>Цена: {item.price}</b></p>
+                  <p><b>В наличии: {item.quantity}</b></p>
                 </Div>
                 <ButtonGroup mode="horizontal" gap="m" stretched style={{ padding: '0 16px 16px' }}>
                   <Button size="m" onClick={() => openMarketItemModal(item)}>Редактировать</Button>
