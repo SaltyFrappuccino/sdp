@@ -286,7 +286,7 @@ router.get('/characters/:id/versions', async (req: Request, res: Response) => {
     const { id } = req.params;
     
     const versions = await db.all(
-      'SELECT version_id, version_number, created_at FROM CharacterVersions WHERE character_id = ? ORDER BY version_number DESC',
+      'SELECT version_id, version_number, created_at, data FROM CharacterVersions WHERE character_id = ? ORDER BY version_number DESC',
       id
     );
     
