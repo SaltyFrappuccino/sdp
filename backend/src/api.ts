@@ -214,6 +214,9 @@ router.post('/characters', async (req: Request, res: Response) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       for (const contract of contracts) {
+        if (contract.sync_level < 0 || contract.sync_level > 100) {
+          return res.status(400).json({ error: 'Sync level must be between 0 and 100' });
+        }
         const contractParams = [
           characterId, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
           contract.creature_description, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities)
@@ -437,6 +440,9 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         for (const contract of contracts) {
+            if (contract.sync_level < 0 || contract.sync_level > 100) {
+              return res.status(400).json({ error: 'Sync level must be between 0 and 100' });
+            }
             const contractParams = [
               id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
               contract.creature_description, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
