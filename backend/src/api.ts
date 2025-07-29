@@ -555,6 +555,40 @@ router.post('/characters/:id/status', async (req: Request, res: Response) => {
     }
 });
 // Market Items CRUD
+
+router.post('/characters/:id/ai-analysis', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+    const { result } = req.body;
+
+    if (!result) {
+      return res.status(400).json({ error: 'Result is required' });
+    }
+
+    const sql = `INSERT INTO ai_analysis (character_id, result) VALUES (?, ?)`;
+    await db.run(sql, [id, result]);
+    res.status(201).json({ message: 'AI analysis saved successfully' });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to save AI analysis for character ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось сохранить анализ ИИ', details: errorMessage });
+  }
+});
+
+router.get('/characters/:id/ai-analysis', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+    const analyses = await db.all('SELECT * FROM ai_analysis WHERE character_id = ? ORDER BY timestamp DESC', id);
+    res.json(analyses);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to fetch AI analyses for character ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось получить историю анализа ИИ', details: errorMessage });
+  }
+});
+
 router.post('/market/items', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
   if (adminId !== ADMIN_VK_ID) {

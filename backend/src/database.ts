@@ -106,6 +106,16 @@ export async function initDB() {
       );
     `);
 
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_analysis (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        result TEXT NOT NULL,
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+    `);
+
     return db;
   } catch (error) {
     console.error('Error initializing database:', error);
