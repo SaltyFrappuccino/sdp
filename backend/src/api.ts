@@ -8,14 +8,14 @@ const router = Router();
 
 // Настройка Multer для загрузки файлов
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
     const dir = './uploads';
     if (!fs.existsSync(dir)){
         fs.mkdirSync(dir);
     }
     cb(null, dir);
   },
-  filename: (req, file, cb) => {
+  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     cb(null, `${Date.now()}-${file.originalname}`);
   }
 });
@@ -23,10 +23,10 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 router.post('/upload', upload.single('image'), (req: Request, res: Response) => {
-  if (!req.file) {
+  if (!(req as any).file) {
     return res.status(400).json({ error: 'Файл не был загружен' });
   }
-  const imageUrl = `/uploads/${req.file.filename}`;
+  const imageUrl = `/uploads/${(req as any).file.filename}`;
   res.json({ imageUrl });
 });
 
