@@ -154,17 +154,28 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
     }) : null);
   };
 
-  const handleContractChange = (index: number, field: string, value: any) => {
+  const handleContractChange = (index: number, fieldOrObject: string | Partial<Contract>, value?: any) => {
     if (!character) return;
-    const newContracts = [...character.contracts];
-    const contract = { ...newContracts[index], [field]: value };
 
-    if (field === 'sync_level') {
-      contract.unity_stage = getUnityStage(Number(value));
+    const newContracts = [...character.contracts];
+    let updatedContract = { ...newContracts[index] };
+
+    if (typeof fieldOrObject === 'string') {
+      // Обновление одного поля
+      updatedContract = { ...updatedContract, [fieldOrObject]: value };
+      if (fieldOrObject === 'sync_level') {
+        updatedContract.unity_stage = getUnityStage(Number(value));
+      }
+    } else {
+      // Обновление нескольких полей из объекта
+      updatedContract = { ...updatedContract, ...fieldOrObject };
+      if (fieldOrObject.sync_level !== undefined) {
+        updatedContract.unity_stage = getUnityStage(fieldOrObject.sync_level);
+      }
     }
-    
-    newContracts[index] = contract;
-    setCharacter(prev => prev ? ({ ...prev, contracts: newContracts }) : null);
+
+    newContracts[index] = updatedContract;
+    setCharacter(prev => prev ? { ...prev, contracts: newContracts } : null);
   };
 
   const addContract = () => {
@@ -448,6 +459,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
                   onChange={handleContractChange}
                   onRemove={removeContract}
                   characterRank={character.rank}
+                  fullCharacterData={character}
                 />
               </Div>
             ))}

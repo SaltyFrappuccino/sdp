@@ -1,6 +1,6 @@
-import { FC } from 'react';
-import { FormItem, Input, Textarea, Button, Select, Header, Div } from '@vkontakte/vkui';
-import { Icon24Delete, Icon24Add } from '@vkontakte/icons';
+import { FC, useState } from 'react';
+import { FormItem, Input, Textarea, Button, Select, Header, Div, ModalRoot, ModalPage, ModalPageHeader, FormLayoutGroup } from '@vkontakte/vkui';
+import { Icon24Delete, Icon24Add, Icon16Stars } from '@vkontakte/icons';
 import { AbilityBuilder, Rank, SelectedTags } from './AbilityBuilder';
 
 interface Ability {
@@ -26,12 +26,17 @@ interface Contract {
 interface ContractFormProps {
   contract: Contract;
   index: number;
-  onChange: (index: number, field: keyof Contract, value: any) => void;
+  onChange: (index: number, fieldOrObject: keyof Contract | Partial<Contract>, value?: any) => void;
   onRemove: (index: number) => void;
   characterRank: Rank;
+  fullCharacterData: any;
 }
 
-export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange, onRemove, characterRank }) => {
+export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange, onRemove, characterRank, fullCharacterData }) => {
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [userPrompt, setUserPrompt] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const value = e.target.type === 'number' ? parseInt(e.target.value, 10) || 0 : e.target.value;
     onChange(index, e.target.name as keyof Contract, value);
@@ -68,8 +73,74 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
     onChange(index, 'abilities', newAbilities);
   };
 
+  const pollTaskResult = (taskId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/ai-api/tasks/${taskId}`);
+        const data = await response.json();
+
+        if (data.status === 'completed') {
+          clearInterval(interval);
+          setIsLoading(false);
+          setActiveModal(null);
+          const result = data.result;
+          // Передаем весь объект целиком для атомарного обновления
+          onChange(index, result);
+        } else if (data.status === 'error') {
+          clearInterval(interval);
+          setIsLoading(false);
+          setActiveModal(null);
+          console.error('Contract generation failed:', data.detail);
+        }
+      } catch (error) {
+        clearInterval(interval);
+        setIsLoading(false);
+        setActiveModal(null);
+        console.error('Failed to poll task status:', error);
+      }
+    }, 3000);
+  };
+
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/ai-api/generate-contract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_data: fullCharacterData,
+          user_prompt: userPrompt,
+        }),
+      });
+      const data = await response.json();
+      pollTaskResult(data.task_id);
+    } catch (error) {
+      setIsLoading(false);
+      console.error('Failed to start contract generation:', error);
+    }
+  };
+
   return (
     <div>
+      <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
+        <ModalPage
+          id="generate-contract"
+          onClose={() => setActiveModal(null)}
+          header={<ModalPageHeader>Сгенерировать идею для контракта</ModalPageHeader>}
+        >
+          <FormLayoutGroup>
+            <FormItem top="Ваш запрос для ИИ">
+              <Textarea value={userPrompt} onChange={(e) => setUserPrompt(e.target.value)} />
+            </FormItem>
+            <FormItem>
+              <Button size="l" stretched onClick={handleGenerate} loading={isLoading}>
+                Сгенерировать
+              </Button>
+            </FormItem>
+          </FormLayoutGroup>
+        </ModalPage>
+      </ModalRoot>
+
       <FormItem top="Название Контракта">
         <Input name="contract_name" value={contract.contract_name} onChange={handleChange} />
       </FormItem>
@@ -109,6 +180,12 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
           type="number"
           value={contract.sync_level}
           onChange={handleChange}
+          onBlur={(e) => {
+            let value = parseInt(e.target.value, 10);
+            if (isNaN(value) || value < 0) value = 0;
+            if (value > 100) value = 100;
+            onChange(index, 'sync_level', value);
+          }}
           min="0"
           max="100"
         />
@@ -181,6 +258,15 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
       <FormItem>
         <Button appearance="negative" onClick={() => onRemove(index)} before={<Icon24Delete />}>
           Удалить контракт
+        </Button>
+      </FormItem>
+      <FormItem>
+        <Button
+          mode="secondary"
+          onClick={() => setActiveModal('generate-contract')}
+          before={<Icon16Stars />}
+        >
+          Сгенерировать с ИИ
         </Button>
       </FormItem>
     </div>

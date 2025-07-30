@@ -18,13 +18,18 @@ import {
   Text,
   Title,
   Accordion,
-  Progress
+  Progress,
+  Button,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader
 } from '@vkontakte/vkui';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect } from 'react';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
+import { getVersionDiff } from '../utils/diff';
 
 interface Item {
     name: string;
@@ -85,6 +90,19 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
   const [character, setCharacter] = useState<Character | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('general');
+  const [versions, setVersions] = useState<any[]>([]);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+
+  const fetchVersions = async () => {
+    try {
+      const response = await fetch(`${API_URL}/characters/${characterId}/versions`);
+      const data = await response.json();
+      setVersions(data);
+      setActiveModal('history');
+    } catch (error) {
+      console.error('Failed to fetch character versions:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchCharacter = async () => {
@@ -114,6 +132,71 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
         <Spinner size="l" style={{ margin: '20px 0' }} />
       ) : character ? (
         <>
+          <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
+            <ModalPage
+              id="history"
+              onClose={() => setActiveModal(null)}
+              header={<ModalPageHeader>История изменений</ModalPageHeader>}
+            >
+              <Div>
+                {versions.length > 0 ? (
+                  versions.map((version: any) => (
+                    <Accordion key={version.version_id}>
+                      <Accordion.Summary>
+                        Версия {version.version_number} - {new Date(version.created_at).toLocaleString()}
+                      </Accordion.Summary>
+                      <Accordion.Content>
+                        <Div>
+                          {(() => {
+                            const currentVersionData = version.data ? JSON.parse(version.data) : {};
+                            const previousVersionData = versions[versions.indexOf(version) + 1]
+                              ? JSON.parse((versions[versions.indexOf(version) + 1] as any).data)
+                              : null;
+                            const diff = getVersionDiff(currentVersionData, previousVersionData);
+
+                            return (
+                              <>
+                                {Object.keys(diff.changed).length > 0 && (
+                                  <Group header={<Header subtitle="Изменено" />}>
+                                    {Object.entries(diff.changed).map(([key, { from, to }]) => (
+                                      <SimpleCell key={key} multiline>
+                                        <Text><b>{key}:</b></Text>
+                                        <Text>Было: {JSON.stringify(from)}</Text>
+                                        <Text>Стало: {JSON.stringify(to)}</Text>
+                                      </SimpleCell>
+                                    ))}
+                                  </Group>
+                                )}
+                                {Object.keys(diff.added).length > 0 && (
+                                  <Group header={<Header subtitle="Добавлено" />}>
+                                    {Object.entries(diff.added).map(([key, value]) => (
+                                      <SimpleCell key={key} multiline>
+                                        <b>{key}:</b> {JSON.stringify(value)}
+                                      </SimpleCell>
+                                    ))}
+                                  </Group>
+                                )}
+                                {Object.keys(diff.removed).length > 0 && (
+                                  <Group header={<Header subtitle="Удалено" />}>
+                                    {Object.keys(diff.removed).map(key => (
+                                      <SimpleCell key={key}>{key}</SimpleCell>
+                                    ))}
+                                  </Group>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </Div>
+                      </Accordion.Content>
+                    </Accordion>
+                  ))
+                ) : (
+                  <p>История изменений пуста.</p>
+                )}
+              </Div>
+            </ModalPage>
+          </ModalRoot>
+
           <Tabs>
             <TabsItem
               id="general"
@@ -142,13 +225,13 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
             <Panel id="general">
               <Group>
                 <Header>I. ОБЩАЯ ИНФОРМАЦИЯ</Header>
-                <SimpleCell multiline>Имя и Фамилия: {character.character_name}</SimpleCell>
-                <SimpleCell multiline>Прозвище/Позывной: {character.nickname}</SimpleCell>
-                <SimpleCell>Возраст: {character.age}</SimpleCell>
-                <SimpleCell>Ранг: {character.rank}</SimpleCell>
-                <SimpleCell>Фракция: {character.faction}</SimpleCell>
-                <SimpleCell>Позиция во фракции: {character.faction_position}</SimpleCell>
-                <SimpleCell>Родной остров: {character.home_island}</SimpleCell>
+                <Div><b>Имя и Фамилия:</b> {character.character_name}</Div>
+                <Div><b>Прозвище/Позывной:</b> {character.nickname}</Div>
+                <Div><b>Возраст:</b> {character.age}</Div>
+                <Div><b>Ранг:</b> {character.rank}</Div>
+                <Div><b>Фракция:</b> {character.faction}</Div>
+                <Div><b>Позиция во фракции:</b> {character.faction_position}</Div>
+                <Div><b>Родной остров:</b> {character.home_island}</Div>
               </Group>
               <Group>
                 <Header>II. ЛИЧНОСТЬ И ВНЕШНОСТЬ</Header>
@@ -162,9 +245,9 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
             <Panel id="combat">
                 <Group>
                     <Header>III. БОЕВЫЕ ХАРАКТЕРИСТИКИ</Header>
-                    <SimpleCell>Архетип(ы): {character.archetypes.join(', ')}</SimpleCell>
+                    <Div><b>Архетип(ы):</b> {character.archetypes.join(', ')}</Div>
                     {Object.entries(character.attributes).map(([key, value]) => (
-                      <SimpleCell key={key}>{key}: {value}</SimpleCell>
+                      <Div key={key}><b>{key}:</b> {value}</Div>
                     ))}
                     <AuraCellsCalculator
                       currentRank={character.rank}
@@ -249,6 +332,11 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                 <Div>{character.admin_note}</Div>
             </Group>
           )}
+          <Div>
+            <Button stretched size="l" mode="secondary" onClick={fetchVersions}>
+              История изменений
+            </Button>
+          </Div>
         </>
       ) : (
         <Div>Не удалось загрузить данные персонажа.</Div>

@@ -35,7 +35,19 @@ export interface AnketaProps extends NavIdProps {
   fetchedUser?: UserInfo;
 }
 
-const emptyContract = {
+interface Contract {
+    contract_name: string;
+    creature_name: string;
+    creature_rank: string;
+    creature_spectrum: string;
+    creature_description: string;
+    gift: string;
+    sync_level: number;
+    unity_stage: string;
+    abilities: any[];
+}
+
+const emptyContract: Contract = {
   contract_name: '',
   creature_name: '',
   creature_rank: '',
@@ -152,13 +164,23 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     }));
   };
 
-  const handleContractChange = (index: number, field: string, value: any) => {
+  const handleContractChange = (index: number, fieldOrObject: string | Partial<Contract>, value?: any) => {
     const newContracts = [...formData.contracts];
-    const contract = { ...newContracts[index], [field]: value };
-    if (field === 'sync_level') {
-      contract.unity_stage = getUnityStage(value);
+    let updatedContract = { ...newContracts[index] };
+
+    if (typeof fieldOrObject === 'string') {
+      updatedContract = { ...updatedContract, [fieldOrObject]: value };
+      if (fieldOrObject === 'sync_level') {
+        updatedContract.unity_stage = getUnityStage(Number(value));
+      }
+    } else {
+      updatedContract = { ...updatedContract, ...fieldOrObject };
+      if (fieldOrObject.sync_level !== undefined) {
+        updatedContract.unity_stage = getUnityStage(fieldOrObject.sync_level);
+      }
     }
-    newContracts[index] = contract;
+
+    newContracts[index] = updatedContract;
     setFormData(prev => ({ ...prev, contracts: newContracts }));
   };
 
@@ -438,6 +460,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
               onChange={handleContractChange}
               onRemove={removeContract}
               characterRank={formData.rank}
+              fullCharacterData={formData}
             />
           </Div>
         ))}
