@@ -1,3 +1,4 @@
+/// <reference types="multer" />
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
@@ -703,7 +704,30 @@ router.post('/market/items', async (req: Request, res: Response) => {
 router.get('/market/items', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
-    const items = await db.all('SELECT * FROM MarketItems');
+    const { item_type, sinki_type, rank } = req.query;
+
+    let query = 'SELECT * FROM MarketItems';
+    const params: any[] = [];
+    const whereClauses: string[] = [];
+
+    if (item_type) {
+      whereClauses.push('item_type = ?');
+      params.push(item_type);
+    }
+    if (sinki_type) {
+      whereClauses.push("json_extract(item_data, '$.sinki_type') = ?");
+      params.push(sinki_type);
+    }
+    if (rank) {
+      whereClauses.push("json_extract(item_data, '$.rank') = ?");
+      params.push(rank);
+    }
+
+    if (whereClauses.length > 0) {
+      query += ' WHERE ' + whereClauses.join(' AND ');
+    }
+
+    const items = await db.all(query, params);
     items.forEach(item => {
       item.item_data = JSON.parse(item.item_data || '{}');
     });
