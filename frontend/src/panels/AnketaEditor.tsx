@@ -32,7 +32,6 @@ import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 
-// Эти интерфейсы и функции можно вынести в общий файл
 interface Item {
     name: string;
     description: string;
@@ -97,8 +96,6 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
   const [character, setCharacter] = useState<CharacterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
-  const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [aiResult, setAiResult] = useState<string>('');
 
   useEffect(() => {
     const fetchCharacter = async () => {

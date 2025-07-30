@@ -1,4 +1,4 @@
-import { FC, useState, useEffect } from 'react';
+import { FC, useState } from 'react';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import {
   Panel,
