@@ -1,10 +1,37 @@
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { initDB } from './database.js';
 
 const router = Router();
 
+// Настройка Multer для загрузки файлов
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = './uploads';
+    if (!fs.existsSync(dir)){
+        fs.mkdirSync(dir);
+    }
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  }
+});
+
+const upload = multer({ storage });
+
+router.post('/upload', upload.single('image'), (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Файл не был загружен' });
+  }
+  const imageUrl = `/uploads/${req.file.filename}`;
+  res.json({ imageUrl });
+});
+
 const ADMIN_PASSWORD = 'heartattack';
-const ADMIN_VK_ID = '1'; // Замените на реальный VK ID администратора
+const ADMIN_VK_ID = '1';
 
 router.get('/health-check', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
@@ -181,15 +208,15 @@ router.post('/characters', async (req: Request, res: Response) => {
     const characterSql = `
       INSERT INTO Characters (
         vk_id, status, character_name, nickname, age, rank, faction, faction_position, home_island,
-        appearance, personality, biography, archetypes, attributes,
+        appearance, character_images, personality, biography, archetypes, attributes,
         attribute_points_total, attribute_points_spent, aura_cells, inventory, currency, admin_note
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const characterParams = [
       character.vk_id, 'на рассмотрении', character.character_name, character.nickname, character.age,
       character.rank, character.faction, character.faction_position, character.home_island,
-      character.appearance, character.personality, character.biography,
+      character.appearance, JSON.stringify(character.character_images || []), character.personality, character.biography,
       JSON.stringify(character.archetypes || []),
       JSON.stringify(character.attributes || {}),
       20, // attribute_points_total
@@ -210,8 +237,8 @@ router.post('/characters', async (req: Request, res: Response) => {
     // Вставляем контракты, связанные с персонажем
     if (contracts.length > 0) {
       const contractSql = `
-        INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, gift, sync_level, unity_stage, abilities)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_image, gift, sync_level, unity_stage, abilities)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       for (const contract of contracts) {
         if (contract.sync_level < 0 || contract.sync_level > 100) {
@@ -219,7 +246,7 @@ router.post('/characters', async (req: Request, res: Response) => {
         }
         const contractParams = [
           characterId, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
-          contract.creature_description, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities)
+          contract.creature_description, contract.creature_image, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities)
         ];
         await db.run(contractSql, contractParams);
       }
@@ -252,14 +279,31 @@ router.post('/characters', async (req: Request, res: Response) => {
 router.get('/characters', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
-    const { status } = req.query;
+    const { status, rank, faction, home_island } = req.query;
 
     let query = 'SELECT id, character_name, vk_id, status, rank, faction, faction_position FROM Characters';
-    const params = [];
+    const params: any[] = [];
+    const whereClauses: string[] = [];
 
-    if (status === 'Принято') {
-      query += ' WHERE status = ?';
-      params.push('Принято');
+    if (status) {
+      whereClauses.push('status = ?');
+      params.push(status);
+    }
+    if (rank) {
+      whereClauses.push('rank = ?');
+      params.push(rank);
+    }
+    if (faction) {
+      whereClauses.push('faction = ?');
+      params.push(faction);
+    }
+    if (home_island) {
+      whereClauses.push('home_island = ?');
+      params.push(home_island);
+    }
+
+    if (whereClauses.length > 0) {
+      query += ' WHERE ' + whereClauses.join(' AND ');
     }
     
     const characters = await db.all(query, params);
@@ -280,6 +324,19 @@ router.get('/characters/by-vk/:vk_id', async (req: Request, res: Response) => {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Error fetching characters by vk_id:', error);
     res.status(500).json({ error: 'Не удалось получить персонажей по vk_id', details: errorMessage });
+  }
+});
+
+router.get('/characters/my/:vk_id', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { vk_id } = req.params;
+    const characters = await db.all('SELECT id, character_name, status FROM Characters WHERE vk_id = ?', [vk_id]);
+    res.json(characters);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Error fetching my characters:', error);
+    res.status(500).json({ error: 'Не удалось получить анкеты пользователя', details: errorMessage });
   }
 });
 
@@ -332,6 +389,7 @@ router.get('/characters/:id', async (req: Request, res: Response) => {
     character.attributes = JSON.parse(character.attributes || '{}');
     character.aura_cells = JSON.parse(character.aura_cells || '{}');
     character.inventory = JSON.parse(character.inventory || '[]');
+    character.character_images = JSON.parse(character.character_images || '[]');
     
     const contracts = await db.all('SELECT * FROM Contracts WHERE character_id = ?', id);
     contracts.forEach(contract => {
@@ -436,8 +494,8 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
     if (Array.isArray(contracts)) {
         await db.run('DELETE FROM Contracts WHERE character_id = ?', id);
         const contractSql = `
-            INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, gift, sync_level, unity_stage, abilities)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_image, gift, sync_level, unity_stage, abilities)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         for (const contract of contracts) {
             if (contract.sync_level < 0 || contract.sync_level > 100) {
@@ -445,7 +503,7 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
             }
             const contractParams = [
               id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
-              contract.creature_description, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
+              contract.creature_description, contract.creature_image, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
             ];
             await db.run(contractSql, contractParams);
         }
@@ -558,6 +616,35 @@ router.post('/characters/:id/status', async (req: Request, res: Response) => {
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         console.error(`Failed to update character status for id ${req.params.id}:`, error);
         res.status(500).json({ error: 'Не удалось обновить статус персонажа', details: errorMessage });
+    }
+});
+
+router.post('/characters/:id/life-status', async (req: Request, res: Response) => {
+    const adminId = req.headers['x-admin-id'];
+    if (adminId !== ADMIN_VK_ID) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { id } = req.params;
+    const { life_status } = req.body;
+
+    if (!life_status || !['Жив', 'Мёртв'].includes(life_status)) {
+        return res.status(400).json({ error: 'Неверное значение статуса жизни' });
+    }
+
+    try {
+        const db = await initDB();
+        const result = await db.run('UPDATE Characters SET life_status = ? WHERE id = ?', [life_status, id]);
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Character not found' });
+        }
+
+        res.json({ message: `Character life status updated to ${life_status}` });
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+        console.error(`Failed to update character life status for id ${req.params.id}:`, error);
+        res.status(500).json({ error: 'Не удалось обновить статус жизни персонажа', details: errorMessage });
     }
 });
 // Market Items CRUD
@@ -711,5 +798,49 @@ router.delete('/market/items/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/market/sell', async (req: Request, res: Response) => {
+  try {
+    const { character_id, item_index, price } = req.body;
+    if (character_id === undefined || item_index === undefined || price === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: character_id, item_index, price' });
+    }
+
+    const db = await initDB();
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', character_id);
+
+    if (!character) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    const inventory = JSON.parse(character.inventory || '[]');
+    if (item_index < 0 || item_index >= inventory.length) {
+      return res.status(400).json({ error: 'Invalid item index' });
+    }
+
+    const itemToSell = inventory.splice(item_index, 1)[0];
+
+    await db.run('UPDATE Characters SET inventory = ? WHERE id = ?', [JSON.stringify(inventory), character_id]);
+
+    const marketItemSql = `
+      INSERT INTO MarketItems (name, description, price, item_type, item_data, image_url, quantity)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    await db.run(marketItemSql, [
+      itemToSell.name,
+      itemToSell.description,
+      price,
+      itemToSell.type,
+      JSON.stringify(itemToSell), // Сохраняем все данные о предмете
+      itemToSell.image || null,
+      1 // Всегда продаем по 1 штуке
+    ]);
+
+    res.json({ message: 'Item listed for sale successfully' });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Failed to sell item:', error);
+    res.status(500).json({ error: 'Не удалось выставить предмет на продажу', details: errorMessage });
+  }
+});
 
 export default router;
