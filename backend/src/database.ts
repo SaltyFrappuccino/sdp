@@ -90,7 +90,7 @@ export async function initDB() {
         creature_rank TEXT,
         creature_spectrum TEXT,
         creature_description TEXT,
-        creature_image TEXT,
+        creature_images TEXT,
         gift TEXT,
         sync_level INTEGER,
         unity_stage TEXT,
@@ -98,6 +98,15 @@ export async function initDB() {
         FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE
       );
     `);
+
+    try {
+      await db.exec('ALTER TABLE Contracts RENAME COLUMN creature_image TO creature_images');
+    } catch (error) {
+      // Игнорируем ошибку, если колонка уже переименована или ее не было
+      if (!(error instanceof Error && (error.message.includes('no such column: creature_image') || error.message.includes('duplicate column name: creature_images')))) {
+        // Также можно добавить проверку на уже существующую колонку creature_images
+      }
+    }
 
     await db.exec(`
       CREATE TABLE IF NOT EXISTS MarketItems (

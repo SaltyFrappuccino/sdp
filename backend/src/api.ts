@@ -29,7 +29,7 @@ router.get('/health-check', (req: Request, res: Response) => {
  *           type: string
  *         creature_description:
  *           type: string
- *         creature_image:
+ *         creature_images:
  *           type: array
  *           items:
  *             type: string
@@ -228,7 +228,7 @@ router.post('/characters', async (req: Request, res: Response) => {
     // Вставляем контракты, связанные с персонажем
     if (contracts.length > 0) {
       const contractSql = `
-        INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_image, gift, sync_level, unity_stage, abilities)
+        INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_images, gift, sync_level, unity_stage, abilities)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       for (const contract of contracts) {
@@ -237,7 +237,7 @@ router.post('/characters', async (req: Request, res: Response) => {
         }
         const contractParams = [
           characterId, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
-          contract.creature_description, JSON.stringify(contract.creature_image || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities)
+          contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities)
         ];
         await db.run(contractSql, contractParams);
       }
@@ -353,7 +353,7 @@ router.get('/my-anketas/:vk_id', async (req: Request, res: Response) => {
       const contracts = await db.all('SELECT * FROM Contracts WHERE character_id = ?', character.id);
       contracts.forEach(contract => {
         contract.abilities = JSON.parse(contract.abilities || '[]');
-        contract.creature_image = JSON.parse(contract.creature_image || '[]');
+        contract.creature_images = JSON.parse(contract.creature_images || '[]');
       });
 
       return { ...character, contracts };
@@ -422,7 +422,7 @@ router.get('/characters/:id', async (req: Request, res: Response) => {
     const contracts = await db.all('SELECT * FROM Contracts WHERE character_id = ?', id);
     contracts.forEach(contract => {
       contract.abilities = JSON.parse(contract.abilities || '[]');
-      contract.creature_image = JSON.parse(contract.creature_image || '[]');
+      contract.creature_images = JSON.parse(contract.creature_images || '[]');
     });
 
     res.json({ ...character, contracts });
@@ -523,7 +523,7 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
     if (Array.isArray(contracts)) {
         await db.run('DELETE FROM Contracts WHERE character_id = ?', id);
         const contractSql = `
-            INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_image, gift, sync_level, unity_stage, abilities)
+            INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_images, gift, sync_level, unity_stage, abilities)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         for (const contract of contracts) {
@@ -532,7 +532,7 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
             }
             const contractParams = [
               id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
-              contract.creature_description, JSON.stringify(contract.creature_image || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
+              contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
             ];
             await db.run(contractSql, contractParams);
         }
