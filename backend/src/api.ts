@@ -207,7 +207,7 @@ router.post('/characters', async (req: Request, res: Response) => {
     const characterParams = [
       character.vk_id, 'на рассмотрении', character.character_name, character.nickname, character.age,
       character.rank, character.faction, character.faction_position, character.home_island,
-      JSON.stringify(character.appearance || {}), JSON.stringify(character.character_images || []), character.personality, character.biography,
+      (character.appearance?.text || ''), JSON.stringify(character.character_images || []), character.personality, character.biography,
       JSON.stringify(character.archetypes || []),
       JSON.stringify(character.attributes || {}),
       20, // attribute_points_total
@@ -506,8 +506,14 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
 
     const setClause = keys.map(key => `${key} = ?`).join(', ');
     const values = keys.map(key => {
-      const value = characterFields[key];
-      return typeof value === 'object' ? JSON.stringify(value) : value;
+      let value = characterFields[key];
+      // Специальная обработка для поля appearance
+      if (key === 'appearance' && typeof value === 'object' && value !== null && 'text' in value) {
+        value = (value as any).text;
+      } else if (typeof value === 'object') {
+        value = JSON.stringify(value);
+      }
+      return value;
     });
 
     const sql = `UPDATE Characters SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
