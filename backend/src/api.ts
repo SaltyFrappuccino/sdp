@@ -376,7 +376,7 @@ router.get('/characters/:id/versions', async (req: Request, res: Response) => {
       id
     );
     
-    res.json(versions);
+    res.json(versions.map(v => ({...v, data: JSON.parse(v.data)})));
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Failed to fetch character versions:', error);
