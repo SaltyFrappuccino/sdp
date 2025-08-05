@@ -7,7 +7,6 @@ import { initDB } from './database.js';
 
 const router = Router();
 
-// Настройка Multer для загрузки файлов
 const storage = multer.diskStorage({
   destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
     const dir = './uploads';
@@ -340,6 +339,40 @@ router.get('/characters/my/:vk_id', async (req: Request, res: Response) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Error fetching my characters:', error);
+    res.status(500).json({ error: 'Не удалось получить анкеты пользователя', details: errorMessage });
+  }
+});
+
+router.get('/my-anketas/:vk_id', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { vk_id } = req.params;
+    
+    const characters = await db.all('SELECT * FROM Characters WHERE vk_id = ?', [vk_id]);
+
+    if (!characters || characters.length === 0) {
+      return res.json([]);
+    }
+
+    const fullAnketas = await Promise.all(characters.map(async (character) => {
+      character.archetypes = JSON.parse(character.archetypes || '[]');
+      character.attributes = JSON.parse(character.attributes || '{}');
+      character.aura_cells = JSON.parse(character.aura_cells || '{}');
+      character.inventory = JSON.parse(character.inventory || '[]');
+      character.character_images = JSON.parse(character.character_images || '[]');
+
+      const contracts = await db.all('SELECT * FROM Contracts WHERE character_id = ?', character.id);
+      contracts.forEach(contract => {
+        contract.abilities = JSON.parse(contract.abilities || '[]');
+      });
+
+      return { ...character, contracts };
+    }));
+
+    res.json(fullAnketas);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Error fetching my anketas:', error);
     res.status(500).json({ error: 'Не удалось получить анкеты пользователя', details: errorMessage });
   }
 });
