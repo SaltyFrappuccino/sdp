@@ -1,37 +1,9 @@
-/// <reference types="multer" />
 import { Router, Request, Response } from 'express';
-import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { initDB } from './database.js';
 
 const router = Router();
-
-const storage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
-    const dir = './uploads';
-    if (!fs.existsSync(dir)){
-        fs.mkdirSync(dir);
-    }
-    cb(null, dir);
-  },
-  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
-});
-
-router.post('/upload', upload.single('image'), (req: Request, res: Response) => {
-  if (!(req as any).file) {
-    return res.status(400).json({ error: 'Файл не был загружен' });
-  }
-  const imageUrl = `/uploads/${(req as any).file.filename}`;
-  res.json({ imageUrl });
-});
 
 const ADMIN_PASSWORD = 'heartattack';
 const ADMIN_VK_ID = '1';
@@ -57,6 +29,10 @@ router.get('/health-check', (req: Request, res: Response) => {
  *           type: string
  *         creature_description:
  *           type: string
+ *         creature_image:
+ *           type: array
+ *           items:
+ *             type: string
  *         gift:
  *           type: string
  *         sync_level:
@@ -86,7 +62,14 @@ router.get('/health-check', (req: Request, res: Response) => {
  *         home_island:
  *           type: string
  *         appearance:
- *           type: string
+ *           type: object
+ *           properties:
+ *             text:
+ *               type: string
+ *             images:
+ *               type: array
+ *               items:
+ *                 type: string
  *         personality:
  *           type: string
  *         biography:
@@ -105,6 +88,11 @@ router.get('/health-check', (req: Request, res: Response) => {
  *           type: object
  *         inventory:
  *           type: string
+ *           description: JSON string representing the character's inventory.
+ *         character_images:
+ *           type: array
+ *           items:
+ *             type: string
  *         currency:
  *           type: integer
  *
@@ -219,7 +207,7 @@ router.post('/characters', async (req: Request, res: Response) => {
     const characterParams = [
       character.vk_id, 'на рассмотрении', character.character_name, character.nickname, character.age,
       character.rank, character.faction, character.faction_position, character.home_island,
-      character.appearance, JSON.stringify(character.character_images || []), character.personality, character.biography,
+      JSON.stringify(character.appearance || {}), JSON.stringify(character.character_images || []), character.personality, character.biography,
       JSON.stringify(character.archetypes || []),
       JSON.stringify(character.attributes || {}),
       20, // attribute_points_total
@@ -249,7 +237,7 @@ router.post('/characters', async (req: Request, res: Response) => {
         }
         const contractParams = [
           characterId, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
-          contract.creature_description, contract.creature_image, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities)
+          contract.creature_description, JSON.stringify(contract.creature_image || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities)
         ];
         await db.run(contractSql, contractParams);
       }
@@ -360,10 +348,12 @@ router.get('/my-anketas/:vk_id', async (req: Request, res: Response) => {
       character.aura_cells = JSON.parse(character.aura_cells || '{}');
       character.inventory = JSON.parse(character.inventory || '[]');
       character.character_images = JSON.parse(character.character_images || '[]');
+      character.appearance = JSON.parse(character.appearance || '{}');
 
       const contracts = await db.all('SELECT * FROM Contracts WHERE character_id = ?', character.id);
       contracts.forEach(contract => {
         contract.abilities = JSON.parse(contract.abilities || '[]');
+        contract.creature_image = JSON.parse(contract.creature_image || '[]');
       });
 
       return { ...character, contracts };
@@ -427,10 +417,12 @@ router.get('/characters/:id', async (req: Request, res: Response) => {
     character.aura_cells = JSON.parse(character.aura_cells || '{}');
     character.inventory = JSON.parse(character.inventory || '[]');
     character.character_images = JSON.parse(character.character_images || '[]');
+    character.appearance = JSON.parse(character.appearance || '{}');
     
     const contracts = await db.all('SELECT * FROM Contracts WHERE character_id = ?', id);
     contracts.forEach(contract => {
       contract.abilities = JSON.parse(contract.abilities || '[]');
+      contract.creature_image = JSON.parse(contract.creature_image || '[]');
     });
 
     res.json({ ...character, contracts });
@@ -540,7 +532,7 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
             }
             const contractParams = [
               id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
-              contract.creature_description, contract.creature_image, contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
+              contract.creature_description, JSON.stringify(contract.creature_image || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
             ];
             await db.run(contractSql, contractParams);
         }
@@ -728,7 +720,7 @@ router.post('/market/items', async (req: Request, res: Response) => {
     const db = await initDB();
     const { name, description, price, item_type, item_data, image_url, quantity } = req.body;
     const sql = `INSERT INTO MarketItems (name, description, price, item_type, item_data, image_url, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-    const result = await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, quantity]);
+    const result = await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), JSON.stringify(image_url || []), quantity]);
     res.status(201).json({ id: result.lastID });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -766,6 +758,7 @@ router.get('/market/items', async (req: Request, res: Response) => {
     const items = await db.all(query, params);
     items.forEach(item => {
       item.item_data = JSON.parse(item.item_data || '{}');
+      item.image_url = JSON.parse(item.image_url || '[]');
     });
     res.json(items);
   } catch (error) {
@@ -785,7 +778,7 @@ router.put('/market/items/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, description, price, item_type, item_data, image_url, quantity } = req.body;
     const sql = `UPDATE MarketItems SET name = ?, description = ?, price = ?, item_type = ?, item_data = ?, image_url = ?, quantity = ? WHERE id = ?`;
-    await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), image_url, quantity, id]);
+    await db.run(sql, [name, description, price, item_type, JSON.stringify(item_data), JSON.stringify(image_url || []), quantity, id]);
     res.json({ message: 'Market item updated successfully' });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -825,7 +818,8 @@ router.post('/market/purchase', async (req: Request, res: Response) => {
         name: item.name,
         description: item.description,
         type: item.item_type,
-        ...itemData
+        ...itemData,
+        image_url: JSON.parse(item.image_url || '[]')
     };
 
     inventory.push(newItem);
@@ -891,7 +885,7 @@ router.post('/market/sell', async (req: Request, res: Response) => {
       price,
       itemToSell.type,
       JSON.stringify(itemToSell), // Сохраняем все данные о предмете
-      itemToSell.image || null,
+      JSON.stringify(itemToSell.image_url || []),
       1 // Всегда продаем по 1 штуке
     ]);
 
