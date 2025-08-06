@@ -95,6 +95,8 @@ export async function initDB() {
         sync_level INTEGER,
         unity_stage TEXT,
         abilities TEXT,
+        manifestation TEXT,
+        dominion TEXT,
         FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE
       );
     `);

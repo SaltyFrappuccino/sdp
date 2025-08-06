@@ -228,8 +228,8 @@ router.post('/characters', async (req: Request, res: Response) => {
     // Вставляем контракты, связанные с персонажем
     if (contracts.length > 0) {
       const contractSql = `
-        INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_images, gift, sync_level, unity_stage, abilities)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_images, gift, sync_level, unity_stage, abilities, manifestation, dominion)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       for (const contract of contracts) {
         if (contract.sync_level < 0 || contract.sync_level > 100) {
@@ -237,7 +237,8 @@ router.post('/characters', async (req: Request, res: Response) => {
         }
         const contractParams = [
           characterId, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
-          contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities)
+          contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities),
+          contract.manifestation, contract.dominion
         ];
         await db.run(contractSql, contractParams);
       }
@@ -527,8 +528,8 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
     if (Array.isArray(contracts)) {
         await db.run('DELETE FROM Contracts WHERE character_id = ?', id);
         const contractSql = `
-            INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_images, gift, sync_level, unity_stage, abilities)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_images, gift, sync_level, unity_stage, abilities, manifestation, dominion)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         for (const contract of contracts) {
             if (contract.sync_level < 0 || contract.sync_level > 100) {
@@ -536,7 +537,8 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
             }
             const contractParams = [
               id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
-              contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || [])
+              contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || []),
+              contract.manifestation, contract.dominion
             ];
             await db.run(contractSql, contractParams);
         }
