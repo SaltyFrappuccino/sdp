@@ -903,4 +903,166 @@ router.post('/market/sell', async (req: Request, res: Response) => {
   }
 });
 
+//** Character Updates **//
+
+// POST /api/characters/:id/updates - Создать запрос на изменение
+router.post('/characters/:id/updates', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+    const { updated_data } = req.body;
+
+    if (!updated_data) {
+      return res.status(400).json({ error: 'updated_data is required' });
+    }
+
+    const sql = `INSERT INTO CharacterUpdates (character_id, updated_data) VALUES (?, ?)`;
+    const result = await db.run(sql, [id, JSON.stringify(updated_data)]);
+
+    res.status(201).json({ message: 'Update request created successfully', updateId: result.lastID });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to create update request for character ${req.params.id}:`, error);
+    res.status(500).json({ error: 'Не удалось создать запрос на изменение', details: errorMessage });
+  }
+});
+
+// GET /api/updates - Получить список всех ожидающих изменений
+router.get('/updates', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const updates = await db.all("SELECT * FROM CharacterUpdates WHERE status = 'pending'");
+    res.json(updates);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Failed to fetch updates:', error);
+    res.status(500).json({ error: 'Не удалось получить список изменений', details: errorMessage });
+  }
+});
+
+// GET /api/updates/:update_id - Получить детали одного изменения и оригинальные данные
+router.get('/updates/:update_id', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { update_id } = req.params;
+
+    const update = await db.get('SELECT * FROM CharacterUpdates WHERE id = ?', update_id);
+    if (!update) {
+      return res.status(404).json({ error: 'Update request not found' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', update.character_id);
+    if (!character) {
+      return res.status(404).json({ error: 'Character not found for this update' });
+    }
+    
+    // Парсим JSON поля, чтобы фронтенду было удобнее
+    update.updated_data = JSON.parse(update.updated_data || '{}');
+    character.archetypes = JSON.parse(character.archetypes || '[]');
+    character.attributes = JSON.parse(character.attributes || '{}');
+    character.aura_cells = JSON.parse(character.aura_cells || '{}');
+    character.inventory = JSON.parse(character.inventory || '[]');
+    character.character_images = JSON.parse(character.character_images || '[]');
+
+    res.json({ update, original_character: character });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to fetch update request ${req.params.update_id}:`, error);
+    res.status(500).json({ error: 'Не удалось получить детали изменения', details: errorMessage });
+  }
+});
+
+// POST /api/updates/:update_id/approve - Одобрить изменение
+router.post('/updates/:update_id/approve', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+      return res.status(403).json({ error: 'Forbidden' });
+  }
+  
+  try {
+    const db = await initDB();
+    const { update_id } = req.params;
+
+    const update = await db.get('SELECT * FROM CharacterUpdates WHERE id = ?', update_id);
+    if (!update) {
+      return res.status(404).json({ error: 'Update request not found' });
+    }
+
+    const updatedData = JSON.parse(update.updated_data);
+    const { contracts, ...characterFields } = updatedData;
+
+    // Удаляем поля, которые не должны обновляться напрямую
+    delete characterFields.id;
+    delete characterFields.vk_id;
+    delete characterFields.created_at;
+    delete characterFields.updated_at;
+
+    const keys = Object.keys(characterFields);
+    if (keys.length > 0) {
+      const setClause = keys.map(key => `${key} = ?`).join(', ');
+      const values = keys.map(key => {
+        let value = characterFields[key];
+        if (typeof value === 'object') {
+          value = JSON.stringify(value);
+        }
+        return value;
+      });
+
+      const sql = `UPDATE Characters SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+      await db.run(sql, [...values, update.character_id]);
+    }
+    
+    // Обновление контрактов, если они есть
+    if (Array.isArray(contracts)) {
+        await db.run('DELETE FROM Contracts WHERE character_id = ?', update.character_id);
+        const contractSql = `
+            INSERT INTO Contracts (character_id, contract_name, creature_name, creature_rank, creature_spectrum, creature_description, creature_images, gift, sync_level, unity_stage, abilities, manifestation, dominion)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        for (const contract of contracts) {
+            const contractParams = [
+              update.character_id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
+              contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || []),
+              contract.manifestation, contract.dominion
+            ];
+            await db.run(contractSql, contractParams);
+        }
+    }
+
+    await db.run("UPDATE CharacterUpdates SET status = 'approved' WHERE id = ?", update_id);
+
+    res.json({ message: 'Update request approved and character updated' });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to approve update request ${req.params.update_id}:`, error);
+    res.status(500).json({ error: 'Не удалось одобрить изменение', details: errorMessage });
+  }
+});
+
+// POST /api/updates/:update_id/reject - Отклонить изменение
+router.post('/updates/:update_id/reject', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+      return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const db = await initDB();
+    const { update_id } = req.params;
+
+    const result = await db.run("UPDATE CharacterUpdates SET status = 'rejected' WHERE id = ?", update_id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Update request not found' });
+    }
+
+    res.json({ message: 'Update request rejected' });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error(`Failed to reject update request ${req.params.update_id}:`, error);
+    res.status(500).json({ error: 'Не удалось отклонить изменение', details: errorMessage });
+  }
+});
+
+
 export default router;

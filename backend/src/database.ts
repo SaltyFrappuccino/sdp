@@ -141,6 +141,17 @@ export async function initDB() {
       );
     `);
 
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS CharacterUpdates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER,
+        updated_data TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(character_id) REFERENCES Characters(id)
+      );
+    `);
+
     return db;
   } catch (error) {
     console.error('Error initializing database:', error);
