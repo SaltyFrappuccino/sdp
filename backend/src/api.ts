@@ -931,7 +931,12 @@ router.post('/characters/:id/updates', async (req: Request, res: Response) => {
 router.get('/updates', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
-    const updates = await db.all("SELECT * FROM CharacterUpdates WHERE status = 'pending'");
+    const updates = await db.all(`
+      SELECT u.id, u.character_id, u.status, u.created_at, c.character_name
+      FROM CharacterUpdates u
+      JOIN Characters c ON u.character_id = c.id
+      WHERE u.status = 'pending'
+    `);
     res.json(updates);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
