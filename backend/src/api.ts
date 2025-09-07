@@ -531,7 +531,17 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
       let value = characterFields[key];
       // Специальная обработка для поля appearance
       if (key === 'appearance' && typeof value === 'object' && value !== null && 'text' in value) {
-        value = (value as any).text;
+        // Если text содержит JSON строку, парсим её
+        if (typeof (value as any).text === 'string' && (value as any).text.startsWith('{')) {
+          try {
+            const parsedAppearance = JSON.parse((value as any).text);
+            value = parsedAppearance.text || '';
+          } catch (e) {
+            value = (value as any).text;
+          }
+        } else {
+          value = (value as any).text;
+        }
       } else if (typeof value === 'object') {
         value = JSON.stringify(value);
       }

@@ -39,6 +39,7 @@ interface Item {
     description: string;
     type: 'Обычный' | 'Синки';
     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+    rank?: string;
     image_url?: string[];
 }
 
@@ -138,7 +139,15 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
         const data = await response.json();
         // Преобразование для обратной совместимости, если appearance - строка
         if (typeof data.appearance === 'string' || !data.appearance) {
-          data.appearance = { text: data.appearance || '' };
+          data.appearance = { text: data.appearance || '', images: [] };
+        } else if (data.appearance && typeof data.appearance.text === 'string' && data.appearance.text.startsWith('{')) {
+          // Если text содержит JSON, парсим его
+          try {
+            const parsedAppearance = JSON.parse(data.appearance.text);
+            data.appearance = parsedAppearance;
+          } catch (e) {
+            // Если не удалось распарсить, оставляем как есть
+          }
         }
         if (!data.character_images) {
           data.character_images = [];
@@ -151,6 +160,8 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
         if (data.inventory) {
             data.inventory.forEach((i: Item) => {
                 if (!i.image_url) i.image_url = [];
+                if (!i.sinki_type) i.sinki_type = undefined;
+                if (!i.rank) i.rank = undefined;
             });
         }
         setCharacter(data);
@@ -481,6 +492,9 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
                   { label: 'Нейтрал', value: 'Нейтрал' },
                 ]}
               />
+            </FormItem>
+            <FormItem top="Позиция во фракции">
+              <Input name="faction_position" value={character.faction_position} onChange={handleChange} />
             </FormItem>
             <FormItem top="Родной остров">
               <Select
