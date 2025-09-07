@@ -116,8 +116,9 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
 
-  const handleImportAnketa = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleImportAnketa = async (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
     if (!file) return;
 
     try {
@@ -167,9 +168,6 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
         </Snackbar>
       );
     }
-    
-    // Очищаем input
-    event.target.value = '';
   };
   useEffect(() => {
     const fetchCharacter = async () => {
@@ -524,18 +522,20 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
 
           <Div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportAnketa}
-                style={{ display: 'none' }}
-                id="import-anketa-editor"
-              />
-              <label htmlFor="import-anketa-editor">
-                <Button size="l" mode="outline" style={{ width: '100%' }}>
-                  📥 Импорт анкеты
-                </Button>
-              </label>
+              <Button 
+                size="l" 
+                mode="outline" 
+                style={{ width: '100%' }}
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.json';
+                  input.onchange = handleImportAnketa;
+                  input.click();
+                }}
+              >
+                📥 Импорт анкеты
+              </Button>
             </div>
             <Button size="l" stretched onClick={handleSave}>
               {character.status === 'Принято' ? 'Отправить на проверку' : 'Сохранить изменения'}

@@ -122,8 +122,9 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
 
-  const handleImportAnketa = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleImportAnketa = async (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
     if (!file) return;
 
     try {
@@ -172,9 +173,6 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         </Snackbar>
       );
     }
-    
-    // Очищаем input
-    event.target.value = '';
   };
 
   const [formData, setFormData] = useState({
@@ -661,18 +659,20 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
       <Div>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          <input
-            type="file"
-            accept=".json"
-            onChange={handleImportAnketa}
-            style={{ display: 'none' }}
-            id="import-anketa"
-          />
-          <label htmlFor="import-anketa">
-            <Button size="l" mode="outline" style={{ width: '100%' }}>
-              📥 Импорт анкеты
-            </Button>
-          </label>
+          <Button 
+            size="l" 
+            mode="outline" 
+            style={{ width: '100%' }}
+            onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.json';
+              input.onchange = handleImportAnketa;
+              input.click();
+            }}
+          >
+            📥 Импорт анкеты
+          </Button>
         </div>
         <Button size="l" stretched onClick={handleSubmit}>
           {isEditing ? 'Сохранить изменения' : 'Отправить анкету'}
