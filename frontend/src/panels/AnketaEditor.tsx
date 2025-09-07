@@ -48,6 +48,18 @@ interface Contract {
     unity_stage: string;
     abilities: any[];
     creature_images?: string[];
+    manifestation?: {
+        avatar_description: string;
+        passive_enhancement: string;
+        ultimate_technique: string;
+    };
+    dominion?: {
+        name: string;
+        environment_description: string;
+        law_name: string;
+        law_description: string;
+        tactical_effects: string;
+    };
 }
 
 interface CharacterData {

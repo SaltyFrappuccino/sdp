@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Panel, PanelHeader, Button, Div, Spacing, ScreenSpinner, Group, Cell, Header } from '@vkontakte/vkui';
 import { getVersionDiff } from '../utils/diff';

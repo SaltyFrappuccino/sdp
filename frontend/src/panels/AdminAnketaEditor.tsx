@@ -53,8 +53,18 @@ interface Contract {
     unity_stage: string;
     abilities: any[];
     creature_images?: string[];
-    manifestation?: string;
-    dominion?: string;
+    manifestation?: {
+        avatar_description: string;
+        passive_enhancement: string;
+        ultimate_technique: string;
+    };
+    dominion?: {
+        name: string;
+        environment_description: string;
+        law_name: string;
+        law_description: string;
+        tactical_effects: string;
+    };
 }
 
 interface CharacterData {
@@ -90,8 +100,18 @@ const emptyContract = {
   sync_level: 0,
   unity_stage: 'Ступень I - Активация',
   abilities: [],
-  manifestation: '',
-  dominion: '',
+  manifestation: {
+    avatar_description: '',
+    passive_enhancement: '',
+    ultimate_technique: ''
+  },
+  dominion: {
+    name: '',
+    environment_description: '',
+    law_name: '',
+    law_description: '',
+    tactical_effects: ''
+  },
 };
 
 const getUnityStage = (syncLevel: number): string => {

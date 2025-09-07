@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { FormItem, Input, Textarea, Header, Div, Card, Separator } from '@vkontakte/vkui';
+import { FormItem, Textarea, Header, Div, Card, Separator } from '@vkontakte/vkui';
 
 interface ManifestationData {
   avatar_description: string;
