@@ -200,9 +200,9 @@ router.post('/characters', async (req: Request, res: Response) => {
       INSERT INTO Characters (
         vk_id, status, character_name, nickname, age, rank, faction, faction_position, home_island,
         appearance, character_images, personality, biography, archetypes, attributes,
-        attribute_points_total, attribute_points_spent, aura_cells, inventory, currency, admin_note
+        attribute_points_total, attribute_points_spent, aura_cells, inventory, currency, admin_note, life_status
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const characterParams = [
       character.vk_id, 'на рассмотрении', character.character_name, character.nickname, character.age,
@@ -210,12 +210,13 @@ router.post('/characters', async (req: Request, res: Response) => {
       (character.appearance?.text || ''), JSON.stringify(character.character_images || []), character.personality, character.biography,
       JSON.stringify(character.archetypes || []),
       JSON.stringify(character.attributes || {}),
-      20, // attribute_points_total
+      220, // attribute_points_total
       spentPoints, // attribute_points_spent
       JSON.stringify(auraCells),
       JSON.stringify(character.inventory || []),
       character.currency,
-      character.admin_note
+      character.admin_note,
+      character.life_status || 'Жив'
     ];
 
     const result = await db.run(characterSql, characterParams);
@@ -238,7 +239,7 @@ router.post('/characters', async (req: Request, res: Response) => {
         const contractParams = [
           characterId, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
           contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities),
-          contract.manifestation, contract.dominion
+          JSON.stringify(contract.manifestation), JSON.stringify(contract.dominion)
         ];
         await db.run(contractSql, contractParams);
       }
@@ -354,6 +355,8 @@ router.get('/my-anketas/:vk_id', async (req: Request, res: Response) => {
       contracts.forEach(contract => {
         contract.abilities = JSON.parse(contract.abilities || '[]');
         contract.creature_images = JSON.parse(contract.creature_images || '[]');
+        contract.manifestation = JSON.parse(contract.manifestation || 'null');
+        contract.dominion = JSON.parse(contract.dominion || 'null');
       });
 
       return { ...character, contracts };
@@ -422,6 +425,8 @@ router.get('/characters/:id', async (req: Request, res: Response) => {
     contracts.forEach(contract => {
       contract.abilities = JSON.parse(contract.abilities || '[]');
       contract.creature_images = JSON.parse(contract.creature_images || '[]');
+      contract.manifestation = JSON.parse(contract.manifestation || 'null');
+      contract.dominion = JSON.parse(contract.dominion || 'null');
     });
 
     res.json({ ...character, contracts });
@@ -538,7 +543,7 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
             const contractParams = [
               id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
               contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || []),
-              contract.manifestation, contract.dominion
+              JSON.stringify(contract.manifestation), JSON.stringify(contract.dominion)
             ];
             await db.run(contractSql, contractParams);
         }
@@ -1028,7 +1033,7 @@ router.post('/updates/:update_id/approve', async (req: Request, res: Response) =
             const contractParams = [
               update.character_id, contract.contract_name, contract.creature_name, contract.creature_rank, contract.creature_spectrum,
               contract.creature_description, JSON.stringify(contract.creature_images || []), contract.gift, contract.sync_level, contract.unity_stage, JSON.stringify(contract.abilities || []),
-              contract.manifestation, contract.dominion
+              JSON.stringify(contract.manifestation), JSON.stringify(contract.dominion)
             ];
             await db.run(contractSql, contractParams);
         }
