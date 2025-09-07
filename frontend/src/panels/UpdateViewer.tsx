@@ -5,6 +5,19 @@ import { getVersionDiff } from '../utils/diff';
 import axios, { AxiosResponse } from 'axios';
 import { API_URL } from '../api';
 
+const formatValue = (value: any): string => {
+  if (value === null || value === undefined) {
+    return '(пусто)';
+  }
+  if (typeof value === 'string' && value.trim() === '') {
+    return '(пустая строка)';
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value, null, 2);
+  }
+  return String(value);
+};
+
 interface UpdateData {
   id: number;
   anketa_id: number;
@@ -34,7 +47,7 @@ const UpdateViewer = ({ id }: { id: string }) => {
           new_data: newData,
         };
         setUpdate(updatePayload);
-        const differences = getVersionDiff(oldData, newData);
+        const differences = getVersionDiff(newData, oldData);
         setDiffResult(differences);
         setLoading(false);
       }).catch((error: any) => {
@@ -94,9 +107,9 @@ const UpdateViewer = ({ id }: { id: string }) => {
               <Cell key={key} multiline>
                 <strong>{key}:</strong>
                 <Div>
-                  <span style={{ color: 'red' }}>- {JSON.stringify(diffResult.changed[key].from)}</span>
+                  <span style={{ color: 'red' }}>- {formatValue(diffResult.changed[key].from)}</span>
                   <br />
-                  <span style={{ color: 'green' }}>+ {JSON.stringify(diffResult.changed[key].to)}</span>
+                  <span style={{ color: 'green' }}>+ {formatValue(diffResult.changed[key].to)}</span>
                 </Div>
               </Cell>
             ))}
@@ -104,14 +117,14 @@ const UpdateViewer = ({ id }: { id: string }) => {
           <Group header={<Header>Добавленные поля</Header>}>
             {diffResult.added && Object.keys(diffResult.added).map(key => (
               <Cell key={key} multiline>
-                <strong>{key}:</strong> {JSON.stringify(diffResult.added[key])}
+                <strong>{key}:</strong> {formatValue(diffResult.added[key])}
               </Cell>
             ))}
           </Group>
           <Group header={<Header>Удаленные поля</Header>}>
             {diffResult.removed && Object.keys(diffResult.removed).map(key => (
               <Cell key={key} multiline>
-                <strong>{key}:</strong> {JSON.stringify(diffResult.removed[key])}
+                <strong>{key}:</strong> {formatValue(diffResult.removed[key])}
               </Cell>
             ))}
           </Group>

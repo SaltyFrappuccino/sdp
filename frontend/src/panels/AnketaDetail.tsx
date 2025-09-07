@@ -33,6 +33,19 @@ import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
 import { getVersionDiff } from '../utils/diff';
 
+const formatValue = (value: any): string => {
+  if (value === null || value === undefined) {
+    return '(пусто)';
+  }
+  if (typeof value === 'string' && value.trim() === '') {
+    return '(пустая строка)';
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value, null, 2);
+  }
+  return String(value);
+};
+
 interface Item {
     name: string;
     description: string;
@@ -176,9 +189,13 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                       <Accordion.Content>
                         <Div>
                           {(() => {
-                            const currentVersionData = version.data ? JSON.parse(version.data) : {};
+                            const currentVersionData = version.data ? 
+                              (typeof version.data === 'string' ? JSON.parse(version.data) : version.data) : {};
                             const previousVersionData = versions[versions.indexOf(version) + 1]
-                              ? JSON.parse((versions[versions.indexOf(version) + 1] as any).data)
+                              ? (() => {
+                                  const prevData = (versions[versions.indexOf(version) + 1] as any).data;
+                                  return prevData ? (typeof prevData === 'string' ? JSON.parse(prevData) : prevData) : null;
+                                })()
                               : null;
                             const diff = getVersionDiff(currentVersionData, previousVersionData);
 
@@ -189,8 +206,8 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                                     {Object.entries(diff.changed).map(([key, { from, to }]) => (
                                       <SimpleCell key={key} multiline>
                                         <Text><b>{key}:</b></Text>
-                                        <Text>Было: {JSON.stringify(from)}</Text>
-                                        <Text>Стало: {JSON.stringify(to)}</Text>
+                                        <Text>Было: {formatValue(from)}</Text>
+                                        <Text>Стало: {formatValue(to)}</Text>
                                       </SimpleCell>
                                     ))}
                                   </Group>
@@ -199,7 +216,7 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                                   <Group header={<Header subtitle="Добавлено" />}>
                                     {Object.entries(diff.added).map(([key, value]) => (
                                       <SimpleCell key={key} multiline>
-                                        <b>{key}:</b> {JSON.stringify(value)}
+                                        <b>{key}:</b> {formatValue(value)}
                                       </SimpleCell>
                                     ))}
                                   </Group>

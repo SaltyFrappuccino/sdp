@@ -1,6 +1,9 @@
 // sdp_vk/frontend/src/utils/diff.ts
 
 const isJsonString = (str: any) => {
+  if (typeof str !== 'string' || str.trim() === '') {
+    return false;
+  }
   try {
     JSON.parse(str);
   } catch (e) {
