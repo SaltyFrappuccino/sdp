@@ -104,7 +104,7 @@ const getUnityStage = (syncLevel: number): string => {
   return 'Ступень I - Активация';
 };
 
-export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null) => void; fetchedUser?: UserInfo }> = ({ id }) => {
+export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null) => void; fetchedUser?: UserInfo }> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
   const params = useParams<'id'>();
   const characterId = params?.id;
@@ -268,6 +268,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
           headers: {
             'Content-Type': 'application/json',
             'x-admin-id': adminId || '',
+            'x-user-vk-id': fetchedUser?.id?.toString() || '',
           },
           body: JSON.stringify({ updated_data: character }),
         });
@@ -278,6 +279,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
           headers: {
             'Content-Type': 'application/json',
             'x-admin-id': adminId || '',
+            'x-user-vk-id': fetchedUser?.id?.toString() || '',
           },
           body: JSON.stringify(character),
         });

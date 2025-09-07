@@ -474,8 +474,24 @@ router.post('/admin/login', (req: Request, res: Response) => {
 
 router.put('/characters/:id', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
+  const userVkId = req.headers['x-user-vk-id'];
+  
+  // Проверяем, является ли пользователь админом или владельцем анкеты
   if (adminId !== ADMIN_VK_ID) {
-    return res.status(403).json({ error: 'Forbidden' });
+    if (!userVkId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    // Проверяем, принадлежит ли анкета пользователю
+    try {
+      const db = await initDB();
+      const character = await db.get('SELECT vk_id FROM Characters WHERE id = ?', [req.params.id]);
+      if (!character || character.vk_id !== parseInt(userVkId as string)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: 'Database error' });
+    }
   }
   try {
     const db = await initDB();
@@ -912,6 +928,21 @@ router.post('/market/sell', async (req: Request, res: Response) => {
 
 // POST /api/characters/:id/updates - Создать запрос на изменение
 router.post('/characters/:id/updates', async (req: Request, res: Response) => {
+  const userVkId = req.headers['x-user-vk-id'];
+  
+  // Проверяем, принадлежит ли анкета пользователю
+  if (userVkId) {
+    try {
+      const db = await initDB();
+      const character = await db.get('SELECT vk_id FROM Characters WHERE id = ?', [req.params.id]);
+      if (!character || character.vk_id !== parseInt(userVkId as string)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+  }
+  
   try {
     const db = await initDB();
     const { id } = req.params;
