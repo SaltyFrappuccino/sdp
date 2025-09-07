@@ -1,6 +1,9 @@
 # Используем официальный Node.js образ
 FROM node:20-alpine
 
+# Устанавливаем необходимые пакеты для компиляции sqlite3
+RUN apk add --no-cache python3 py3-pip make gcc g++ musl-dev
+
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
@@ -8,7 +11,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Устанавливаем зависимости
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Копируем исходный код
 COPY . .
