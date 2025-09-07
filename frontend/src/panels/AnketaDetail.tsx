@@ -24,14 +24,16 @@ import {
   ModalPage,
   ModalPageHeader,
   CardGrid,
-  Image
+  Image,
+  Snackbar
 } from '@vkontakte/vkui';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, ReactNode } from 'react';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
 import { getVersionDiff } from '../utils/diff';
+import { exportAnketaToJson, downloadJsonFile } from '../utils/anketaExport';
 
 const formatValue = (value: any): string => {
   if (value === null || value === undefined) {
@@ -114,12 +116,35 @@ export interface AnketaDetailProps extends NavIdProps {
   fetchedUser?: UserInfo;
 }
 
-export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
+export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
   const params = useParams<'id'>();
   const characterId = params?.id;
   const [character, setCharacter] = useState<Character | null>(null);
   const [loading, setLoading] = useState(true);
+  const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+
+  const handleExportAnketa = () => {
+    if (!character) return;
+    
+    try {
+      const jsonString = exportAnketaToJson(character, fetchedUser);
+      const filename = `anketa_${character.character_name}_${new Date().toISOString().split('T')[0]}.json`;
+      downloadJsonFile(jsonString, filename);
+      
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Анкета успешно экспортирована!
+        </Snackbar>
+      );
+    } catch (error) {
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Ошибка при экспорте анкеты
+        </Snackbar>
+      );
+    }
+  };
   const [activeTab, setActiveTab] = useState('general');
   const [versions, setVersions] = useState<any[]>([]);
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -477,11 +502,15 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
             <Button stretched size="l" mode="secondary" onClick={fetchVersions}>
               История изменений
             </Button>
+            <Button stretched size="l" mode="outline" onClick={handleExportAnketa} style={{ marginTop: '8px' }}>
+              📄 Экспорт анкеты
+            </Button>
           </Div>
         </>
       ) : (
         <Div>Не удалось загрузить данные персонажа.</Div>
       )}
+      {snackbar}
     </Panel>
   );
 };

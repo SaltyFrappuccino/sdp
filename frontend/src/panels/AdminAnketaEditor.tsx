@@ -33,6 +33,7 @@ import { InventoryManager } from '../components/InventoryManager';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
+import { importAnketaFromJson, readJsonFile } from '../utils/anketaExport';
 
 interface Item {
     name: string;
@@ -130,6 +131,62 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
   const [character, setCharacter] = useState<CharacterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+
+  const handleImportAnketa = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const jsonString = await readJsonFile(file);
+      const importedData = importAnketaFromJson(jsonString);
+      
+      if (importedData && character) {
+        // Заполняем форму импортированными данными
+        setCharacter({
+          ...character,
+          character_name: importedData.character_name,
+          nickname: importedData.nickname,
+          age: importedData.age,
+          rank: importedData.rank as Rank,
+          faction: importedData.faction,
+          faction_position: importedData.faction_position,
+          home_island: importedData.home_island,
+          appearance: importedData.appearance,
+          character_images: importedData.character_images,
+          personality: importedData.personality,
+          biography: importedData.biography,
+          archetypes: importedData.archetypes,
+          attributes: importedData.attributes,
+          contracts: importedData.contracts,
+          inventory: importedData.inventory,
+          currency: importedData.currency,
+          admin_note: importedData.admin_note,
+          life_status: importedData.life_status
+        });
+        
+        setSnackbar(
+          <Snackbar onClose={() => setSnackbar(null)}>
+            Анкета успешно импортирована!
+          </Snackbar>
+        );
+      } else {
+        setSnackbar(
+          <Snackbar onClose={() => setSnackbar(null)}>
+            Ошибка при импорте анкеты. Проверьте формат файла.
+          </Snackbar>
+        );
+      }
+    } catch (error) {
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Ошибка при чтении файла
+        </Snackbar>
+      );
+    }
+    
+    // Очищаем input
+    event.target.value = '';
+  };
 
   useEffect(() => {
     const fetchCharacter = async () => {
@@ -605,16 +662,32 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
             </FormItem>
           </Group>
 
-          <Div style={{ display: 'flex', gap: '8px' }}>
-            <Button size="l" stretched onClick={handleSave}>
-              Сохранить
-            </Button>
+          <Div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportAnketa}
+                style={{ display: 'none' }}
+                id="import-anketa-admin"
+              />
+              <label htmlFor="import-anketa-admin">
+                <Button size="l" mode="outline" style={{ width: '100%' }}>
+                  📥 Импорт анкеты
+                </Button>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Button size="l" stretched onClick={handleSave}>
+                Сохранить
+              </Button>
             <Button size="l" stretched mode="secondary" onClick={handleAICheck}>
               Проверить ИИ
             </Button>
             <Button size="l" stretched mode="secondary" onClick={handleShowHistory}>
               История проверок ИИ
             </Button>
+            </div>
           </Div>
           {snackbar}
         </>

@@ -31,6 +31,7 @@ import { InventoryManager } from '../components/InventoryManager';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
+import { importAnketaFromJson, readJsonFile } from '../utils/anketaExport';
 import ReactMarkdown from 'react-markdown';
 
 export interface AnketaProps extends NavIdProps {
@@ -121,6 +122,61 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
 
+  const handleImportAnketa = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const jsonString = await readJsonFile(file);
+      const importedData = importAnketaFromJson(jsonString);
+      
+      if (importedData) {
+        // Заполняем форму импортированными данными
+        setFormData({
+          character_name: importedData.character_name,
+          nickname: importedData.nickname,
+          age: String(importedData.age),
+          rank: importedData.rank as Rank,
+          faction: importedData.faction,
+          faction_position: importedData.faction_position,
+          home_island: importedData.home_island,
+          appearance: importedData.appearance,
+          character_images: importedData.character_images,
+          personality: importedData.personality,
+          biography: importedData.biography,
+          archetypes: importedData.archetypes,
+          attributes: importedData.attributes,
+          contracts: importedData.contracts,
+          inventory: importedData.inventory,
+          currency: importedData.currency,
+          admin_note: importedData.admin_note,
+          life_status: importedData.life_status
+        });
+        
+        setSnackbar(
+          <Snackbar onClose={() => setSnackbar(null)}>
+            Анкета успешно импортирована!
+          </Snackbar>
+        );
+      } else {
+        setSnackbar(
+          <Snackbar onClose={() => setSnackbar(null)}>
+            Ошибка при импорте анкеты. Проверьте формат файла.
+          </Snackbar>
+        );
+      }
+    } catch (error) {
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Ошибка при чтении файла
+        </Snackbar>
+      );
+    }
+    
+    // Очищаем input
+    event.target.value = '';
+  };
+
   const [formData, setFormData] = useState({
     character_name: '',
     nickname: '',
@@ -139,6 +195,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     currency: 0,
     admin_note: '',
     character_images: [] as string[],
+    life_status: 'Жив' as 'Жив' | 'Мёртв',
   });
 
   useEffect(() => {
@@ -603,6 +660,20 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       </Group>
 
       <Div>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+          <input
+            type="file"
+            accept=".json"
+            onChange={handleImportAnketa}
+            style={{ display: 'none' }}
+            id="import-anketa"
+          />
+          <label htmlFor="import-anketa">
+            <Button size="l" mode="outline" style={{ width: '100%' }}>
+              📥 Импорт анкеты
+            </Button>
+          </label>
+        </div>
         <Button size="l" stretched onClick={handleSubmit}>
           {isEditing ? 'Сохранить изменения' : 'Отправить анкету'}
         </Button>

@@ -28,6 +28,7 @@ import {
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect, ReactNode } from 'react';
 import { API_URL } from '../api';
+import { exportAnketaToJson, downloadJsonFile } from '../utils/anketaExport';
 import { Icon24CheckCircleOutline, Icon24ErrorCircle, Icon24Add } from '@vkontakte/icons';
 
 interface Character {
@@ -140,6 +141,21 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         {message}
       </Snackbar>
     );
+  };
+
+  const handleExportAnketa = async (characterId: number) => {
+    try {
+      const response = await fetch(`${API_URL}/characters/${characterId}`);
+      const character = await response.json();
+      
+      const jsonString = exportAnketaToJson(character, { first_name: 'Admin' });
+      const filename = `anketa_${character.character_name}_${new Date().toISOString().split('T')[0]}.json`;
+      downloadJsonFile(jsonString, filename);
+      
+      showResultSnackbar('Анкета успешно экспортирована!', true);
+    } catch (error) {
+      showResultSnackbar('Ошибка при экспорте анкеты', false);
+    }
   };
   
   const handleStatusChange = async (characterId: number, status: 'Принято' | 'Отклонено') => {
@@ -363,6 +379,9 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
                   </Button>
                   <Button size="m" appearance="neutral" onClick={() => routeNavigator.push(`/admin_anketa_edit/${char.id}`)}>
                     Редактировать
+                  </Button>
+                  <Button size="m" appearance="positive" onClick={() => handleExportAnketa(char.id)}>
+                    📄 Экспорт
                   </Button>
                   <Button size="m" appearance="negative" onClick={() => handleDeleteCharacter(char.id)}>
                     Удалить
