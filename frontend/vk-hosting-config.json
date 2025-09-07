@@ -7,6 +7,12 @@
     "web": "index.html"
   },
   "proxy": {
-    "/api/": "http://193.162.143.80:3000/"
+    "/api/": {
+      "target": "http://95.81.121.225:8000/",
+      "engine": "nginx",
+      "proxy_custom_options": {
+        "client_max_body_size": "52428800"
+      }
+    }
   }
 }

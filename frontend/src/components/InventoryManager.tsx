@@ -1,104 +1,138 @@
 import { FC } from 'react';
-import { FormItem, Input, Textarea, Button, Select, Header, Div, Group } from '@vkontakte/vkui';
-import { Icon24Delete, Icon24Add } from '@vkontakte/icons';
+import { Group, Header, FormItem, Input, Select, Button, Div, Accordion, IconButton} from '@vkontakte/vkui';
+import { Icon24Add, Icon24Cancel } from '@vkontakte/icons';
 
 interface Item {
-    name: string;
-    description: string;
-    type: 'Обычный' | 'Синки';
-    sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
-    rank?: 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
+  name: string;
+  description: string;
+  type: 'Обычный' | 'Синки';
+  sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+  rank?: string;
+  image_url?: string[];
 }
 
 interface InventoryManagerProps {
-    inventory: Item[];
-    onInventoryChange: (inventory: Item[]) => void;
+  inventory: Item[];
+  onInventoryChange: (inventory: Item[]) => void;
 }
 
 export const InventoryManager: FC<InventoryManagerProps> = ({ inventory, onInventoryChange }) => {
 
-    const handleItemChange = (index: number, field: keyof Item, value: string) => {
-        const newInventory = [...inventory];
-        newInventory[index] = { ...newInventory[index], [field]: value };
-        onInventoryChange(newInventory);
-    };
+  const handleItemChange = (index: number, field: keyof Item, value: any) => {
+    const newInventory = [...inventory];
+    newInventory[index] = { ...newInventory[index], [field]: value };
+    onInventoryChange(newInventory);
+  };
 
-    const addItem = () => {
-        const newItem: Item = { name: '', description: '', type: 'Обычный' };
-        onInventoryChange([...inventory, newItem]);
-    };
+  const addItem = () => {
+    onInventoryChange([...inventory, { name: '', description: '', type: 'Обычный' }]);
+  };
 
-    const removeItem = (index: number) => {
-        const newInventory = inventory.filter((_, i) => i !== index);
-        onInventoryChange(newInventory);
-    };
+  const removeItem = (index: number) => {
+    const newInventory = inventory.filter((_, i) => i !== index);
+    onInventoryChange(newInventory);
+  };
 
-    return (
-        <Group>
-            <Header>Инвентарь</Header>
-            {inventory.map((item, index) => (
-                <Div key={index} style={{ border: '1px solid var(--vkui--color_separator_primary)', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
-                    <FormItem top="Название предмета">
-                        <Input value={item.name} onChange={(e) => handleItemChange(index, 'name', e.target.value)} />
-                    </FormItem>
-                    <FormItem top="Описание предмета">
-                        <Textarea value={item.description} onChange={(e) => handleItemChange(index, 'description', e.target.value)} />
-                    </FormItem>
-                    <FormItem top="Тип предмета">
-                        <Select
-                            value={item.type}
-                            onChange={(e) => handleItemChange(index, 'type', e.target.value)}
-                            options={[
-                                { label: 'Обычный', value: 'Обычный' },
-                                { label: 'Синки', value: 'Синки' },
-                            ]}
-                        />
-                    </FormItem>
-                    {item.type === 'Синки' && (
-                        <FormItem top="Тип Синки">
-                            <Select
-                                value={item.sinki_type}
-                                onChange={(e) => handleItemChange(index, 'sinki_type', e.target.value)}
-                                options={[
-                                    { label: 'Осколок', value: 'Осколок' },
-                                    { label: 'Фокус', value: 'Фокус' },
-                                    { label: 'Эхо', value: 'Эхо' },
-                                ]}
-                            />
-                        </FormItem>
-                    )}
-                    {item.type === 'Синки' && (
-                        <FormItem top="Ранг Синки">
-                            <Select
-                                placeholder="Не выбрано"
-                                value={item.rank}
-                                onChange={(e) => handleItemChange(index, 'rank', e.target.value)}
-                                options={[
-                                    { label: 'F', value: 'F' },
-                                    { label: 'E', value: 'E' },
-                                    { label: 'D', value: 'D' },
-                                    { label: 'C', value: 'C' },
-                                    { label: 'B', value: 'B' },
-                                    { label: 'A', value: 'A' },
-                                    { label: 'S', value: 'S' },
-                                    { label: 'SS', value: 'SS' },
-                                    { label: 'SSS', value: 'SSS' },
-                                ]}
-                            />
-                        </FormItem>
-                    )}
-                    <FormItem>
-                        <Button appearance="negative" onClick={() => removeItem(index)} before={<Icon24Delete />}>
-                            Удалить предмет
-                        </Button>
-                    </FormItem>
-                </Div>
-            ))}
-            <FormItem>
-                <Button onClick={addItem} before={<Icon24Add />}>
-                    Добавить предмет
+  const handleUrlChange = (itemIndex: number, url: string, urlIndex: number) => {
+    const newInventory = [...inventory];
+    const newImages = [...(newInventory[itemIndex].image_url || [])];
+    newImages[urlIndex] = url;
+    handleItemChange(itemIndex, 'image_url', newImages);
+  };
+
+  const addUrlField = (itemIndex: number) => {
+    const newInventory = [...inventory];
+    const newImages = [...(newInventory[itemIndex].image_url || []), ''];
+    handleItemChange(itemIndex, 'image_url', newImages);
+  };
+
+  const removeUrlField = (itemIndex: number, urlIndex: number) => {
+    const newInventory = [...inventory];
+    const newImages = [...(newInventory[itemIndex].image_url || [])];
+    newImages.splice(urlIndex, 1);
+    handleItemChange(itemIndex, 'image_url', newImages);
+  };
+
+  return (
+    <>
+    <Group header={<Header>V. ИНВЕНТАРЬ</Header>}>
+      {inventory.map((item, index) => (
+        <Div key={index} style={{ marginBottom: '12px' }}>
+          <Accordion>
+            <Accordion.Summary>{item.name || 'Новый предмет'}</Accordion.Summary>
+            <Accordion.Content>
+              <Div>
+                <FormItem top="Название">
+                <Input value={item.name} onChange={(e) => handleItemChange(index, 'name', e.target.value)} />
+              </FormItem>
+              <FormItem top="Описание">
+                <Input value={item.description} onChange={(e) => handleItemChange(index, 'description', e.target.value)} />
+              </FormItem>
+              <FormItem top="Изображения предмета (URL)">
+                {item.image_url?.map((url, urlIndex) => (
+                  <div key={urlIndex} style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                    <Input
+                      value={url}
+                      onChange={(e) => handleUrlChange(index, e.target.value, urlIndex)}
+                      style={{ marginRight: 8 }}
+                    />
+                    <IconButton onClick={() => removeUrlField(index, urlIndex)}>
+                      <Icon24Cancel />
+                    </IconButton>
+                  </div>
+                ))}
+                <Button onClick={() => addUrlField(index)} before={<Icon24Add />}>
+                  Добавить URL
                 </Button>
-            </FormItem>
-        </Group>
-    );
+              </FormItem>
+              <FormItem top="Тип">
+                <Select
+                  value={item.type}
+                  onChange={(e) => handleItemChange(index, 'type', e.target.value)}
+                  options={[
+                    { label: 'Обычный', value: 'Обычный' },
+                    { label: 'Синки', value: 'Синки' },
+                  ]}
+                />
+              </FormItem>
+              {item.type === 'Синки' && (
+                <>
+                  <FormItem top="Тип Синки">
+                    <Select
+                      value={item.sinki_type}
+                      onChange={(e) => handleItemChange(index, 'sinki_type', e.target.value)}
+                      options={[
+                        { label: 'Осколок', value: 'Осколок' },
+                        { label: 'Фокус', value: 'Фокус' },
+                        { label: 'Эхо', value: 'Эхо' },
+                      ]}
+                    />
+                  </FormItem>
+                  <FormItem top="Ранг">
+                    <Select
+                      value={item.rank}
+                      onChange={(e) => handleItemChange(index, 'rank', e.target.value)}
+                      options={[
+                        { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
+                        { label: 'C', value: 'C' }, { label: 'B', value: 'B' }, { label: 'A', value: 'A' },
+                        { label: 'S', value: 'S' }, { label: 'SS', value: 'SS' }, { label: 'SSS', value: 'SSS' },
+                      ]}
+                    />
+                  </FormItem>
+                </>
+              )}
+              <FormItem>
+                <Button appearance="negative" onClick={() => removeItem(index)}>Удалить предмет</Button>
+              </FormItem>
+            </Div>
+          </Accordion.Content>
+        </Accordion>
+        </Div>
+      ))}
+      <FormItem>
+        <Button onClick={addItem} before={<Icon24Add />}>Добавить предмет</Button>
+      </FormItem>
+    </Group>
+    </>
+  );
 };

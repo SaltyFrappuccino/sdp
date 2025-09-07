@@ -7,3 +7,4 @@ export { AdminPanel } from './AdminPanel';
 export { AnketaEditor } from './AnketaEditor';
 export { Calculator } from './Calculator';
 export { MarketPanel } from './MarketPanel';
+export { MyAnketasPanel } from './MyAnketasPanel';

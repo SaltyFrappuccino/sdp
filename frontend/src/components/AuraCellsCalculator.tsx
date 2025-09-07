@@ -45,13 +45,13 @@ const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank }) => {
   const auraCellsData: AuraCellData[] = [
     { rank: 'F', small: 2, significant: 0, ultimate: 0 },
     { rank: 'E', small: 4, significant: 0, ultimate: 0 },
-    { rank: 'D', small: 6, significant: 1, ultimate: 0 },
-    { rank: 'C', small: 10, significant: 2, ultimate: 0 },
-    { rank: 'B', small: 15, significant: 3, ultimate: 1 },
-    { rank: 'A', small: 20, significant: 4, ultimate: 2 },
-    { rank: 'S', small: 30, significant: 6, ultimate: 3 },
-    { rank: 'SS', small: 40, significant: 8, ultimate: 4 },
-    { rank: 'SSS', small: 50, significant: 10, ultimate: 5 },
+    { rank: 'D', small: 8, significant: 2, ultimate: 0 },
+    { rank: 'C', small: 16, significant: 4, ultimate: 0 },
+    { rank: 'B', small: 32, significant: 8, ultimate: 1 },
+    { rank: 'A', small: Infinity, significant: 16, ultimate: 2 },
+    { rank: 'S', small: Infinity, significant: Infinity, ultimate: 4 },
+    { rank: 'SS', small: Infinity, significant: Infinity, ultimate: 8 },
+    { rank: 'SSS', small: Infinity, significant: Infinity, ultimate: 16 },
   ];
 
   const totalSynchronization = contracts.reduce((acc, contract) => acc + (contract.sync_level || 0), 0);
@@ -62,8 +62,8 @@ const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank }) => {
 
   const getCalculatedCells = (rankData: AuraCellData) => {
       return {
-          small: rankData.small + bonusSmallCells,
-          significant: rankData.significant + bonusSignificantCells,
+          small: rankData.small === Infinity ? Infinity : rankData.small + bonusSmallCells,
+          significant: rankData.significant === Infinity ? Infinity : rankData.significant + bonusSignificantCells,
           ultimate: rankData.ultimate + bonusUltimateCells
       }
   }
@@ -91,10 +91,16 @@ const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank }) => {
                 >
                   <td style={cellStyle}>{row.rank}</td>
                   <td style={cellStyle}>
-                    {row.rank === currentRank ? `${calculated.small} (${row.small} + ${bonusSmallCells})` : row.small}
+                    {row.rank === currentRank ? 
+                      (row.small === Infinity ? `∞ (∞ + ${bonusSmallCells})` : `${calculated.small} (${row.small} + ${bonusSmallCells})`) : 
+                      (row.small === Infinity ? '∞' : row.small)
+                    }
                   </td>
                   <td style={cellStyle}>
-                    {row.rank === currentRank ? `${calculated.significant} (${row.significant} + ${bonusSignificantCells})` : row.significant}
+                    {row.rank === currentRank ? 
+                      (row.significant === Infinity ? `∞ (∞ + ${bonusSignificantCells})` : `${calculated.significant} (${row.significant} + ${bonusSignificantCells})`) : 
+                      (row.significant === Infinity ? '∞' : row.significant)
+                    }
                   </td>
                   <td style={cellStyle}>
                     {row.rank === currentRank ? `${calculated.ultimate} (${row.ultimate} + ${bonusUltimateCells})` : row.ultimate}

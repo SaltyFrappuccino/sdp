@@ -14,16 +14,13 @@ import {
   Separator,
   Header,
   Div,
-  ModalRoot,
-  ModalPage,
-  ModalPageHeader,
+  IconButton,
 } from '@vkontakte/vkui';
+import { Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, ReactNode, useEffect } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { Icon24ErrorCircle, Icon24CheckCircleOutline, Icon24Add } from '@vkontakte/icons';
-import ReactMarkdown from 'react-markdown';
-import { AI_API_URL } from '../api';
 import { ContractForm } from '../components/ContractForm';
 import { AttributeManager } from '../components/AttributeManager';
 import { ArchetypeSelector } from '../components/ArchetypeSelector';
@@ -37,6 +34,7 @@ interface Item {
     description: string;
     type: 'Обычный' | 'Синки';
     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+    image_url?: string[];
 }
 
 interface Contract {
@@ -49,6 +47,7 @@ interface Contract {
     sync_level: number;
     unity_stage: string;
     abilities: any[];
+    creature_images?: string[];
 }
 
 interface CharacterData {
@@ -57,8 +56,12 @@ interface CharacterData {
     age: number | string;
     rank: Rank;
     faction: string;
+    faction_position: string;
     home_island: string;
-    appearance: string;
+    appearance: {
+        text: string;
+    };
+    character_images: string[];
     personality: string;
     biography: string;
     archetypes: string[];
@@ -67,6 +70,7 @@ interface CharacterData {
     inventory: Item[];
     currency: number;
     admin_note: string;
+    status: string;
 }
 
 const emptyContract = {
@@ -88,7 +92,7 @@ const getUnityStage = (syncLevel: number): string => {
   return 'Ступень I - Активация';
 };
 
-export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null) => void; fetchedUser?: UserInfo }> = ({ id, setModal, fetchedUser }) => {
+export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null) => void; fetchedUser?: UserInfo }> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const params = useParams<'id'>();
   const characterId = params?.id;
@@ -96,13 +100,29 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
   const [character, setCharacter] = useState<CharacterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
-
   useEffect(() => {
     const fetchCharacter = async () => {
       try {
         setLoading(true);
         const response = await fetch(`${API_URL}/characters/${characterId}`);
         const data = await response.json();
+        // Преобразование для обратной совместимости, если appearance - строка
+        if (typeof data.appearance === 'string' || !data.appearance) {
+          data.appearance = { text: data.appearance || '', images: [] };
+        }
+        if (!data.character_images) {
+          data.character_images = [];
+        }
+        if (data.contracts) {
+            data.contracts.forEach((c: Contract) => {
+                if (!c.creature_images) c.creature_images = [];
+            });
+        }
+        if (data.inventory) {
+            data.inventory.forEach((i: Item) => {
+                if (!i.image_url) i.image_url = [];
+            });
+        }
         setCharacter(data);
       } catch (error) {
         console.error('Failed to fetch character:', error);
@@ -119,11 +139,22 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (character) {
-        let processedValue: string | number = value;
-        if (name === 'age' || name === 'currency') {
-            processedValue = parseInt(value, 10) || 0;
+        const nameParts = name.split('.');
+        if (nameParts.length > 1 && nameParts[0] === 'appearance') {
+            setCharacter({
+                ...character,
+                appearance: {
+                    ...character.appearance,
+                    [nameParts[1]]: value
+                }
+            });
+        } else {
+            let processedValue: string | number = value;
+            if (name === 'age' || name === 'currency') {
+                processedValue = parseInt(value, 10) || 0;
+            }
+            setCharacter({ ...character, [name]: processedValue });
         }
-        setCharacter({ ...character, [name]: processedValue });
     }
   };
 
@@ -191,170 +222,74 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
       setCharacter(prev => prev ? ({ ...prev, inventory: newInventory }) : null);
   }
 
-  const pollTaskResult = (taskId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch(`${AI_API_URL}/tasks/${taskId}`);
-        const data = await response.json();
-
-        if (data.status === 'completed') {
-          clearInterval(interval);
-          setLoading(false);
-          setModal(
-            <ModalRoot activeModal="ai-result">
-              <ModalPage
-                id="ai-result"
-                onClose={() => setModal(null)}
-                header={<ModalPageHeader>Результат проверки ИИ</ModalPageHeader>}
-              >
-                <Div>
-                  <ReactMarkdown>{data.result}</ReactMarkdown>
-                </Div>
-              </ModalPage>
-            </ModalRoot>
-          );
-        } else if (data.status === 'error') {
-          clearInterval(interval);
-          setLoading(false);
-          throw new Error(data.detail || 'AI check failed');
-        }
-      } catch (error) {
-        clearInterval(interval);
-        setLoading(false);
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        setSnackbar(<Snackbar
-          onClose={() => setSnackbar(null)}
-          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-        >{`Ошибка проверки ИИ: ${message}`}</Snackbar>);
-      }
-    }, 3000);
-
-    setTimeout(() => {
-      clearInterval(interval);
-      if (loading) {
-        setLoading(false);
-        setSnackbar(<Snackbar
-          onClose={() => setSnackbar(null)}
-          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-        >Проверка ИИ заняла слишком много времени.</Snackbar>);
-      }
-    }, 120000); // 2 minutes timeout
-  };
-
-  const handleAICheck = async () => {
+  const handleCharacterImageChange = (index: number, value: string) => {
     if (!character) return;
-    setLoading(true);
-    setSnackbar(<Snackbar
-      onClose={() => setSnackbar(null)}
-    >Проверка ИИ запущена...</Snackbar>);
-
-    try {
-      const response = await fetch(`${AI_API_URL}/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          character_data: character,
-          vk_id: fetchedUser?.id || 0,
-          admin_id: localStorage.getItem('adminId'),
-          character_id: characterId,
-        }),
-      });
-
-      if (response.status !== 200) {
-        const errorText = await response.text();
-        try {
-            const errorJson = JSON.parse(errorText);
-            throw new Error(errorJson.detail || 'Failed to start AI check');
-        } catch (e) {
-            throw new Error(errorText || 'Failed to start AI check');
-        }
-      }
-
-      const data = await response.json();
-      pollTaskResult(data.task_id);
-
-    } catch (error) {
-      setLoading(false);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      setSnackbar(<Snackbar
-        onClose={() => setSnackbar(null)}
-        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-      >{`Ошибка запуска проверки ИИ: ${message}`}</Snackbar>);
-    }
+    const newImages = [...character.character_images];
+    newImages[index] = value;
+    setCharacter(prev => prev ? ({ ...prev, character_images: newImages }) : null);
   };
 
-  const handleShowHistory = async () => {
-    if (!characterId) return;
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/characters/${characterId}/ai-analysis`);
-      const data = await response.json();
-      setModal(
-        <ModalRoot activeModal="ai-history">
-          <ModalPage
-            id="ai-history"
-            onClose={() => setModal(null)}
-            header={<ModalPageHeader>История проверок ИИ</ModalPageHeader>}
-          >
-            <Div>
-              {data.length > 0 ? (
-                data.map((item: any) => (
-                  <div key={item.id}>
-                    <p><strong>{new Date(item.timestamp).toLocaleString()}</strong></p>
-                    <ReactMarkdown>{item.result}</ReactMarkdown>
-                    <Separator />
-                  </div>
-                ))
-              ) : (
-                <p>История проверок пуста.</p>
-              )}
-            </Div>
-          </ModalPage>
-        </ModalRoot>
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      setSnackbar(<Snackbar
-        onClose={() => setSnackbar(null)}
-        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-      >{`Ошибка загрузки истории: ${message}`}</Snackbar>);
-    } finally {
-      setLoading(false);
-    }
+  const addCharacterImage = () => {
+    if (!character) return;
+    setCharacter(prev => prev ? ({ ...prev, character_images: [...prev.character_images, ''] }) : null);
   };
+
+  const removeCharacterImage = (index: number) => {
+    if (!character) return;
+    const newImages = character.character_images.filter((_, i) => i !== index);
+    setCharacter(prev => prev ? ({ ...prev, character_images: newImages }) : null);
+  };
+
 
   const handleSave = async () => {
+    if (!character) return;
+
     const adminId = localStorage.getItem('adminId');
-    if (!character || !adminId) return;
 
     try {
-      const response = await fetch(`${API_URL}/characters/${characterId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-id': adminId,
-        },
-        body: JSON.stringify(character),
-      });
+      let response;
+      let successMessage;
+
+      if (character.status === 'Принято') {
+        response = await fetch(`${API_URL}/characters/${characterId}/updates`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-id': adminId || '',
+          },
+          body: JSON.stringify({ updated_data: character }),
+        });
+        successMessage = "Изменения отправлены на проверку";
+      } else {
+        response = await fetch(`${API_URL}/characters/${characterId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-id': adminId || '',
+          },
+          body: JSON.stringify(character),
+        });
+        successMessage = "Анкета успешно обновлена!";
+      }
 
       if (response.ok) {
         setSnackbar(<Snackbar
           onClose={() => setSnackbar(null)}
           before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
-        >Анкета успешно обновлена!</Snackbar>);
-        routeNavigator.push('/admin_panel');
+        >{successMessage}</Snackbar>);
+        routeNavigator.back();
       } else {
         const errorData = await response.text();
         console.error("Server response:", errorData);
         throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
-        console.error("Save error:", error);
-        const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
-        setSnackbar(<Snackbar
-          onClose={() => setSnackbar(null)}
-          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-        >{`Ошибка сохранения: ${message}`}</Snackbar>);
+      console.error("Save error:", error);
+      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      setSnackbar(<Snackbar
+        onClose={() => setSnackbar(null)}
+        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+      >{`Ошибка сохранения: ${message}`}</Snackbar>);
     }
   };
 
@@ -419,8 +354,26 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
           </Group>
 
           <Group header={<Header>II. ЛИЧНОСТЬ И ВНЕШНОСТЬ</Header>}>
-            <FormItem top="Внешность">
-              <Textarea name="appearance" value={character.appearance} onChange={handleChange} />
+            <FormItem top="Внешность (описание)">
+              <Textarea name="appearance.text" value={character.appearance.text} onChange={handleChange} />
+            </FormItem>
+            <FormItem top="Ссылки на внешность">
+              {character.character_images.map((img, index) => (
+                <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                  <Input
+                    value={img}
+                    onChange={(e) => handleCharacterImageChange(index, e.target.value)}
+                    style={{ marginRight: '8px' }}
+                    placeholder="https://example.com/image.png"
+                  />
+                  <IconButton onClick={() => removeCharacterImage(index)} aria-label="Удалить ссылку">
+                    <Icon24Cancel />
+                  </IconButton>
+                </div>
+              ))}
+              <Button onClick={addCharacterImage} before={<Icon24Add />}>
+                Добавить ссылку на внешность
+              </Button>
             </FormItem>
             <FormItem top="Характер">
               <Textarea name="personality" value={character.personality} onChange={handleChange} />
@@ -438,7 +391,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
             <AttributeManager
               attributes={character.attributes}
               onAttributeChange={handleAttributeChange}
-              totalPoints={20} // Это значение может быть нужно будет сделать динамическим
+              totalPoints={220}
             />
             <AuraCellsCalculator
               contracts={character.contracts}
@@ -453,7 +406,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
                 <ContractForm
                   contract={contract}
                   index={index}
-                  onChange={handleContractChange}
+                  onChange={handleContractChange as any}
                   onRemove={removeContract}
                   characterRank={character.rank}
                   fullCharacterData={character}
@@ -485,13 +438,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
 
           <Div style={{ display: 'flex', gap: '8px' }}>
             <Button size="l" stretched onClick={handleSave}>
-              Сохранить
-            </Button>
-            <Button size="l" stretched mode="secondary" onClick={handleAICheck}>
-              Проверить ИИ
-            </Button>
-            <Button size="l" stretched mode="secondary" onClick={handleShowHistory}>
-              История проверок ИИ
+              {character.status === 'Принято' ? 'Отправить на проверку' : 'Сохранить изменения'}
             </Button>
           </Div>
           {snackbar}

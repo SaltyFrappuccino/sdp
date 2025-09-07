@@ -22,7 +22,9 @@ import {
   Button,
   ModalRoot,
   ModalPage,
-  ModalPageHeader
+  ModalPageHeader,
+  CardGrid,
+  Image
 } from '@vkontakte/vkui';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect } from 'react';
@@ -37,6 +39,7 @@ interface Item {
     type: 'Обычный' | 'Синки';
     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
     rank?: string;
+    image_url?: string[];
 }
 
 interface Ability {
@@ -55,6 +58,19 @@ interface Contract {
     sync_level: number;
     unity_stage: string;
     abilities: Ability[];
+    creature_images?: string[];
+    manifestation?: {
+        avatar_description: string;
+        passive_enhancement: string;
+        ultimate_technique: string;
+    };
+    dominion?: {
+        name: string;
+        environment_description: string;
+        law_name: string;
+        law_description: string;
+        tactical_effects: string;
+    };
 }
 
 interface Character {
@@ -68,7 +84,7 @@ interface Character {
     faction: string;
     faction_position: string;
     home_island: string;
-    appearance: string;
+    appearance: string | { text: string; images?: string[] };
     personality: string;
     biography: string;
     archetypes: string[];
@@ -77,6 +93,8 @@ interface Character {
     currency: number;
     contracts: Contract[];
     admin_note: string;
+    character_images?: string[];
+    life_status: 'Жив' | 'Мёртв';
 }
 
 export interface AnketaDetailProps extends NavIdProps {
@@ -92,6 +110,7 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
   const [activeTab, setActiveTab] = useState('general');
   const [versions, setVersions] = useState<any[]>([]);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const fetchVersions = async () => {
     try {
@@ -104,11 +123,20 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
     }
   };
 
+  const openImageModal = (img: string) => {
+    setSelectedImage(img);
+    setActiveModal('image');
+  };
+
   useEffect(() => {
     const fetchCharacter = async () => {
       try {
         const response = await fetch(`${API_URL}/characters/${characterId}`);
         const data = await response.json();
+        // Преобразование для обратной совместимости, если appearance - строка
+        if (typeof data.appearance === 'string') {
+          data.appearance = { text: data.appearance, images: [] };
+        }
         setCharacter(data);
       } catch (error) {
         console.error('Failed to fetch character:', error);
@@ -195,6 +223,16 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                 )}
               </Div>
             </ModalPage>
+            <ModalPage
+              id="image"
+              onClose={() => setActiveModal(null)}
+              header={<ModalPageHeader>Просмотр изображения</ModalPageHeader>}
+              settlingHeight={100}
+            >
+              <Div style={{ textAlign: 'center' }}>
+                <img src={selectedImage || ''} style={{ maxWidth: '100%', maxHeight: '80vh' }} alt="Full size" />
+              </Div>
+            </ModalPage>
           </ModalRoot>
 
           <Tabs>
@@ -232,10 +270,29 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                 <Div><b>Фракция:</b> {character.faction}</Div>
                 <Div><b>Позиция во фракции:</b> {character.faction_position}</Div>
                 <Div><b>Родной остров:</b> {character.home_island}</Div>
+                <Div><b>Статус:</b> {character.life_status}</Div>
               </Group>
               <Group>
                 <Header>II. ЛИЧНОСТЬ И ВНЕШНОСТЬ</Header>
-                <Div>{character.appearance}</Div>
+                {character.character_images && character.character_images.length > 0 && (
+                  <CardGrid size="l">
+                    {character.character_images.map((img, i) => (
+                      <Card key={i} onClick={() => openImageModal(img)}>
+                        <Image src={img} size={128} />
+                      </Card>
+                    ))}
+                  </CardGrid>
+                )}
+                {typeof character.appearance === 'object' && character.appearance.images && character.appearance.images.length > 0 && (
+                  <CardGrid size="l">
+                    {character.appearance.images.map((img, i) => (
+                      <Card key={i} onClick={() => openImageModal(img)}>
+                        <Image src={img} size={128} />
+                      </Card>
+                    ))}
+                  </CardGrid>
+                )}
+                <Div>{typeof character.appearance === 'object' ? character.appearance.text : character.appearance}</Div>
                 <Separator />
                 <Div>{character.personality}</Div>
                 <Separator />
@@ -259,6 +316,15 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                     {character.contracts.map((contract, index) => (
                       <Card key={index} mode="shadow" style={{ marginBottom: 16 }}>
                         <Header>{contract.contract_name}</Header>
+                        {contract.creature_images && contract.creature_images.length > 0 && (
+                          <CardGrid size="l">
+                            {contract.creature_images.map((img, i) => (
+                              <Card key={i} onClick={() => openImageModal(img)}>
+                                <Image src={img} size={128} />
+                              </Card>
+                            ))}
+                          </CardGrid>
+                        )}
                         <Div>
                           <Title level="3" style={{ marginBottom: 8 }}>{contract.creature_name} ({contract.creature_rank})</Title>
                           <Text style={{ marginBottom: 16 }}>{contract.creature_description}</Text>
@@ -267,6 +333,57 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                           <Progress value={contract.sync_level} style={{ marginBottom: 8 }} />
 
                           <Subhead weight="1">Ступень Единства: {contract.unity_stage}</Subhead>
+
+                          {contract.manifestation && (
+                            <Card mode="outline" style={{ marginTop: 12, background: 'var(--vkui--color_background_accent_alpha)' }}>
+                              <Div style={{ padding: '12px' }}>
+                                <Subhead weight="1" style={{ marginBottom: 8 }}>⚡ Манифестация</Subhead>
+                                {contract.manifestation.avatar_description && (
+                                  <div style={{ marginBottom: 8 }}>
+                                    <Text weight="1">Описание Аватара:</Text>
+                                    <Text>{contract.manifestation.avatar_description}</Text>
+                                  </div>
+                                )}
+                                {contract.manifestation.passive_enhancement && (
+                                  <div style={{ marginBottom: 8 }}>
+                                    <Text weight="1">Пассивное Усиление:</Text>
+                                    <Text>{contract.manifestation.passive_enhancement}</Text>
+                                  </div>
+                                )}
+                                {contract.manifestation.ultimate_technique && (
+                                  <div>
+                                    <Text weight="1">Предельная Техника:</Text>
+                                    <Text>{contract.manifestation.ultimate_technique}</Text>
+                                  </div>
+                                )}
+                              </Div>
+                            </Card>
+                          )}
+                          {contract.dominion && (
+                            <Card mode="outline" style={{ marginTop: 12, background: 'var(--vkui--color_background_accent_alpha)' }}>
+                              <Div style={{ padding: '12px' }}>
+                                <Subhead weight="1" style={{ marginBottom: 8 }}>🌌 Доминион: {contract.dominion.name}</Subhead>
+                                {contract.dominion.environment_description && (
+                                  <div style={{ marginBottom: 8 }}>
+                                    <Text weight="1">Архитектура Подпространства:</Text>
+                                    <Text>{contract.dominion.environment_description}</Text>
+                                  </div>
+                                )}
+                                {contract.dominion.law_name && (
+                                  <div style={{ marginBottom: 8 }}>
+                                    <Text weight="1">Закон: "{contract.dominion.law_name}"</Text>
+                                    <Text>{contract.dominion.law_description}</Text>
+                                  </div>
+                                )}
+                                {contract.dominion.tactical_effects && (
+                                  <div>
+                                    <Text weight="1">Тактические Эффекты:</Text>
+                                    <Text>{contract.dominion.tactical_effects}</Text>
+                                  </div>
+                                )}
+                              </Div>
+                            </Card>
+                          )}
                         </Div>
 
                         {contract.abilities && contract.abilities.length > 0 && (
@@ -314,13 +431,20 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id }) => {
                                     multiline
                                     subtitle={item.rank ? `Ранг: ${item.rank}` : ''}
                                 >
-                                    <Title level="3">{item.name}</Title>
-                                </RichCell>
-                                <Div>
+                                    <Title level="3" style={{marginBottom: 4}}>{item.name}</Title>
                                     <Text>{item.description}</Text>
-                                </Div>
-                            </Card>
-                        ))}
+                                </RichCell>
+                                {item.image_url && item.image_url.length > 0 && (
+                                  <CardGrid size="l" style={{ padding: '0 16px 16px' }}>
+                                      {item.image_url.map((img, i) => (
+                                          <Card key={i} onClick={() => openImageModal(img)}>
+                                              <Image src={img} size={96} />
+                                          </Card>
+                                      ))}
+                                  </CardGrid>
+                                )}
+                          </Card>
+                      ))}
                     </div>
                     <SimpleCell style={{marginTop: 16}}>Валюта: {character.currency} ₭</SimpleCell>
                 </Group>

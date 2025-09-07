@@ -9,6 +9,7 @@ import {
   Div,
   Avatar,
   NavIdProps,
+  ButtonGroup,
 } from '@vkontakte/vkui';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -34,9 +35,14 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
 
       <Group header={<Header size="s">Salty's Dream Project</Header>}>
         <Div>
-          <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('anketa')}>
-            Создать анкету
-          </Button>
+          <ButtonGroup stretched mode="horizontal">
+            <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('anketa')}>
+              Создать анкету
+            </Button>
+            <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('my_anketas')}>
+              Мои анкеты
+            </Button>
+          </ButtonGroup>
         </Div>
         <Div>
           <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('anketa_list')}>

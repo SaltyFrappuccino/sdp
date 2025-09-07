@@ -17,7 +17,9 @@ import {
   ModalRoot,
   ModalPage,
   ModalPageHeader,
+  IconButton,
 } from '@vkontakte/vkui';
+import { Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, ReactNode, useEffect } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
@@ -28,7 +30,7 @@ import { ArchetypeSelector } from '../components/ArchetypeSelector';
 import { InventoryManager } from '../components/InventoryManager';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { Rank } from '../components/AbilityBuilder';
-import { API_URL, AI_API_URL } from '../api';
+import { API_URL } from '../api';
 import ReactMarkdown from 'react-markdown';
 
 export interface AnketaProps extends NavIdProps {
@@ -45,7 +47,29 @@ interface Contract {
     sync_level: number;
     unity_stage: string;
     abilities: any[];
+    creature_images?: string[];
+    manifestation?: {
+        avatar_description: string;
+        passive_enhancement: string;
+        ultimate_technique: string;
+    };
+    dominion?: {
+        name: string;
+        environment_description: string;
+        law_name: string;
+        law_description: string;
+        tactical_effects: string;
+    };
 }
+
+// interface InventoryItem {
+//     name: string;
+//     description: string;
+//     type: 'Обычный' | 'Синки';
+//     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+//     rank?: string;
+//     image_url?: string[];
+// }
 
 const emptyContract: Contract = {
   contract_name: '',
@@ -57,6 +81,18 @@ const emptyContract: Contract = {
   sync_level: 0,
   unity_stage: 'Ступень I - Активация',
   abilities: [],
+  manifestation: {
+    avatar_description: '',
+    passive_enhancement: '',
+    ultimate_technique: ''
+  },
+  dominion: {
+    name: '',
+    environment_description: '',
+    law_name: '',
+    law_description: '',
+    tactical_effects: ''
+  },
 };
 
 const getUnityStage = (syncLevel: number): string => {
@@ -93,7 +129,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     faction: '',
     faction_position: '',
     home_island: '',
-    appearance: '',
+    appearance: { text: '', images: [] as string[] },
     personality: '',
     biography: '',
     archetypes: [] as string[],
@@ -102,6 +138,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     inventory: [] as any[],
     currency: 0,
     admin_note: '',
+    character_images: [] as string[],
   });
 
   useEffect(() => {
@@ -110,7 +147,15 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       fetch(`${API_URL}/characters/${characterId}`)
         .then(res => res.json())
         .then(data => {
-          setFormData({ ...data, age: data.age.toString() });
+          const fetchedData = { ...data, age: data.age.toString() };
+          // Преобразование для обратной совместимости
+          if (typeof fetchedData.appearance === 'string') {
+            fetchedData.appearance = { text: fetchedData.appearance, images: [] };
+          }
+          if (!fetchedData.appearance.images) {
+            fetchedData.appearance.images = [];
+          }
+          setFormData(fetchedData);
           setPopout(null);
         })
         .catch(err => {
@@ -120,6 +165,29 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         });
     }
   }, [isEditing, characterId]);
+
+  // Загрузка черновика из localStorage
+  useEffect(() => {
+    if (!isEditing) {
+      const savedDraft = localStorage.getItem('anketaDraft');
+      if (savedDraft) {
+        try {
+          const draftData = JSON.parse(savedDraft);
+          setFormData(draftData);
+        } catch (error) {
+          console.error("Failed to parse anketa draft:", error);
+          localStorage.removeItem('anketaDraft');
+        }
+      }
+    }
+  }, [isEditing]);
+
+  // Сохранение черновика в localStorage
+  useEffect(() => {
+    if (!isEditing) {
+      localStorage.setItem('anketaDraft', JSON.stringify(formData));
+    }
+  }, [formData, isEditing]);
 
   const [formErrors, setFormErrors] = useState<Partial<typeof formData>>({});
 
@@ -142,7 +210,18 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const nameParts = name.split('.');
+    if (nameParts.length > 1 && nameParts[0] === 'appearance') {
+        setFormData(prev => ({
+            ...prev,
+            appearance: {
+                ...prev.appearance,
+                [nameParts[1]]: value
+            }
+        }));
+    } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleAttributeChange = (name: string, value: string) => {
@@ -194,6 +273,21 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     setFormData(prev => ({ ...prev, contracts: newContracts }));
   };
 
+  const handleCharacterImageChange = (index: number, value: string) => {
+    const newImages = [...formData.character_images];
+    newImages[index] = value;
+    setFormData(prev => ({ ...prev, character_images: newImages }));
+  };
+
+  const addCharacterImage = () => {
+    setFormData(prev => ({ ...prev, character_images: [...prev.character_images, ''] }));
+  };
+
+  const removeCharacterImage = (index: number) => {
+    const newImages = formData.character_images.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, character_images: newImages }));
+  };
+
   const handleShowHistory = async () => {
     if (!characterId) return;
     setPopout(<ScreenSpinner />);
@@ -216,91 +310,91 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   };
  
    const [activeModal, setActiveModal] = useState<string | null>(null);
-   const [aiResult, setAiResult] = useState<string>('');
+   const [aiResult] = useState<string>('');
  
-   const pollTaskResult = (taskId: string) => {
-     const interval = setInterval(async () => {
-       try {
-         const response = await fetch(`${AI_API_URL}/tasks/${taskId}`);
-         const data = await response.json();
+  //  const pollTaskResult = (taskId: string) => {
+  //    const interval = setInterval(async () => {
+  //      try {
+  //        const response = await fetch(`${AI_API_URL}/tasks/${taskId}`);
+  //        const data = await response.json();
  
-         if (data.status === 'completed') {
-           clearInterval(interval);
-           setPopout(null);
-           setAiResult(data.result);
-           setActiveModal("ai-result");
-         } else if (data.status === 'error') {
-           clearInterval(interval);
-           setPopout(null);
-           throw new Error(data.detail || 'AI check failed');
-         }
-       } catch (error) {
-         clearInterval(interval);
-         setPopout(null);
-         const message = error instanceof Error ? error.message : 'Unknown error';
-         setSnackbar(<Snackbar
-           onClose={() => setSnackbar(null)}
-           before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-         >{`Ошибка проверки ИИ: ${message}`}</Snackbar>);
-       }
-     }, 3000);
+  //        if (data.status === 'completed') {
+  //          clearInterval(interval);
+  //          setPopout(null);
+  //          setAiResult(data.result);
+  //          setActiveModal("ai-result");
+  //        } else if (data.status === 'error') {
+  //          clearInterval(interval);
+  //          setPopout(null);
+  //          throw new Error(data.detail || 'AI check failed');
+  //        }
+  //      } catch (error) {
+  //        clearInterval(interval);
+  //        setPopout(null);
+  //        const message = error instanceof Error ? error.message : 'Unknown error';
+  //        setSnackbar(<Snackbar
+  //          onClose={() => setSnackbar(null)}
+  //          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+  //        >{`Ошибка проверки ИИ: ${message}`}</Snackbar>);
+  //      }
+  //    }, 8000);
  
-     setTimeout(() => {
-       clearInterval(interval);
-       if (popout) {
-         setPopout(null);
-         setSnackbar(<Snackbar
-           onClose={() => setSnackbar(null)}
-           before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-         >Проверка ИИ заняла слишком много времени.</Snackbar>);
-       }
-     }, 120000); // 2 minutes timeout
-   };
+  //    setTimeout(() => {
+  //      clearInterval(interval);
+  //      if (popout) {
+  //        setPopout(null);
+  //        setSnackbar(<Snackbar
+  //          onClose={() => setSnackbar(null)}
+  //          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+  //        >Проверка ИИ заняла слишком много времени.</Snackbar>);
+  //      }
+  //    }, 120000); // 2 minutes timeout
+  //  };
  
-   const handleAICheck = async () => {
-     setPopout(<ScreenSpinner />);
-     setSnackbar(<Snackbar
-       onClose={() => setSnackbar(null)}
-     >Проверка ИИ запущена...</Snackbar>);
+  //  const handleAICheck = async () => {
+  //    setPopout(<ScreenSpinner />);
+  //    setSnackbar(<Snackbar
+  //      onClose={() => setSnackbar(null)}
+  //    >Проверка ИИ запущена...</Snackbar>);
  
-     try {
-       const payload = {
-         ...formData,
-         age: parseInt(formData.age, 10) || 0,
-       };
+  //    try {
+  //      const payload = {
+  //        ...formData,
+  //        age: parseInt(formData.age, 10) || 0,
+  //      };
  
-       const response = await fetch(`${AI_API_URL}/validate`, {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({
-           character_data: payload,
-           vk_id: fetchedUser?.id || 0,
-           admin_id: localStorage.getItem('adminId') || '',
-         }),
-       });
+  //      const response = await fetch(`${AI_API_URL}/validate`, {
+  //        method: 'POST',
+  //        headers: { 'Content-Type': 'application/json' },
+  //        body: JSON.stringify({
+  //          character_data: payload,
+  //          vk_id: fetchedUser?.id || 0,
+  //          admin_id: localStorage.getItem('adminId') || '',
+  //        }),
+  //      });
  
-       if (response.status !== 200) {
-         const errorText = await response.text();
-         try {
-             const errorJson = JSON.parse(errorText);
-             throw new Error(errorJson.detail || 'Failed to start AI check');
-         } catch (e) {
-             throw new Error(errorText || 'Failed to start AI check');
-         }
-       }
+  //      if (response.status !== 200) {
+  //        const errorText = await response.text();
+  //        try {
+  //            const errorJson = JSON.parse(errorText);
+  //            throw new Error(errorJson.detail || 'Failed to start AI check');
+  //        } catch (e) {
+  //            throw new Error(errorText || 'Failed to start AI check');
+  //        }
+  //      }
  
-       const data = await response.json();
-       pollTaskResult(data.task_id);
+  //      const data = await response.json();
+  //      pollTaskResult(data.task_id);
  
-     } catch (error) {
-       setPopout(null);
-       const message = error instanceof Error ? error.message : 'Unknown error';
-       setSnackbar(<Snackbar
-         onClose={() => setSnackbar(null)}
-         before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-       >{`Ошибка запуска проверки ИИ: ${message}`}</Snackbar>);
-     }
-   };
+  //    } catch (error) {
+  //      setPopout(null);
+  //      const message = error instanceof Error ? error.message : 'Unknown error';
+  //      setSnackbar(<Snackbar
+  //        onClose={() => setSnackbar(null)}
+  //        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+  //      >{`Ошибка запуска проверки ИИ: ${message}`}</Snackbar>);
+  //    }
+  //  };
  
    const handleSubmit = async () => {
      if (!validateForm()) {
@@ -337,6 +431,9 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
       if (response.ok) {
         setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24CheckCircleOutline />}>{isEditing ? 'Анкета обновлена!' : `Анкета создана! ID: ${result.characterId}`}</Snackbar>);
+        if (!isEditing) {
+          localStorage.removeItem('anketaDraft');
+        }
         routeNavigator.push(isEditing ? `/admin_panel` : '/');
       } else {
         const errorData = result.error || 'Неизвестная ошибка сервера';
@@ -423,8 +520,26 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       </Group>
 
       <Group header={<Header>II. ЛИЧНОСТЬ И ВНЕШНОСТЬ</Header>}>
-        <FormItem top="Внешность">
-          <Textarea name="appearance" value={formData.appearance} onChange={handleChange} />
+        <FormItem top="Внешность (описание)">
+          <Textarea name="appearance.text" value={formData.appearance.text} onChange={handleChange} />
+        </FormItem>
+        <FormItem top="Ссылки на внешность">
+          {formData.character_images.map((img, index) => (
+            <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+              <Input
+                value={img}
+                onChange={(e) => handleCharacterImageChange(index, e.target.value)}
+                style={{ marginRight: '8px' }}
+                placeholder="https://example.com/image.png"
+              />
+              <IconButton onClick={() => removeCharacterImage(index)} aria-label="Удалить ссылку">
+                <Icon24Cancel />
+              </IconButton>
+            </div>
+          ))}
+          <Button onClick={addCharacterImage} before={<Icon24Add />}>
+            Добавить ссылку на внешность
+          </Button>
         </FormItem>
         <FormItem top="Характер">
           <Textarea name="personality" value={formData.personality} onChange={handleChange} />
@@ -442,7 +557,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         <AttributeManager
           attributes={formData.attributes}
           onAttributeChange={handleAttributeChange}
-          totalPoints={20}
+          totalPoints={220}
         />
         <AuraCellsCalculator
           contracts={formData.contracts}
@@ -490,9 +605,6 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       <Div>
         <Button size="l" stretched onClick={handleSubmit}>
           {isEditing ? 'Сохранить изменения' : 'Отправить анкету'}
-        </Button>
-        <Button size="l" stretched mode="secondary" onClick={handleAICheck} style={{ marginTop: '10px' }}>
-          Проверить с ИИ
         </Button>
         {isEditing && (
           <Button size="l" stretched mode="secondary" onClick={handleShowHistory} style={{ marginTop: '10px' }}>

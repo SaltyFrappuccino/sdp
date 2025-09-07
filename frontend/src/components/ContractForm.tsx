@@ -1,7 +1,9 @@
 import { FC, useState } from 'react';
-import { FormItem, Input, Textarea, Button, Select, Header, Div, ModalRoot, ModalPage, ModalPageHeader, FormLayoutGroup } from '@vkontakte/vkui';
-import { Icon24Delete, Icon24Add, Icon16Stars } from '@vkontakte/icons';
+import { FormItem, Input, Textarea, Button, Select, Header, Div, ModalRoot, ModalPage, ModalPageHeader, FormLayoutGroup, IconButton} from '@vkontakte/vkui';
+import { Icon24Delete, Icon24Add, Icon24Cancel } from '@vkontakte/icons';
 import { AbilityBuilder, Rank, SelectedTags } from './AbilityBuilder';
+import { ManifestationForm, ManifestationData } from './ManifestationForm';
+import { DominionForm, DominionData } from './DominionForm';
 
 interface Ability {
   name: string;
@@ -17,9 +19,12 @@ interface Contract {
   creature_rank: string;
   creature_spectrum: string;
   creature_description: string;
+  creature_images?: string[];
   gift: string;
   sync_level: number;
   unity_stage: string;
+  manifestation?: ManifestationData;
+  dominion?: DominionData;
   abilities: Ability[];
 }
 
@@ -98,7 +103,7 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
         setActiveModal(null);
         console.error('Failed to poll task status:', error);
       }
-    }, 3000);
+    }, 8000);
   };
 
   const handleGenerate = async () => {
@@ -118,6 +123,23 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
       setIsLoading(false);
       console.error('Failed to start contract generation:', error);
     }
+  };
+
+  const handleUrlChange = (url: string, urlIndex: number) => {
+    const newImages = [...(contract.creature_images || [])];
+    newImages[urlIndex] = url;
+    onChange(index, 'creature_images', newImages);
+  };
+
+  const addUrlField = () => {
+    const newImages = [...(contract.creature_images || []), ''];
+    onChange(index, 'creature_images', newImages);
+  };
+
+  const removeUrlField = (urlIndex: number) => {
+    const newImages = [...(contract.creature_images || [])];
+    newImages.splice(urlIndex, 1);
+    onChange(index, 'creature_images', newImages);
   };
 
   return (
@@ -146,6 +168,23 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
       </FormItem>
       <FormItem top="Имя/Название Существа">
         <Input name="creature_name" value={contract.creature_name} onChange={handleChange} />
+      </FormItem>
+      <FormItem top="Изображения существа (URL)">
+        {contract.creature_images?.map((url, urlIndex) => (
+          <div key={urlIndex} style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+            <Input
+              value={url}
+              onChange={(e) => handleUrlChange(e.target.value, urlIndex)}
+              style={{ marginRight: 8 }}
+            />
+            <IconButton onClick={() => removeUrlField(urlIndex)}>
+              <Icon24Cancel />
+            </IconButton>
+          </div>
+        ))}
+        <Button onClick={addUrlField} before={<Icon24Add />}>
+          Добавить URL
+        </Button>
       </FormItem>
       <FormItem top="Ранг Существа">
         <Select
@@ -178,7 +217,7 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
         <Input
           name="sync_level"
           type="number"
-          value={contract.sync_level}
+          value={String(contract.sync_level)}
           onChange={handleChange}
           onBlur={(e) => {
             let value = parseInt(e.target.value, 10);
@@ -193,6 +232,26 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
       <FormItem top="Ступень Единения">
         <Input name="unity_stage" value={contract.unity_stage} readOnly />
       </FormItem>
+
+      {contract.sync_level >= 75 && (
+        <ManifestationForm
+          manifestation={contract.manifestation || { avatar_description: '', passive_enhancement: '', ultimate_technique: '' }}
+          onChange={(field, value) => {
+            const newManifestation = { ...contract.manifestation, [field]: value };
+            onChange(index, 'manifestation', newManifestation);
+          }}
+        />
+      )}
+
+      {contract.sync_level >= 100 && (
+        <DominionForm
+          dominion={contract.dominion || { name: '', environment_description: '', law_name: '', law_description: '', tactical_effects: '' }}
+          onChange={(field, value) => {
+            const newDominion = { ...contract.dominion, [field]: value };
+            onChange(index, 'dominion', newDominion);
+          }}
+        />
+      )}
 
       <Header>Способности Контракта</Header>
       {contract.abilities.map((ability, abilityIndex) => (
@@ -258,15 +317,6 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
       <FormItem>
         <Button appearance="negative" onClick={() => onRemove(index)} before={<Icon24Delete />}>
           Удалить контракт
-        </Button>
-      </FormItem>
-      <FormItem>
-        <Button
-          mode="secondary"
-          onClick={() => setActiveModal('generate-contract')}
-          before={<Icon16Stars />}
-        >
-          Сгенерировать с ИИ
         </Button>
       </FormItem>
     </div>

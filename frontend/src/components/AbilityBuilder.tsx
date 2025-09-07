@@ -8,14 +8,14 @@ export type SelectedTags = Record<string, Rank>;
 
 // --- DATA ---
 const tagCosts: Record<Rank, number> = {
-  'F': 1, 'E': 2, 'D': 3, 'C': 5, 'B': 8, 'A': 10, 'S': 20, 'SS': 30, 'SSS': 45
+  'F': 1, 'E': 2, 'D': 5, 'C': 10, 'B': 20, 'A': 35, 'S': 70, 'SS': 100, 'SSS': 150
 };
 
 const cellSpecs: Record<CellType, { budget: number; maxTagRank: Rank }> = {
-  'Нулевая': { budget: 2, maxTagRank: 'F' },
-  'Малая (I)': { budget: 10, maxTagRank: 'C' },
-  'Значительная (II)': { budget: 15, maxTagRank: 'A' }, 
-  'Предельная (III)': { budget: 30, maxTagRank: 'SSS' },
+  'Нулевая': { budget: 5, maxTagRank: 'F' },
+  'Малая (I)': { budget: 20, maxTagRank: 'C' },
+  'Значительная (II)': { budget: 50, maxTagRank: 'A' }, 
+  'Предельная (III)': { budget: 150, maxTagRank: 'SSS' },
 };
 
 const tagTypes = [

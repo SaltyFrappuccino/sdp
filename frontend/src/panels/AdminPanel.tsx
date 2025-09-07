@@ -22,7 +22,8 @@ import {
   Textarea,
   FormItem,
   Select,
-  Search
+  Search,
+  Cell
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect, ReactNode } from 'react';
@@ -53,13 +54,21 @@ interface MarketItem {
   quantity: number;
 }
 
+interface Update {
+ id: number;
+ character_id: number;
+ status: string;
+ character_name: string;
+}
+
 const MODAL_PAGE_MARKET_ITEM = 'market_item';
 
 export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
-  const [loading, setLoading] = useState({ characters: true, items: true });
+  const [updates, setUpdates] = useState<Update[]>([]);
+  const [loading, setLoading] = useState({ characters: true, items: true, updates: true });
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -93,6 +102,19 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     }
   };
 
+  const fetchUpdates = async () => {
+   try {
+     const response = await fetch(`${API_URL}/updates`);
+     const data = await response.json();
+     setUpdates(data);
+   } catch (error) {
+     console.error('Failed to fetch updates:', error);
+     showResultSnackbar('Не удалось загрузить обновления', false);
+   } finally {
+     setLoading(prev => ({ ...prev, updates: false }));
+   }
+  };
+
   useEffect(() => {
     const adminId = localStorage.getItem('adminId');
     if (!adminId) {
@@ -101,6 +123,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     }
     fetchCharacters();
     fetchMarketItems();
+    fetchUpdates();
   }, [routeNavigator]);
 
   const handleLogout = () => {
@@ -349,6 +372,17 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
             ))}
           </CardGrid>
         )}
+      </Group>
+
+      <Group>
+       <Header>Ожидающие проверки изменения</Header>
+       {loading.updates ? <Spinner /> : (
+         updates.filter(u => u.status === 'pending').map(update => (
+           <Cell key={update.id} hasActive hasHover onClick={() => routeNavigator.push(`/update_viewer/${update.id}`)}>
+             Запрос на обновление для {update.character_name} (ID: {update.character_id})
+           </Cell>
+         ))
+       )}
       </Group>
 
       <Group>

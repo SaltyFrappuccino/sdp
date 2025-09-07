@@ -3,9 +3,10 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { View, SplitLayout, SplitCol, ScreenSpinner, ModalRoot, ModalPage, ModalPageHeader, Div, Group, Panel } from '@vkontakte/vkui';
 import { useActiveVkuiLocation } from '@vkontakte/vk-mini-apps-router';
 
-import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, AnketaEditor, Calculator, MarketPanel } from './panels';
+import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, AnketaEditor, Calculator, MarketPanel, MyAnketasPanel } from './panels';
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { API_URL } from './api';
+import UpdateViewer from './panels/UpdateViewer';
 
 export const App = () => {
   const { panel: activePanel = DEFAULT_VIEW_PANELS.HOME } = useActiveVkuiLocation();
@@ -72,12 +73,13 @@ export const App = () => {
             <AdminLogin id="admin_login" />
             <AdminPanel id="admin_panel" />
             <AnketaEditor id="admin_anketa_edit" setModal={setModal} fetchedUser={fetchedUser} />
+            <AnketaEditor id="anketa-editor" setModal={setModal} fetchedUser={fetchedUser} />
             <Calculator id="calculator" />
             <MarketPanel id="market" fetchedUser={fetchedUser} />
+            <MyAnketasPanel id="my_anketas" fetchedUser={fetchedUser} />
+            <UpdateViewer id="update_viewer" />
           </View>
         ) : (
-          // Можно показать пустой View или дополнительную заглушку здесь,
-          // если модальное окно не перекрывает все
           <View activePanel="placeholder">
             <Panel id="placeholder" />
           </View>
