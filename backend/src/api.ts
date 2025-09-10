@@ -3,6 +3,21 @@ import path from 'path';
 import fs from 'fs';
 import { initDB } from './database.js';
 
+const getAttributePointsForRank = (rank: string): number => {
+  switch (rank) {
+    case 'F': return 10;
+    case 'E': return 14;
+    case 'D': return 16;
+    case 'C': return 20;
+    case 'B': return 30;
+    case 'A': return 40;
+    case 'S': return 50;
+    case 'SS': return 60;
+    case 'SSS': return 70;
+    default: return 10;
+  }
+};
+
 const router = Router();
 
 const ADMIN_PASSWORD = 'heartattack';
@@ -122,35 +137,35 @@ router.get('/health-check', (req: Request, res: Response) => {
  *         description: Ошибка сервера.
  */
 const calculateAuraCells = (rank: string, contracts: any[]) => {
-  const rankCellMap: { [key: string]: { small: number; medium: number; large: number } } = {
-    'F': { small: 2, medium: 0, large: 0 },
-    'E': { small: 4, medium: 0, large: 0 },
-    'D': { small: 6, medium: 1, large: 0 },
-    'C': { small: 10, medium: 2, large: 0 },
-    'B': { small: 15, medium: 3, large: 1 },
-    'A': { small: 20, medium: 4, large: 2 },
-    'S': { small: 30, medium: 6, large: 3 },
-    'SS': { small: 40, medium: 8, large: 4 },
-    'SSS': { small: 50, medium: 10, large: 5 },
+  const rankCellMap: { [key: string]: { small: number | typeof Infinity; significant: number | typeof Infinity; ultimate: number } } = {
+    'F': { small: 2, significant: 0, ultimate: 0 },
+    'E': { small: 4, significant: 0, ultimate: 0 },
+    'D': { small: 8, significant: 2, ultimate: 0 },
+    'C': { small: 16, significant: 4, ultimate: 0 },
+    'B': { small: 32, significant: 8, ultimate: 1 },
+    'A': { small: Infinity, significant: 16, ultimate: 2 },
+    'S': { small: Infinity, significant: Infinity, ultimate: 4 },
+    'SS': { small: Infinity, significant: Infinity, ultimate: 8 },
+    'SSS': { small: Infinity, significant: Infinity, ultimate: 16 },
   };
 
-  const baseCells = rankCellMap[rank] || { small: 0, medium: 0, large: 0 };
+  const baseCells = rankCellMap[rank] || { small: 0, significant: 0, ultimate: 0 };
 
   const bonusCells = contracts.reduce(
     (acc, contract) => {
       const sync = contract.sync_level || 0;
       acc.small += Math.floor(sync / 10);
-      acc.medium += Math.floor(sync / 25);
-      acc.large += sync >= 100 ? 1 : 0;
+      acc.significant += Math.floor(sync / 25);
+      acc.ultimate += Math.floor(sync / 100);
       return acc;
     },
-    { small: 0, medium: 0, large: 0 }
+    { small: 0, significant: 0, ultimate: 0 }
   );
 
   return {
-    "Малые (I)": baseCells.small + bonusCells.small,
-    "Значительные (II)": baseCells.medium + bonusCells.medium,
-    "Предельные (III)": baseCells.large + bonusCells.large,
+    "Малые (I)": baseCells.small === Infinity ? Infinity : baseCells.small + bonusCells.small,
+    "Значительные (II)": baseCells.significant === Infinity ? Infinity : baseCells.significant + bonusCells.significant,
+    "Предельные (III)": baseCells.ultimate + bonusCells.ultimate,
   };
 };
 
@@ -210,7 +225,7 @@ router.post('/characters', async (req: Request, res: Response) => {
       (character.appearance?.text || ''), JSON.stringify(character.character_images || []), character.personality, character.biography,
       JSON.stringify(character.archetypes || []),
       JSON.stringify(character.attributes || {}),
-      220, // attribute_points_total
+      getAttributePointsForRank((character as any).rank), // attribute_points_total
       spentPoints, // attribute_points_spent
       JSON.stringify(auraCells),
       JSON.stringify(character.inventory || []),
@@ -509,6 +524,7 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
         }
     }
     characterFields.attribute_points_spent = spentPoints;
+    characterFields.attribute_points_total = getAttributePointsForRank(characterFields.rank);
 
     // Пересчет ячеек ауры
     if (contracts) {
