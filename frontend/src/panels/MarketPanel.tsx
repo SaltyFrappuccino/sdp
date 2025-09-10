@@ -27,6 +27,7 @@ import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { Icon24CheckCircleOutline, Icon24ErrorCircle } from '@vkontakte/icons';
+import { ShinkiAbility } from '../components/ShinkiAbilityForm';
 
 interface Character {
   id: number;
@@ -35,18 +36,20 @@ interface Character {
   inventory: any[];
 }
 
-interface MarketItem {
-  id: number;
+interface Item {
+  id?: number;
   name: string;
   description: string;
   price: number;
-  image_url: string;
   quantity: number;
   item_type: 'Обычный' | 'Синки';
   item_data: {
     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
-    rank?: 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
+    rank?: string;
+    aura_cells?: { small: number; significant: number; ultimate: number };
+    abilities?: ShinkiAbility[];
   };
+  image_url: string[];
 }
 
 interface MarketPanelProps extends NavIdProps {
@@ -57,7 +60,7 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
-  const [items, setItems] = useState<MarketItem[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
   const [search, setSearch] = useState('');
@@ -319,7 +322,7 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
             .filter(i => !filters.canAfford || selectedCharacter.currency >= i.price)
             .map(item => (
             <Card key={item.id}>
-              {item.image_url && <img src={item.image_url} alt={item.name} style={{ width: '100%', height: 150, objectFit: 'cover' }} />}
+              {item.image_url && <img src={item.image_url[0]} alt={item.name} style={{ width: '100%', height: 150, objectFit: 'cover' }} />}
               <Div>
                 <Header>{item.name}</Header>
                 <p>{item.description}</p>
@@ -331,7 +334,7 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
                 )}
                 <p><b>Цена: {item.price} кредитов</b></p>
                 <p><b>В наличии: {item.quantity}</b></p>
-                <Button stretched onClick={() => handlePurchase(item.id)} disabled={selectedCharacter.currency < item.price || item.quantity <= 0}>
+                <Button stretched onClick={() => handlePurchase(item.id!)} disabled={selectedCharacter.currency < item.price || item.quantity <= 0}>
                   Купить
                 </Button>
               </Div>

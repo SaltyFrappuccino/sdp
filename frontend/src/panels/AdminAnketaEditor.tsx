@@ -33,7 +33,8 @@ import { InventoryManager } from '../components/InventoryManager';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
-import { importAnketaFromJson, readJsonFile } from '../utils/anketaExport';
+import { readJsonFile } from '../utils/anketaExport';
+import { ManifestationData } from '../components/ManifestationForm';
 
 const getAttributePointsForRank = (rank: Rank): number => {
   switch (rank) {
@@ -70,11 +71,7 @@ interface Contract {
     unity_stage: string;
     abilities: any[];
     creature_images?: string[];
-    manifestation?: {
-        avatar_description: string;
-        passive_enhancement: string;
-        ultimate_technique: string;
-    };
+    manifestation?: ManifestationData;
     dominion?: {
         name: string;
         environment_description: string;
@@ -107,7 +104,7 @@ interface CharacterData {
     life_status: 'Жив' | 'Мёртв';
 }
 
-const emptyContract = {
+const emptyContract: Contract = {
   contract_name: '',
   creature_name: '',
   creature_rank: '',
@@ -118,6 +115,7 @@ const emptyContract = {
   unity_stage: 'Ступень I - Активация',
   abilities: [],
   manifestation: {
+    modus: '',
     avatar_description: '',
     passive_enhancement: '',
     ultimate_technique: ''
@@ -153,13 +151,19 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
     if (!file) return;
 
     try {
-      const jsonString = await readJsonFile(file);
-      const importedData = importAnketaFromJson(jsonString);
-      
-      if (importedData && character) {
-        // Заполняем форму импортированными данными
-        setCharacter({
-          ...character,
+      const content = await readJsonFile(file);
+      const importedData = JSON.parse(content as string);
+
+      if (importedData.contracts && Array.isArray(importedData.contracts)) {
+        importedData.contracts.forEach((contract: any) => {
+          if (contract.manifestation && typeof contract.manifestation.modus === 'undefined') {
+            contract.manifestation.modus = '';
+          }
+        });
+      }
+
+      const characterData = {
+        ...character,
           character_name: importedData.character_name,
           nickname: importedData.nickname,
           age: importedData.age,
@@ -178,20 +182,15 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
           currency: importedData.currency,
           admin_note: importedData.admin_note,
           life_status: importedData.life_status
-        });
+        };
+        
+        setCharacter(characterData);
         
         setSnackbar(
           <Snackbar onClose={() => setSnackbar(null)}>
             Анкета успешно импортирована!
           </Snackbar>
         );
-      } else {
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)}>
-            Ошибка при импорте анкеты. Проверьте формат файла.
-          </Snackbar>
-        );
-      }
     } catch (error) {
       setSnackbar(
         <Snackbar onClose={() => setSnackbar(null)}>

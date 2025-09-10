@@ -31,11 +31,28 @@ import { InventoryManager } from '../components/InventoryManager';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
-import { importAnketaFromJson, readJsonFile } from '../utils/anketaExport';
+import { readJsonFile } from '../utils/anketaExport';
 import ReactMarkdown from 'react-markdown';
+import { ManifestationData } from '../components/ManifestationForm';
+import { ShinkiAbility } from '../components/ShinkiAbilityForm';
 
 export interface AnketaProps extends NavIdProps {
   fetchedUser?: UserInfo;
+}
+
+interface Item {
+    name: string;
+    description: string;
+    type: 'Обычный' | 'Синки';
+    sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+    rank?: string;
+    image_url?: string[];
+    aura_cells?: {
+        small: number;
+        significant: number;
+        ultimate: number;
+    };
+    abilities?: ShinkiAbility[];
 }
 
 interface Contract {
@@ -49,11 +66,7 @@ interface Contract {
     unity_stage: string;
     abilities: any[];
     creature_images?: string[];
-    manifestation?: {
-        avatar_description: string;
-        passive_enhancement: string;
-        ultimate_technique: string;
-    };
+    manifestation?: ManifestationData;
     dominion?: {
         name: string;
         environment_description: string;
@@ -63,14 +76,27 @@ interface Contract {
     };
 }
 
-// interface InventoryItem {
-//     name: string;
-//     description: string;
-//     type: 'Обычный' | 'Синки';
-//     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
-//     rank?: string;
-//     image_url?: string[];
-// }
+interface CharacterData {
+    character_name: string;
+    nickname: string;
+    age: string;
+    rank: Rank;
+    faction: string;
+    faction_position: string;
+    home_island: string;
+    appearance: { text: string; images: string[] };
+    personality: string;
+    biography: string;
+    archetypes: string[];
+    attributes: { [key: string]: string };
+    contracts: Contract[];
+    inventory: Item[];
+    currency: number;
+    admin_note: string;
+    character_images: string[];
+    life_status: 'Жив' | 'Мёртв';
+}
+
 
 const emptyContract: Contract = {
   contract_name: '',
@@ -83,6 +109,7 @@ const emptyContract: Contract = {
   unity_stage: 'Ступень I - Активация',
   abilities: [],
   manifestation: {
+    modus: '',
     avatar_description: '',
     passive_enhancement: '',
     ultimate_technique: ''
@@ -128,15 +155,6 @@ const getAttributePointsForRank = (rank: Rank): number => {
   }
 };
 
-interface Item {
-    name: string;
-    description: string;
-    type: 'Обычный' | 'Синки';
-    sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
-    rank?: string;
-    image_url?: string[];
-}
-
 const getDefaultCharacterData = (): Omit<CharacterData, 'vk_id' | 'status'> => {
   return {
     character_name: '',
@@ -146,7 +164,7 @@ const getDefaultCharacterData = (): Omit<CharacterData, 'vk_id' | 'status'> => {
     faction: 'Нейтрал',
     faction_position: '',
     home_island: 'Кага',
-    appearance: { text: '' },
+    appearance: { text: '', images: [] },
     character_images: [],
     personality: '',
     biography: '',
@@ -185,48 +203,50 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     if (!file) return;
 
     try {
-      const jsonString = await readJsonFile(file);
-      const importedData = importAnketaFromJson(jsonString);
-      
-      if (importedData) {
-        // Заполняем форму импортированными данными
-        setFormData({
-          character_name: importedData.character_name,
-          nickname: importedData.nickname,
-          age: String(importedData.age),
-          rank: importedData.rank as Rank,
-          faction: importedData.faction,
-          faction_position: importedData.faction_position,
-          home_island: importedData.home_island,
-          appearance: importedData.appearance,
-          character_images: importedData.character_images,
-          personality: importedData.personality,
-          biography: importedData.biography,
-          archetypes: importedData.archetypes,
-          attributes: importedData.attributes,
-          contracts: importedData.contracts,
-          inventory: importedData.inventory,
-          currency: importedData.currency,
-          admin_note: importedData.admin_note,
-          life_status: importedData.life_status
+      const content = await readJsonFile(file);
+      const importedData = JSON.parse(content as string);
+
+      if (importedData.contracts && Array.isArray(importedData.contracts)) {
+        importedData.contracts.forEach((contract: any) => {
+          if (contract.manifestation && typeof contract.manifestation.modus === 'undefined') {
+            contract.manifestation.modus = '';
+          }
         });
-        
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)}>
-            Анкета успешно импортирована!
-          </Snackbar>
-        );
-      } else {
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)}>
-            Ошибка при импорте анкеты. Проверьте формат файла.
-          </Snackbar>
-        );
       }
+
+      const dataToSet = {
+        ...formData,
+        character_name: importedData.character_name,
+        nickname: importedData.nickname,
+        age: String(importedData.age),
+        rank: importedData.rank as Rank,
+        faction: importedData.faction,
+        faction_position: importedData.faction_position,
+        home_island: importedData.home_island,
+        appearance: importedData.appearance,
+        character_images: importedData.character_images,
+        personality: importedData.personality,
+        biography: importedData.biography,
+        archetypes: importedData.archetypes,
+        attributes: importedData.attributes,
+        contracts: importedData.contracts,
+        inventory: importedData.inventory,
+        currency: importedData.currency,
+        admin_note: importedData.admin_note,
+        life_status: importedData.life_status
+      };
+      
+      setFormData(dataToSet);
+      
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Анкета успешно импортирована!
+        </Snackbar>
+      );
     } catch (error) {
       setSnackbar(
         <Snackbar onClose={() => setSnackbar(null)}>
-          Ошибка при чтении файла
+          Ошибка при импорте анкеты. Проверьте формат файла.
         </Snackbar>
       );
     }
@@ -707,6 +727,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       <InventoryManager
         inventory={formData.inventory}
         onInventoryChange={(newInventory) => setFormData(prev => ({ ...prev, inventory: newInventory}))}
+        characterRank={formData.rank}
       />
       <Group>
          <FormItem top="Валюта (Кредиты ₭)">
