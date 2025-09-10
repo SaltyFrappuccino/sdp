@@ -35,6 +35,21 @@ import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 import { importAnketaFromJson, readJsonFile } from '../utils/anketaExport';
 
+const getAttributePointsForRank = (rank: Rank): number => {
+  switch (rank) {
+    case 'F': return 10;
+    case 'E': return 14;
+    case 'D': return 16;
+    case 'C': return 20;
+    case 'B': return 30;
+    case 'A': return 40;
+    case 'S': return 50;
+    case 'SS': return 60;
+    case 'SSS': return 70;
+    default: return 10;
+  }
+};
+
 interface Item {
     name: string;
     description: string;
@@ -615,7 +630,7 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
             <AttributeManager
               attributes={character.attributes}
               onAttributeChange={handleAttributeChange}
-              totalPoints={220}
+              totalPoints={getAttributePointsForRank(character.rank)}
             />
             <AuraCellsCalculator
               contracts={character.contracts}
@@ -647,6 +662,7 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
           <InventoryManager
             inventory={character.inventory}
             onInventoryChange={handleInventoryChange}
+            characterRank={character.rank}
           />
           <Group>
              <FormItem top="Валюта (Кредиты ₭)">

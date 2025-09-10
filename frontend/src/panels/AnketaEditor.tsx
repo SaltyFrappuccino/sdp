@@ -30,6 +30,46 @@ import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 import { importAnketaFromJson, readJsonFile } from '../utils/anketaExport';
 
+const getAttributePointsForRank = (rank: Rank): number => {
+  switch (rank) {
+    case 'F': return 10;
+    case 'E': return 14;
+    case 'D': return 16;
+    case 'C': return 20;
+    case 'B': return 30;
+    case 'A': return 40;
+    case 'S': return 50;
+    case 'SS': return 60;
+    case 'SSS': return 70;
+    default: return 10;
+  }
+};
+
+const getDefaultCharacterData = (): CharacterData => {
+  const defaultRank: Rank = 'F';
+  return {
+    character_name: '',
+    nickname: '',
+    age: '',
+    rank: defaultRank,
+    faction: 'Нейтрал',
+    faction_position: '',
+    home_island: 'Кага',
+    appearance: { text: '' },
+    character_images: [],
+    personality: '',
+    biography: '',
+    archetypes: [],
+    attributes: {},
+    contracts: [{ ...emptyContract }],
+    inventory: [],
+    currency: 0,
+    admin_note: '',
+    status: 'на рассмотрении',
+    life_status: 'Жив',
+  };
+};
+
 interface Item {
     name: string;
     description: string;
@@ -212,8 +252,18 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
 
     if (characterId) {
       fetchCharacter();
+    } else {
+      // Это новая анкета, устанавливаем значения по умолчанию
+      setCharacter(getDefaultCharacterData());
+      setLoading(false);
     }
   }, [characterId]);
+
+  const handleClearForm = () => {
+    if (window.confirm('Вы уверены, что хотите очистить всю анкету? Все несохраненные данные будут потеряны.')) {
+      setCharacter(getDefaultCharacterData());
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -475,7 +525,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
             <AttributeManager
               attributes={character.attributes}
               onAttributeChange={handleAttributeChange}
-              totalPoints={220}
+              totalPoints={getAttributePointsForRank(character.rank)}
             />
             <AuraCellsCalculator
               contracts={character.contracts}
@@ -507,6 +557,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
           <InventoryManager
             inventory={character.inventory}
             onInventoryChange={handleInventoryChange}
+            characterRank={character.rank}
           />
           <Group>
              <FormItem top="Валюта (Кредиты ₭)">
@@ -535,6 +586,15 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
                 }}
               >
                 📥 Импорт анкеты
+              </Button>
+              <Button 
+                size="l" 
+                mode="secondary"
+                appearance="negative"
+                style={{ width: '100%' }}
+                onClick={handleClearForm}
+              >
+                Очистить
               </Button>
             </div>
             <Button size="l" stretched onClick={handleSave}>

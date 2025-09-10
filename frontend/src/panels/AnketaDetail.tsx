@@ -55,6 +55,12 @@ interface Item {
     sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
     rank?: string;
     image_url?: string[];
+    aura_cells?: {
+        small: number;
+        significant: number;
+        ultimate: number;
+    };
+    abilities?: Ability[];
 }
 
 interface Ability {
@@ -63,6 +69,7 @@ interface Ability {
     cell_type: 'Нулевая' | 'Малая (I)' | 'Значительная (II)' | 'Предельная (III)';
     cell_cost: number;
     tags: Record<string, string>;
+    is_summon?: boolean;
 }
 
 interface Contract {
@@ -75,6 +82,7 @@ interface Contract {
     abilities: Ability[];
     creature_images?: string[];
     manifestation?: {
+        modus?: 'Аватар' | 'Проекция' | 'Вооружение' | 'Слияние';
         avatar_description: string;
         passive_enhancement: string;
         ultimate_technique: string;
@@ -380,9 +388,15 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
                             <Card mode="outline" style={{ marginTop: 12, background: 'var(--vkui--color_background_accent_alpha)' }}>
                               <Div style={{ padding: '12px' }}>
                                 <Subhead weight="1" style={{ marginBottom: 8 }}>⚡ Манифестация</Subhead>
+                                {contract.manifestation.modus && (
+                                  <div style={{ marginBottom: 8 }}>
+                                    <Text weight="1">Модус:</Text>
+                                    <Text>{contract.manifestation.modus}</Text>
+                                  </div>
+                                )}
                                 {contract.manifestation.avatar_description && (
                                   <div style={{ marginBottom: 8 }}>
-                                    <Text weight="1">Описание Аватара:</Text>
+                                    <Text weight="1">Описание:</Text>
                                     <Text>{contract.manifestation.avatar_description}</Text>
                                   </div>
                                 )}
@@ -444,7 +458,10 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
                                                 </div>
                                             }
                                         >
-                                            <Title level="3">{ability.name}</Title>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Title level="3">{ability.name}</Title>
+                                                {ability.is_summon && <Subhead weight="1" style={{ color: 'var(--vkui--color_text_accent)' }}>(Призыв)</Subhead>}
+                                            </div>
                                             {ability.tags && Object.keys(ability.tags).length > 0 && (
                                                 <Div>
                                                     <Subhead>Теги:</Subhead>
@@ -465,7 +482,7 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
             <Panel id="inventory">
                 <Group>
                     <Header>V. ИНВЕНТАРЬ И РЕСУРСЫ</Header>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                    <CardGrid size="l">
                         {character.inventory.map((item, index) => (
                             <Card key={index} mode="shadow">
                                 <RichCell
@@ -476,18 +493,61 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
                                     <Title level="3" style={{marginBottom: 4}}>{item.name}</Title>
                                     <Text>{item.description}</Text>
                                 </RichCell>
+                                {item.sinki_type === 'Эхо' && (
+                                    <Div>
+                                        {item.aura_cells && (
+                                            <Div>
+                                                <Subhead>Ячейки Ауры:</Subhead>
+                                                <Text>Малые (I): {item.aura_cells.small}</Text>
+                                                <Text>Значительные (II): {item.aura_cells.significant}</Text>
+                                                <Text>Предельные (III): {item.aura_cells.ultimate}</Text>
+                                            </Div>
+                                        )}
+                                        {item.abilities && item.abilities.length > 0 && (
+                                            <Accordion>
+                                                <Accordion.Summary>Способности</Accordion.Summary>
+                                                <Accordion.Content>
+                                                    {item.abilities.map((ability, i) => (
+                                                        <RichCell
+                                                            key={i}
+                                                            subtitle={ability.description}
+                                                            multiline
+                                                            after={
+                                                                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
+                                                                    <Text>Тип: {ability.cell_type}</Text>
+                                                                    <Text>Цена: {ability.cell_cost}</Text>
+                                                                </div>
+                                                            }
+                                                        >
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <Title level="3">{ability.name}</Title>
+                                                                {(ability as any).is_summon && <Subhead weight="1" style={{ color: 'var(--vkui--color_text_accent)' }}>(Призыв)</Subhead>}
+                                                            </div>
+                                                            {ability.tags && Object.keys(ability.tags).length > 0 && (
+                                                                <Div>
+                                                                    <Subhead>Теги:</Subhead>
+                                                                    {Object.entries(ability.tags).map(([tag, rank]) => (
+                                                                        <Text key={tag}>{tag}: {rank}</Text>
+                                                                    ))}
+                                                                </Div>
+                                                            )}
+                                                        </RichCell>
+                                                    ))}
+                                                </Accordion.Content>
+                                            </Accordion>
+                                        )}
+                                    </Div>
+                                )}
                                 {item.image_url && item.image_url.length > 0 && (
-                                  <CardGrid size="l" style={{ padding: '0 16px 16px' }}>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '0 16px 16px' }}>
                                       {item.image_url.map((img, i) => (
-                                          <Card key={i} onClick={() => openImageModal(img)}>
-                                              <Image src={img} size={96} />
-                                          </Card>
+                                          <img key={i} src={img} style={{ width: '96px', height: '96px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer' }} onClick={() => openImageModal(img)} />
                                       ))}
-                                  </CardGrid>
+                                  </div>
                                 )}
                           </Card>
                       ))}
-                    </div>
+                    </CardGrid>
                     <SimpleCell style={{marginTop: 16}}>Валюта: {character.currency} ₭</SimpleCell>
                 </Group>
             </Panel>

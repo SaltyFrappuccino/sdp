@@ -113,6 +113,63 @@ const initialAttributes = attributesList.reduce((acc, attr) => {
   return acc;
 }, {} as { [key: string]: string });
 
+const getAttributePointsForRank = (rank: Rank): number => {
+  switch (rank) {
+    case 'F': return 10;
+    case 'E': return 14;
+    case 'D': return 16;
+    case 'C': return 20;
+    case 'B': return 30;
+    case 'A': return 40;
+    case 'S': return 50;
+    case 'SS': return 60;
+    case 'SSS': return 70;
+    default: return 10;
+  }
+};
+
+interface Item {
+    name: string;
+    description: string;
+    type: 'Обычный' | 'Синки';
+    sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
+    rank?: string;
+    image_url?: string[];
+}
+
+const getDefaultCharacterData = (): Omit<CharacterData, 'vk_id' | 'status'> => {
+  return {
+    character_name: '',
+    nickname: '',
+    age: '',
+    rank: 'F',
+    faction: 'Нейтрал',
+    faction_position: '',
+    home_island: 'Кага',
+    appearance: { text: '' },
+    character_images: [],
+    personality: '',
+    biography: '',
+    archetypes: [],
+    attributes: {},
+    contracts: [{
+      contract_name: '',
+      creature_name: '',
+      creature_rank: 'F',
+      creature_spectrum: '',
+      creature_description: '',
+      gift: '',
+      sync_level: 0,
+      unity_stage: 'Ступень I - Активация',
+      abilities: [],
+    }],
+    inventory: [],
+    currency: 0,
+    admin_note: '',
+    life_status: 'Жив',
+  };
+};
+
 export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
   const params = useParams<'id'>();
@@ -502,6 +559,12 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     }
   };
 
+  const handleClearForm = () => {
+    if (window.confirm('Вы уверены, что хотите очистить всю анкету? Все несохраненные данные будут потеряны.')) {
+      setFormData(getDefaultCharacterData());
+    }
+  };
+
   return (
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
@@ -612,7 +675,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         <AttributeManager
           attributes={formData.attributes}
           onAttributeChange={handleAttributeChange}
-          totalPoints={220}
+          totalPoints={getAttributePointsForRank(formData.rank)}
         />
         <AuraCellsCalculator
           contracts={formData.contracts}
@@ -672,6 +735,15 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
             }}
           >
             📥 Импорт анкеты
+          </Button>
+          <Button 
+            size="l" 
+            mode="secondary"
+            appearance="negative"
+            style={{ width: '100%' }}
+            onClick={handleClearForm}
+          >
+            Очистить
           </Button>
         </div>
         <Button size="l" stretched onClick={handleSubmit}>

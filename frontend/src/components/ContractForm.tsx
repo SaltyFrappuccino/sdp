@@ -1,5 +1,5 @@
 import { FC, useState } from 'react';
-import { FormItem, Input, Textarea, Button, Select, Header, Div, ModalRoot, ModalPage, ModalPageHeader, FormLayoutGroup, IconButton} from '@vkontakte/vkui';
+import { FormItem, Input, Textarea, Button, Select, Header, Div, ModalRoot, ModalPage, ModalPageHeader, FormLayoutGroup, IconButton, Checkbox, Text } from '@vkontakte/vkui';
 import { Icon24Delete, Icon24Add, Icon24Cancel } from '@vkontakte/icons';
 import { AbilityBuilder, Rank, SelectedTags } from './AbilityBuilder';
 import { ManifestationForm, ManifestationData } from './ManifestationForm';
@@ -11,6 +11,7 @@ interface Ability {
   cell_cost: number;
   description: string;
   tags: SelectedTags;
+  is_summon?: boolean;
 }
 
 interface Contract {
@@ -23,7 +24,7 @@ interface Contract {
   gift: string;
   sync_level: number;
   unity_stage: string;
-  manifestation?: ManifestationData;
+  manifestation?: ManifestationData & { modus: 'Аватар' | 'Проекция' | 'Вооружение' | 'Слияние' | '' };
   dominion?: DominionData;
   abilities: Ability[];
 }
@@ -47,14 +48,14 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
     onChange(index, e.target.name as keyof Contract, value);
   };
 
-  const handleAbilityChange = (abilityIndex: number, field: keyof Ability, value: string | number) => {
+  const handleAbilityChange = (abilityIndex: number, field: keyof Ability, value: string | number | boolean) => {
     const newAbilities = [...contract.abilities];
     newAbilities[abilityIndex] = { ...newAbilities[abilityIndex], [field]: value };
     onChange(index, 'abilities', newAbilities);
   };
 
   const addAbility = () => {
-    const newAbility: Ability = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: {} };
+    const newAbility: Ability = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: {}, is_summon: false };
     onChange(index, 'abilities', [...contract.abilities, newAbility]);
   };
 
@@ -235,7 +236,7 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
 
       {contract.sync_level >= 75 && (
         <ManifestationForm
-          manifestation={contract.manifestation || { avatar_description: '', passive_enhancement: '', ultimate_technique: '' }}
+          manifestation={contract.manifestation || { modus: '', avatar_description: '', passive_enhancement: '', ultimate_technique: '' }}
           onChange={(field, value) => {
             const newManifestation = { ...contract.manifestation, [field]: value };
             onChange(index, 'manifestation', newManifestation);
@@ -254,7 +255,12 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
       )}
 
       <Header>Способности Контракта</Header>
-      {contract.abilities.map((ability, abilityIndex) => (
+      {contract.abilities.map((ability, abilityIndex) => {
+        const isSummon = ability.is_summon;
+        const requiredTags = ['Пробивающий', 'Защитный', 'Неотвратимый', 'Область'];
+        const missingTags = isSummon ? requiredTags.filter(tag => !ability.tags[tag]) : [];
+
+        return (
         <Div key={abilityIndex} style={{ border: '1px solid var(--vkui--color_separator_primary)', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
           <FormItem top="Название способности">
             <Input
@@ -292,6 +298,31 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
             />
           </FormItem>
           
+          <FormItem>
+            <Checkbox
+                checked={ability.is_summon || false}
+                onChange={(e) => handleAbilityChange(abilityIndex, 'is_summon', e.target.checked)}
+            >
+                Способность является Призывом Существа
+            </Checkbox>
+          </FormItem>
+
+          {isSummon && (
+              <FormItem>
+                  <Text style={{ color: 'var(--vkui--color_text_secondary)' }}>
+                      <b>Правило Четырёх Основ:</b> Способность призыва должна включать в себя как минимум четыре Тега: [Пробивающий] (сила атаки), [Защитный] (здоровье), [Неотвратимый] (скорость) и [Область] (радиус действия).
+                  </Text>
+              </FormItem>
+          )}
+
+          {missingTags.length > 0 && (
+              <FormItem>
+                  <Text style={{ color: 'var(--vkui--color_text_negative)' }}>
+                  Отсутствуют обязательные теги: {missingTags.join(', ')}
+                  </Text>
+              </FormItem>
+          )}
+
           <AbilityBuilder
             cellType={ability.cell_type}
             cellCost={ability.cell_cost}
@@ -306,7 +337,8 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
             </Button>
           </FormItem>
         </Div>
-      ))}
+        );
+      })}
       
       <FormItem>
         <Button onClick={addAbility} before={<Icon24Add />}>

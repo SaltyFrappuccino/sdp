@@ -1,6 +1,8 @@
 import { FC } from 'react';
 import { Group, Header, FormItem, Input, Select, Button, Div, Accordion, IconButton} from '@vkontakte/vkui';
 import { Icon24Add, Icon24Cancel } from '@vkontakte/icons';
+import { ShinkiAbilityForm, ShinkiAbility } from './ShinkiAbilityForm';
+import { Rank } from './AbilityBuilder';
 
 interface Item {
   name: string;
@@ -9,14 +11,21 @@ interface Item {
   sinki_type?: 'Осколок' | 'Фокус' | 'Эхо';
   rank?: string;
   image_url?: string[];
+  aura_cells?: {
+    small: number;
+    significant: number;
+    ultimate: number;
+  };
+  abilities?: ShinkiAbility[];
 }
 
 interface InventoryManagerProps {
   inventory: Item[];
   onInventoryChange: (inventory: Item[]) => void;
+  characterRank: Rank;
 }
 
-export const InventoryManager: FC<InventoryManagerProps> = ({ inventory, onInventoryChange }) => {
+export const InventoryManager: FC<InventoryManagerProps> = ({ inventory, onInventoryChange, characterRank }) => {
 
   const handleItemChange = (index: number, field: keyof Item, value: any) => {
     const newInventory = [...inventory];
@@ -119,6 +128,37 @@ export const InventoryManager: FC<InventoryManagerProps> = ({ inventory, onInven
                       ]}
                     />
                   </FormItem>
+                  {item.sinki_type === 'Эхо' && (
+                    <>
+                      <Header subtitle="Запас Ячеек Эха" />
+                      <FormItem top="Малые (I)">
+                        <Input
+                          type="number"
+                          value={String(item.aura_cells?.small || 0)}
+                          onChange={(e) => handleItemChange(index, 'aura_cells', { ...item.aura_cells, small: parseInt(e.target.value) || 0 })}
+                        />
+                      </FormItem>
+                      <FormItem top="Значительные (II)">
+                        <Input
+                          type="number"
+                          value={String(item.aura_cells?.significant || 0)}
+                          onChange={(e) => handleItemChange(index, 'aura_cells', { ...item.aura_cells, significant: parseInt(e.target.value) || 0 })}
+                        />
+                      </FormItem>
+                      <FormItem top="Предельные (III)">
+                        <Input
+                          type="number"
+                          value={String(item.aura_cells?.ultimate || 0)}
+                          onChange={(e) => handleItemChange(index, 'aura_cells', { ...item.aura_cells, ultimate: parseInt(e.target.value) || 0 })}
+                        />
+                      </FormItem>
+                      <ShinkiAbilityForm
+                        abilities={item.abilities || []}
+                        onAbilitiesChange={(abilities) => handleItemChange(index, 'abilities', abilities)}
+                        characterRank={characterRank}
+                      />
+                    </>
+                  )}
                 </>
               )}
               <FormItem>
