@@ -1058,6 +1058,25 @@ router.post('/updates/:update_id/approve', async (req: Request, res: Response) =
     const updatedData = JSON.parse(update.updated_data);
     const { contracts, ...characterFields } = updatedData;
 
+    // Пересчет очков атрибутов
+    const attributeCosts: { [key: string]: number } = {
+      "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
+    };
+    let spentPoints = 0;
+    if (characterFields.attributes) {
+        for (const level of Object.values(characterFields.attributes)) {
+            spentPoints += attributeCosts[level as string] || 0;
+        }
+    }
+    characterFields.attribute_points_spent = spentPoints;
+    characterFields.attribute_points_total = getAttributePointsForRank(characterFields.rank);
+
+    // Пересчет ячеек ауры, если переданы контракты
+    if (contracts) {
+        characterFields.aura_cells = calculateAuraCells(characterFields.rank, contracts);
+    }
+
+
     // Удаляем поля, которые не должны обновляться напрямую
     delete characterFields.id;
     delete characterFields.vk_id;
