@@ -1605,8 +1605,14 @@ router.delete('/events/:id/participants/:participant_id', async (req: Request, r
 router.get('/market/stocks', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
-    const stocks = await db.all('SELECT id, name, ticker_symbol, description, current_price, exchange FROM Stocks ORDER BY exchange, name');
-    res.json(stocks);
+    const stocks = await db.all('SELECT id, name, ticker_symbol, description, current_price, exchange, base_trend FROM Stocks ORDER BY exchange, name');
+
+    const stocksWithHistory = await Promise.all(stocks.map(async (stock) => {
+      const history = await db.all('SELECT price, timestamp FROM StockPriceHistory WHERE stock_id = ? ORDER BY timestamp DESC LIMIT 30', [stock.id]);
+      return { ...stock, history };
+    }));
+
+    res.json(stocksWithHistory);
   } catch (error) {
     console.error('Failed to fetch stocks:', error);
     res.status(500).json({ error: 'Не удалось получить список акций' });
