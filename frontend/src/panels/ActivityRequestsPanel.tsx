@@ -44,6 +44,12 @@ interface ActivityRequest {
   updated_at: string;
 }
 
+interface Character {
+  id: number;
+  character_name: string;
+  nickname: string;
+}
+
 interface ActivityRequestsPanelProps extends NavIdProps {
   fetchedUser?: UserInfo;
   isAdmin?: boolean;
@@ -52,6 +58,7 @@ interface ActivityRequestsPanelProps extends NavIdProps {
 export const ActivityRequestsPanel: FC<ActivityRequestsPanelProps> = ({ id, fetchedUser, isAdmin = false }) => {
   const routeNavigator = useRouteNavigator();
   const [requests, setRequests] = useState<ActivityRequest[]>([]);
+  const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -62,6 +69,7 @@ export const ActivityRequestsPanel: FC<ActivityRequestsPanelProps> = ({ id, fetc
 
   useEffect(() => {
     fetchRequests();
+    fetchAllCharacters();
   }, [fetchedUser?.id]);
 
   const fetchRequests = async () => {
@@ -94,6 +102,18 @@ export const ActivityRequestsPanel: FC<ActivityRequestsPanelProps> = ({ id, fetc
       console.error('Failed to fetch requests:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllCharacters = async () => {
+    try {
+      const response = await fetch(`${API_URL}/characters?status=Принято&rank=&faction=&home_island=`);
+      if (response.ok) {
+        const data = await response.json();
+        setAllCharacters(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch all characters:', error);
     }
   };
 
@@ -288,8 +308,8 @@ export const ActivityRequestsPanel: FC<ActivityRequestsPanelProps> = ({ id, fetc
                 {request.team_members && JSON.parse(request.team_members).length > 0 && (
                   <Text style={{ marginBottom: '8px' }}>
                     <strong>Команда:</strong> {JSON.parse(request.team_members).map((id: number) => {
-                      const char = requests.find(r => r.character_id === id);
-                      return char ? char.character_name : `ID: ${id}`;
+                      const char = allCharacters.find(c => c.id === id);
+                      return char ? `${char.character_name}${char.nickname ? ` (${char.nickname})` : ''}` : `ID: ${id}`;
                     }).join(', ')}
                   </Text>
                 )}
