@@ -1168,7 +1168,26 @@ router.get('/activity-requests', async (req: Request, res: Response) => {
       ORDER BY ar.created_at DESC
     `);
     
-    res.json(requests);
+    const requestsWithTeamNames = await Promise.all(requests.map(async (request) => {
+      if (request.team_members && request.team_members.length > 2) { // '[]'
+        try {
+          const teamIds = JSON.parse(request.team_members);
+          if (Array.isArray(teamIds) && teamIds.length > 0) {
+            const placeholders = teamIds.map(() => '?').join(',');
+            const teamCharacters = await db.all(
+              `SELECT id, character_name, nickname FROM Characters WHERE id IN (${placeholders})`,
+              teamIds
+            );
+            return { ...request, team_members_details: teamCharacters };
+          }
+        } catch (e) {
+          console.error('Error parsing team members JSON or fetching names:', e);
+        }
+      }
+      return { ...request, team_members_details: [] };
+    }));
+
+    res.json(requestsWithTeamNames);
   } catch (error) {
     console.error('Failed to fetch activity requests:', error);
     res.status(500).json({ error: 'Не удалось получить заявки на активности' });
