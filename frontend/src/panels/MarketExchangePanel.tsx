@@ -2,11 +2,9 @@ import { FC, useState, useEffect } from 'react';
 import { Panel, PanelHeader, Header, Group, Div, Select, CardGrid, Card, Text, Button, Spinner, ScreenSpinner, ButtonGroup, Snackbar, ModalRoot, ModalPage, ModalPageHeader, FormItem, Input, Cell, Avatar, Popover, SimpleCell } from '@vkontakte/vkui';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
-import { XAxis as RechartsXAxis, YAxis as RechartsYAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Icon24CheckCircleOutline, Icon24ErrorCircle } from '@vkontakte/icons';
-
-const XAxis: any = RechartsXAxis;
-const YAxis: any = RechartsYAxis;
+import { ValueType } from 'recharts/types/component/DefaultTooltipContent';
 
 interface MarketExchangePanelProps {
   id: string;
@@ -324,8 +322,8 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                                 <XAxis dataKey="timestamp" hide />
                                 <YAxis domain={['dataMin', 'dataMax']} hide />
                                 <Tooltip
-                                  formatter={(value) => [`${Number(value).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`, "Цена"]}
-                                  labelFormatter={(label) => new Date(label).toLocaleDateString('ru-RU')}
+                                  formatter={(value: ValueType) => [`${Number(value).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`, "Цена"]}
+                                  labelFormatter={(label: string | number) => new Date(label).toLocaleDateString('ru-RU')}
                                 />
                                  <Area type="monotone" dataKey="price" stroke="#8884d8" fill="#8884d8" strokeWidth={2} dot={false} />
                               </AreaChart>
