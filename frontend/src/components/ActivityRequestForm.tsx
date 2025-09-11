@@ -119,6 +119,12 @@ export const ActivityRequestForm: FC<ActivityRequestFormProps> = ({ vkId, onRequ
     setTeamMembers(prev => prev.filter(id => id !== characterId));
   };
 
+  const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+
+  const availableTargetRanks = currentRank 
+    ? rankOptions.filter(rank => rankOrder.indexOf(rank.value) > rankOrder.indexOf(currentRank))
+    : rankOptions;
+
   const handleSubmit = async () => {
     if (!selectedCharacter) return;
 
@@ -309,7 +315,7 @@ export const ActivityRequestForm: FC<ActivityRequestFormProps> = ({ vkId, onRequ
                   placeholder="Выберите целевой ранг"
                   value={targetRank}
                   onChange={(e) => setTargetRank(e.target.value)}
-                  options={rankOptions}
+                  options={availableTargetRanks}
                 />
               </div>
             </div>
