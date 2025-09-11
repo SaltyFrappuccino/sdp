@@ -10,3 +10,4 @@ export { MarketPanel } from './MarketPanel';
 export { MyAnketasPanel } from './MyAnketasPanel';
 export { ActivityRequestsPanel } from './ActivityRequestsPanel';
 export { AdminActivityRequestsPanel } from './AdminActivityRequestsPanel';
+export { Handbook } from './Handbook';
