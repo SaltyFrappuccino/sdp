@@ -152,6 +152,27 @@ export async function initDB() {
       );
     `);
 
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS ActivityRequests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        vk_id INTEGER NOT NULL,
+        request_type TEXT NOT NULL CHECK (request_type IN ('quest', 'gate')),
+        quest_rank TEXT,
+        gate_rank TEXT,
+        character_rank TEXT NOT NULL,
+        faction TEXT NOT NULL,
+        team_members TEXT DEFAULT '[]',
+        rank_promotion TEXT,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
+        reward TEXT,
+        admin_notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+    `);
+
     return db;
   } catch (error) {
     console.error('Error initializing database:', error);

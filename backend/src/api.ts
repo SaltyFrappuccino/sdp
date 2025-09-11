@@ -1150,5 +1150,176 @@ router.post('/updates/:update_id/reject', async (req: Request, res: Response) =>
   }
 });
 
+// ==================== ACTIVITY REQUESTS ====================
+
+// GET /api/activity-requests - Получить все заявки на активности (для админов)
+router.get('/activity-requests', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const db = await initDB();
+    const requests = await db.all(`
+      SELECT ar.*, c.character_name, c.nickname, c.vk_id as character_vk_id
+      FROM ActivityRequests ar
+      JOIN Characters c ON ar.character_id = c.id
+      ORDER BY ar.created_at DESC
+    `);
+    
+    res.json(requests);
+  } catch (error) {
+    console.error('Failed to fetch activity requests:', error);
+    res.status(500).json({ error: 'Не удалось получить заявки на активности' });
+  }
+});
+
+// GET /api/activity-requests/user/:vk_id - Получить заявки пользователя
+router.get('/activity-requests/user/:vk_id', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { vk_id } = req.params;
+    
+    const requests = await db.all(`
+      SELECT ar.*, c.character_name, c.nickname
+      FROM ActivityRequests ar
+      JOIN Characters c ON ar.character_id = c.id
+      WHERE ar.vk_id = ?
+      ORDER BY ar.created_at DESC
+    `, [vk_id]);
+    
+    res.json(requests);
+  } catch (error) {
+    console.error('Failed to fetch user activity requests:', error);
+    res.status(500).json({ error: 'Не удалось получить заявки пользователя' });
+  }
+});
+
+// POST /api/activity-requests - Создать заявку на активность
+router.post('/activity-requests', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { 
+      character_id, 
+      vk_id, 
+      request_type, 
+      quest_rank, 
+      gate_rank, 
+      character_rank, 
+      faction, 
+      team_members, 
+      rank_promotion 
+    } = req.body;
+
+    // Валидация
+    if (!character_id || !vk_id || !request_type || !character_rank || !faction) {
+      return res.status(400).json({ error: 'Не все обязательные поля заполнены' });
+    }
+
+    if (request_type === 'quest' && !quest_rank) {
+      return res.status(400).json({ error: 'Для квеста необходимо указать ранг квеста' });
+    }
+
+    if (request_type === 'gate' && !gate_rank) {
+      return res.status(400).json({ error: 'Для врат необходимо указать ранг врат' });
+    }
+
+    // Проверяем, что персонаж принадлежит пользователю
+    const character = await db.get('SELECT vk_id FROM Characters WHERE id = ?', [character_id]);
+    if (!character || character.vk_id !== vk_id) {
+      return res.status(403).json({ error: 'Персонаж не принадлежит пользователю' });
+    }
+
+    const result = await db.run(`
+      INSERT INTO ActivityRequests (
+        character_id, vk_id, request_type, quest_rank, gate_rank, 
+        character_rank, faction, team_members, rank_promotion
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      character_id, vk_id, request_type, quest_rank, gate_rank,
+      character_rank, faction, JSON.stringify(team_members || []), rank_promotion
+    ]);
+
+    res.status(201).json({ 
+      id: result.lastID, 
+      message: 'Заявка на активность создана' 
+    });
+  } catch (error) {
+    console.error('Failed to create activity request:', error);
+    res.status(500).json({ error: 'Не удалось создать заявку на активность' });
+  }
+});
+
+// PUT /api/activity-requests/:id - Обновить заявку на активность (для админов)
+router.put('/activity-requests/:id', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+    const { status, reward, admin_notes } = req.body;
+
+    const result = await db.run(`
+      UPDATE ActivityRequests 
+      SET status = ?, reward = ?, admin_notes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [status, reward, admin_notes, id]);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Заявка не найдена' });
+    }
+
+    res.json({ message: 'Заявка обновлена' });
+  } catch (error) {
+    console.error('Failed to update activity request:', error);
+    res.status(500).json({ error: 'Не удалось обновить заявку' });
+  }
+});
+
+// DELETE /api/activity-requests/:id - Удалить заявку на активность (для админов)
+router.delete('/activity-requests/:id', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+
+    const result = await db.run('DELETE FROM ActivityRequests WHERE id = ?', [id]);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Заявка не найдена' });
+    }
+
+    res.json({ message: 'Заявка удалена' });
+  } catch (error) {
+    console.error('Failed to delete activity request:', error);
+    res.status(500).json({ error: 'Не удалось удалить заявку' });
+  }
+});
+
+// GET /api/characters/accepted - Получить список принятых персонажей для выбора команды
+router.get('/characters/accepted', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const characters = await db.all(`
+      SELECT id, character_name, nickname, rank, faction, vk_id
+      FROM Characters 
+      WHERE status = 'Принято' AND life_status = 'Жив'
+      ORDER BY character_name
+    `);
+    
+    res.json(characters);
+  } catch (error) {
+    console.error('Failed to fetch accepted characters:', error);
+    res.status(500).json({ error: 'Не удалось получить список персонажей' });
+  }
+});
 
 export default router;
