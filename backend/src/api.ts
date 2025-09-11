@@ -1822,19 +1822,40 @@ router.get('/market/events', async (req: Request, res: Response) => {
 router.get('/market/leaderboard', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
-    const leaderboard = await db.all(`
+    const leaderboardData = await db.all(`
       SELECT
         c.id as character_id,
         c.character_name,
-        p.cash_balance + IFNULL(SUM(pa.quantity * s.current_price), 0) as total_value
+        p.cash_balance,
+        (p.cash_balance + IFNULL(SUM(pa.quantity * s.current_price), 0)) as total_value,
+        (
+          SELECT json_group_array(
+              json_object(
+                  'name', s_inner.name,
+                  'ticker', s_inner.ticker_symbol,
+                  'quantity', pa_inner.quantity,
+                  'value', pa_inner.quantity * s_inner.current_price
+              )
+          )
+          FROM PortfolioAssets pa_inner
+          JOIN Stocks s_inner ON pa_inner.stock_id = s_inner.id
+          WHERE pa_inner.portfolio_id = p.id
+        ) as assets
       FROM Characters c
       JOIN Portfolios p ON c.id = p.character_id
       LEFT JOIN PortfolioAssets pa ON p.id = pa.portfolio_id
       LEFT JOIN Stocks s ON pa.stock_id = s.id
-      GROUP BY c.id, c.character_name, p.cash_balance
+      WHERE c.status = 'Принято'
+      GROUP BY c.id, c.character_name, p.id
       ORDER BY total_value DESC
       LIMIT 20
     `);
+
+    const leaderboard = leaderboardData.map(entry => ({
+      ...entry,
+      assets: entry.assets ? JSON.parse(entry.assets) : []
+    }));
+
     res.json(leaderboard);
   } catch (error) {
     console.error('Failed to fetch leaderboard:', error);
