@@ -384,8 +384,126 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
   };
 
 
+  const validateCharacter = (char: any) => {
+    const errors: { [key: string]: string } = {};
+
+    // Проверка лимита очков атрибутов
+    if (char.attributes) {
+      const attributeCosts: { [key: string]: number } = {
+        "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
+      };
+      
+      const getAttributePointsForRank = (rank: string): number => {
+        switch (rank) {
+          case 'F': return 10;
+          case 'E': return 14;
+          case 'D': return 16;
+          case 'C': return 20;
+          case 'B': return 30;
+          case 'A': return 40;
+          case 'S': return 50;
+          case 'SS': return 60;
+          case 'SSS': return 70;
+          default: return 10;
+        }
+      };
+      
+      const spentPoints = Object.values(char.attributes).reduce((acc: number, level: unknown) => {
+        const levelStr = level as string;
+        return acc + (attributeCosts[levelStr] || 0);
+      }, 0);
+      const totalPoints = getAttributePointsForRank(char.rank);
+      
+      if (spentPoints > totalPoints) {
+        errors.attributes = `Превышен лимит очков атрибутов! Потрачено: ${spentPoints}, доступно: ${totalPoints}`;
+      }
+    }
+
+    // Проверка контрактов (только если они есть)
+    if (char.contracts && char.contracts.length > 0) {
+      char.contracts.forEach((contract: any, contractIndex: number) => {
+        // Проверка обязательных полей контракта только если контракт не пустой
+        const hasAnyContractData = contract.contract_name?.trim() || 
+                                  contract.creature_name?.trim() || 
+                                  contract.creature_spectrum?.trim() || 
+                                  contract.creature_description?.trim() || 
+                                  contract.gift?.trim();
+        
+        if (hasAnyContractData) {
+          if (!contract.contract_name?.trim()) {
+            errors[`contract_${contractIndex}_name`] = 'Название контракта обязательно';
+          }
+          if (!contract.creature_name?.trim()) {
+            errors[`contract_${contractIndex}_creature_name`] = 'Имя существа обязательно';
+          }
+          if (!contract.creature_spectrum?.trim()) {
+            errors[`contract_${contractIndex}_creature_spectrum`] = 'Спектр существа обязателен';
+          }
+          if (!contract.creature_description?.trim()) {
+            errors[`contract_${contractIndex}_creature_description`] = 'Описание существа обязательно';
+          }
+          if (!contract.gift?.trim()) {
+            errors[`contract_${contractIndex}_gift`] = 'Дар существа обязателен';
+          }
+        }
+
+        // Проверка способностей контракта
+        if (contract.abilities && contract.abilities.length > 0) {
+          contract.abilities.forEach((ability: any, abilityIndex: number) => {
+            // Проверка бюджета способности
+            const cellSpecs: Record<string, { budget: number; maxTagRank: string }> = {
+              'Нулевая': { budget: 5, maxTagRank: 'F' },
+              'Малая (I)': { budget: 20, maxTagRank: 'C' },
+              'Значительная (II)': { budget: 50, maxTagRank: 'A' }, 
+              'Предельная (III)': { budget: 150, maxTagRank: 'SSS' },
+            };
+
+            const tagCosts: Record<string, number> = {
+              'F': 1, 'E': 2, 'D': 5, 'C': 10, 'B': 20, 'A': 35, 'S': 70, 'SS': 100, 'SSS': 150
+            };
+
+            const spec = cellSpecs[ability.cell_type];
+            if (spec) {
+              const budget = spec.budget * ability.cell_cost;
+              const spentPoints = Object.values(ability.tags || {}).reduce((acc: number, rank: unknown) => {
+                const rankStr = rank as string;
+                return acc + (tagCosts[rankStr] || 0);
+              }, 0);
+              
+              if (spentPoints > budget) {
+                errors[`contract_${contractIndex}_ability_${abilityIndex}_budget`] = `Превышен бюджет способности! Потрачено: ${spentPoints}, доступно: ${budget}`;
+              }
+            }
+
+            // Проверка обязательных тегов для способностей призыва
+            if (ability.is_summon) {
+              const requiredTags = ['Пробивающий', 'Защитный', 'Неотвратимый', 'Область'];
+              const missingTags = requiredTags.filter(tag => !ability.tags?.[tag]);
+              
+              if (missingTags.length > 0) {
+                errors[`contract_${contractIndex}_ability_${abilityIndex}_tags`] = `Отсутствуют обязательные теги для призыва: ${missingTags.join(', ')}`;
+              }
+            }
+          });
+        }
+      });
+    }
+
+    return errors;
+  };
+
   const handleSave = async () => {
     if (!character) return;
+
+    // Валидация перед сохранением
+    const validationErrors = validateCharacter(character);
+    if (Object.keys(validationErrors).length > 0) {
+      const errorMessages = Object.values(validationErrors).filter(Boolean);
+      setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>
+        Ошибки валидации: {errorMessages.join('; ')}
+      </Snackbar>);
+      return;
+    }
 
     const adminId = localStorage.getItem('adminId');
 

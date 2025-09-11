@@ -18,6 +18,7 @@ import {
   ModalPage,
   ModalPageHeader,
   IconButton,
+  Text,
 } from '@vkontakte/vkui';
 import { Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
@@ -265,7 +266,7 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     biography: '',
     archetypes: [] as string[],
     attributes: initialAttributes,
-    contracts: [emptyContract],
+    contracts: [] as Contract[],
     inventory: [] as any[],
     currency: 0,
     admin_note: '',
@@ -321,24 +322,8 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
     }
   }, [formData, isEditing]);
 
-  const [formErrors, setFormErrors] = useState<Partial<typeof formData>>({});
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
-  const validateForm = () => {
-    const errors: { [key: string]: string } = {};
-    const requiredFields: (keyof typeof formData)[] = [
-      'character_name', 'age', 'faction', 'rank', 'faction_position', 'home_island'
-    ];
-
-    requiredFields.forEach(field => {
-      const value = formData[field];
-      if (value === null || value === undefined || String(value).trim() === '') {
-        errors[field] = 'Это поле обязательно для заполнения';
-      }
-    });
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -529,10 +514,119 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   //  };
  
    const handleSubmit = async () => {
-     if (!validateForm()) {
-      setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>Пожалуйста, заполните все обязательные поля.</Snackbar>);
-      return;
-    }
+     // Создаем локальную копию ошибок для немедленного использования
+     const errors: { [key: string]: string } = {};
+     const requiredFields: (keyof typeof formData)[] = [
+       'character_name', 'age', 'faction', 'rank', 'faction_position', 'home_island'
+     ];
+
+     // Проверка обязательных полей
+     requiredFields.forEach(field => {
+       const value = formData[field];
+       if (value === null || value === undefined || String(value).trim() === '') {
+         errors[field] = 'Это поле обязательно для заполнения';
+       }
+     });
+
+     // Проверка лимита очков атрибутов
+     if (formData.attributes) {
+       const attributeCosts: { [key: string]: number } = {
+         "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
+       };
+       
+       const spentPoints = Object.values(formData.attributes).reduce((acc, level) => acc + (attributeCosts[level as string] || 0), 0);
+       const totalPoints = getAttributePointsForRank(formData.rank);
+       
+       if (spentPoints > totalPoints) {
+         errors.attributes = `Превышен лимит очков атрибутов! Потрачено: ${spentPoints}, доступно: ${totalPoints}`;
+       }
+     }
+
+     // Проверка контрактов (только если они есть)
+     if (formData.contracts && formData.contracts.length > 0) {
+       formData.contracts.forEach((contract, contractIndex) => {
+         // Проверка обязательных полей контракта только если контракт не пустой
+         const hasAnyContractData = contract.contract_name?.trim() || 
+                                   contract.creature_name?.trim() || 
+                                   contract.creature_spectrum?.trim() || 
+                                   contract.creature_description?.trim() || 
+                                   contract.gift?.trim();
+         
+         if (hasAnyContractData) {
+           if (!contract.contract_name?.trim()) {
+             errors[`contract_${contractIndex}_name`] = 'Название контракта обязательно';
+           }
+           if (!contract.creature_name?.trim()) {
+             errors[`contract_${contractIndex}_creature_name`] = 'Имя существа обязательно';
+           }
+           if (!contract.creature_spectrum?.trim()) {
+             errors[`contract_${contractIndex}_creature_spectrum`] = 'Спектр существа обязателен';
+           }
+           if (!contract.creature_description?.trim()) {
+             errors[`contract_${contractIndex}_creature_description`] = 'Описание существа обязательно';
+           }
+           if (!contract.gift?.trim()) {
+             errors[`contract_${contractIndex}_gift`] = 'Дар существа обязателен';
+           }
+         }
+
+         // Проверка способностей контракта
+         if (contract.abilities && contract.abilities.length > 0) {
+           contract.abilities.forEach((ability, abilityIndex) => {
+             if (!ability.name?.trim()) {
+               errors[`contract_${contractIndex}_ability_${abilityIndex}_name`] = 'Название способности обязательно';
+             }
+
+             // Проверка бюджета способности
+             const cellSpecs: Record<string, { budget: number; maxTagRank: string }> = {
+               'Нулевая': { budget: 5, maxTagRank: 'F' },
+               'Малая (I)': { budget: 20, maxTagRank: 'C' },
+               'Значительная (II)': { budget: 50, maxTagRank: 'A' }, 
+               'Предельная (III)': { budget: 150, maxTagRank: 'SSS' },
+             };
+
+             const tagCosts: Record<string, number> = {
+               'F': 1, 'E': 2, 'D': 5, 'C': 10, 'B': 20, 'A': 35, 'S': 70, 'SS': 100, 'SSS': 150
+             };
+
+             const spec = cellSpecs[ability.cell_type];
+             if (spec) {
+               const budget = spec.budget * ability.cell_cost;
+               const spentPoints = Object.values(ability.tags || {}).reduce((acc: number, rank: unknown) => {
+                 const rankStr = rank as string;
+                 return acc + (tagCosts[rankStr] || 0);
+               }, 0);
+               
+               if (spentPoints > budget) {
+                 errors[`contract_${contractIndex}_ability_${abilityIndex}_budget`] = `Превышен бюджет способности! Потрачено: ${spentPoints}, доступно: ${budget}`;
+               }
+             }
+
+             // Проверка обязательных тегов для способностей призыва
+             if (ability.is_summon) {
+               const requiredTags = ['Пробивающий', 'Защитный', 'Неотвратимый', 'Область'];
+               const missingTags = requiredTags.filter(tag => !ability.tags?.[tag]);
+               
+               if (missingTags.length > 0) {
+                 errors[`contract_${contractIndex}_ability_${abilityIndex}_tags`] = `Отсутствуют обязательные теги для призыва: ${missingTags.join(', ')}`;
+               }
+             }
+           });
+         }
+       });
+     }
+
+     setFormErrors(errors);
+     const isValid = Object.keys(errors).length === 0;
+     
+     if (!isValid) {
+       const errorMessages = Object.values(errors).filter(Boolean);
+       const errorText = errorMessages.length > 0 
+         ? `Ошибки валидации: ${errorMessages.join('; ')}`
+         : 'Пожалуйста, заполните все обязательные поля.';
+       setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>{errorText}</Snackbar>);
+       return;
+     }
 
     if (!fetchedUser && !isEditing) {
       setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>Не удалось получить данные пользователя.</Snackbar>);
@@ -697,6 +791,13 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
           onAttributeChange={handleAttributeChange}
           totalPoints={getAttributePointsForRank(formData.rank)}
         />
+        {formErrors.attributes && (
+          <FormItem>
+            <Text style={{ color: 'var(--vkui--color_text_negative)' }}>
+              {formErrors.attributes}
+            </Text>
+          </FormItem>
+        )}
         <AuraCellsCalculator
           contracts={formData.contracts}
           currentRank={formData.rank}
@@ -715,6 +816,14 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
               characterRank={formData.rank}
               fullCharacterData={formData}
             />
+            {/* Отображение ошибок валидации для контракта */}
+            {Object.keys(formErrors).filter(key => key.startsWith(`contract_${index}_`)).map(errorKey => (
+              <FormItem key={errorKey}>
+                <Text style={{ color: 'var(--vkui--color_text_negative)' }}>
+                  {formErrors[errorKey]}
+                </Text>
+              </FormItem>
+            ))}
           </Div>
         ))}
         <FormItem>
