@@ -60,6 +60,11 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
           </Button>
         </Div>
         <Div>
+          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('market_exchange')}>
+            Биржа
+          </Button>
+        </Div>
+        <Div>
           <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('activity_requests')}>
             Заявки на Активности
           </Button>

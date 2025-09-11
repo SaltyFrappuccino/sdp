@@ -34,6 +34,7 @@ interface ActivityRequest {
   character_rank: string;
   faction: string;
   team_members: string;
+  team_members_details: { id: number; character_name: string; nickname: string }[];
   rank_promotion?: string;
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   reward?: string;
@@ -247,12 +248,11 @@ export const AdminActivityRequestsPanel: FC<NavIdProps> = ({ id }) => {
                   </Text>
                 )}
 
-                {request.team_members && JSON.parse(request.team_members).length > 0 && (
+                {request.team_members_details && request.team_members_details.length > 0 && (
                   <Text style={{ marginBottom: '8px' }}>
-                    <strong>Команда:</strong> {JSON.parse(request.team_members).map((id: number) => {
-                      const char = requests.find(r => r.character_id === id);
-                      return char ? char.character_name : `ID: ${id}`;
-                    }).join(', ')}
+                    <strong>Команда:</strong> {request.team_members_details.map(member => 
+                      member.nickname ? `${member.character_name} (${member.nickname})` : member.character_name
+                    ).join(', ')}
                   </Text>
                 )}
 

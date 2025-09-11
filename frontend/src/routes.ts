@@ -26,6 +26,8 @@ export const DEFAULT_VIEW_PANELS = {
   ACTIVITY_REQUESTS: 'activity_requests',
   ADMIN_ACTIVITY_REQUESTS: 'admin_activity_requests',
   HANDBOOK: 'handbook',
+  MARKET_EXCHANGE: 'market_exchange',
+  ADMIN_MARKET: 'admin_market',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -46,6 +48,8 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.ACTIVITY_REQUESTS, `/${DEFAULT_VIEW_PANELS.ACTIVITY_REQUESTS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_ACTIVITY_REQUESTS, `/${DEFAULT_VIEW_PANELS.ADMIN_ACTIVITY_REQUESTS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.HANDBOOK, `/${DEFAULT_VIEW_PANELS.HANDBOOK}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.MARKET_EXCHANGE, `/${DEFAULT_VIEW_PANELS.MARKET_EXCHANGE}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_MARKET, `/${DEFAULT_VIEW_PANELS.ADMIN_MARKET}`, []),
     ]),
   ]),
 ]);

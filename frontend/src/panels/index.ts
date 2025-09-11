@@ -11,3 +11,5 @@ export { MyAnketasPanel } from './MyAnketasPanel';
 export { ActivityRequestsPanel } from './ActivityRequestsPanel';
 export { AdminActivityRequestsPanel } from './AdminActivityRequestsPanel';
 export { Handbook } from './Handbook';
+export { MarketExchangePanel } from './MarketExchangePanel';
+export { AdminMarketPanel } from './AdminMarketPanel';
