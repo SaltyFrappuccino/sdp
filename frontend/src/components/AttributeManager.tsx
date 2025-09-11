@@ -106,9 +106,12 @@ export const AttributeManager: FC<AttributeManagerProps> = ({ attributes, onAttr
           </Text>
           <Select
             placeholder="Выберите уровень"
-            value={attributes[attr.name] || 'Дилетант'}
+            value={attributes[attr.name] || 'none'}
             onChange={(e) => onAttributeChange(attr.name, e.target.value)}
-            options={attributeLevels.map(level => ({ label: level.label, value: level.value }))}
+            options={[
+              { label: 'Не выбрано', value: 'none' },
+              ...attributeLevels.map(level => ({ label: level.label, value: level.value }))
+            ]}
           />
         </FormItem>
       ))}

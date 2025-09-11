@@ -429,6 +429,19 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           </CardGrid>
         )}
       </Group>
+
+      <Group>
+        <Div>
+          <Button 
+            size="l" 
+            stretched 
+            mode="secondary" 
+            onClick={() => routeNavigator.push('/admin_activity_requests')}
+          >
+            Управление заявками на активности
+          </Button>
+        </Div>
+      </Group>
       
       {snackbar}
       {popout}

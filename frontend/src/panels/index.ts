@@ -8,3 +8,5 @@ export { AnketaEditor } from './AnketaEditor';
 export { Calculator } from './Calculator';
 export { MarketPanel } from './MarketPanel';
 export { MyAnketasPanel } from './MyAnketasPanel';
+export { ActivityRequestsPanel } from './ActivityRequestsPanel';
+export { AdminActivityRequestsPanel } from './AdminActivityRequestsPanel';

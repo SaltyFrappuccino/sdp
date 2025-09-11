@@ -23,6 +23,8 @@ export const DEFAULT_VIEW_PANELS = {
   MY_ANKETAS: 'my_anketas',
   ANKETA_EDITOR: 'anketa-editor',
   UPDATE_VIEWER: 'update_viewer',
+  ACTIVITY_REQUESTS: 'activity_requests',
+  ADMIN_ACTIVITY_REQUESTS: 'admin_activity_requests',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -40,6 +42,8 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.MY_ANKETAS, `/${DEFAULT_VIEW_PANELS.MY_ANKETAS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ANKETA_EDITOR, `/${DEFAULT_VIEW_PANELS.ANKETA_EDITOR}/:id`, []),
       createPanel(DEFAULT_VIEW_PANELS.UPDATE_VIEWER, `/${DEFAULT_VIEW_PANELS.UPDATE_VIEWER}/:update_id`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ACTIVITY_REQUESTS, `/${DEFAULT_VIEW_PANELS.ACTIVITY_REQUESTS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_ACTIVITY_REQUESTS, `/${DEFAULT_VIEW_PANELS.ADMIN_ACTIVITY_REQUESTS}`, []),
     ]),
   ]),
 ]);
