@@ -72,7 +72,7 @@ export const ActivityRequestForm: FC<ActivityRequestFormProps> = ({ vkId, onRequ
       if (myResponse.ok) {
         const myData = await myResponse.json();
         const acceptedMyCharacters = Array.isArray(myData) 
-          ? myData.filter((char: any) => char.status === 'Принято' && char.life_status === 'Жив')
+          ? myData.filter((char: any) => char.status === 'Принято' && (char.life_status === 'Жив' || char.life_status === 'Жива'))
           : [];
         setMyCharacters(acceptedMyCharacters);
       }
