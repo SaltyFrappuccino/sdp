@@ -84,7 +84,7 @@ export const ActivityRequestsPanel: FC<ActivityRequestsPanelProps> = ({ id, fetc
       
       const url = isAdmin 
         ? `${API_URL}/activity-requests`
-        : `${API_URL}/activity-requests/user/${fetchedUser?.id}`;
+        : `${API_URL}/activity-requests`;
       
       const response = await fetch(url, {
         headers: isAdmin ? {
@@ -239,7 +239,7 @@ export const ActivityRequestsPanel: FC<ActivityRequestsPanelProps> = ({ id, fetc
   return (
     <Panel id={id}>
       <PanelHeader before={<Button onClick={() => routeNavigator.back()}>Назад</Button>}>
-        {isAdmin ? 'Управление заявками' : 'Мои заявки на активности'}
+        {isAdmin ? 'Управление заявками' : 'Все Заявки в РП'}
       </PanelHeader>
 
       {!isAdmin && (
