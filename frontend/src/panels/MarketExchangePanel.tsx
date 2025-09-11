@@ -2,9 +2,11 @@ import { FC, useState, useEffect } from 'react';
 import { Panel, PanelHeader, Header, Group, Div, Select, CardGrid, Card, Text, Button, Spinner, ScreenSpinner, ButtonGroup, Snackbar, ModalRoot, ModalPage, ModalPageHeader, FormItem, Input, Cell, Avatar, Popover, SimpleCell } from '@vkontakte/vkui';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, TooltipProps } from 'recharts';
 import { Icon24CheckCircleOutline, Icon24ErrorCircle } from '@vkontakte/icons';
-import { ValueType } from 'recharts/types/component/DefaultTooltipContent';
+
+// Стабильный способ получить типы для Tooltip
+type ValueType = TooltipProps<number, string>['payload'][number]['value'];
 
 interface MarketExchangePanelProps {
   id: string;
