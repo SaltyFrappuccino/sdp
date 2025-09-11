@@ -21,11 +21,14 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
 
   const sections = [
+    // ОСНОВЫ МИРА
     {
       id: 'world',
       title: 'Мир и Лор',
       icon: <Icon24Info />,
       color: '#4CAF50',
+      category: 'Основы мира',
+      priority: 1,
       content: {
         title: 'Мир после Разлома',
         description: 'В 1800 году произошел Разлом - невидимый катаклизм, который истончил барьер между миром людей и параллельным измерением, где обитают Существа.',
@@ -56,6 +59,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Проводники',
       icon: <Icon24Users />,
       color: '#2196F3',
+      category: 'Основы мира',
+      priority: 2,
       content: {
         title: 'Проводники - Связующее Звено',
         description: 'Особенные люди, обладающие даром видеть Существ и взаимодействовать с ними. Только они могут заключать контракты с Существами.',
@@ -76,6 +81,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Существа',
       icon: <Icon24Fire />,
       color: '#FF9800',
+      category: 'Основы мира',
+      priority: 3,
       content: {
         title: 'Существа - Мистические Создания',
         description: 'Потусторонние создания, существующие параллельно с нашим миром и недоступные взору обычных людей.',
@@ -93,6 +100,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Контракты',
       icon: <Icon24Users />,
       color: '#9C27B0',
+      category: 'Основы мира',
+      priority: 4,
       content: {
         title: 'Магические Договоры',
         description: 'Договор между Проводником и Существом, подробно описывающий условия использования способностей.',
@@ -112,6 +121,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Фракции',
       icon: <Icon24Fire />,
       color: '#F44336',
+      category: 'Политика и власть',
+      priority: 1,
       content: {
         title: 'Три Могущественные Фракции',
         description: 'Ведут вечную борьбу за влияние в мире после Разлома.',
@@ -193,6 +204,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Острова',
       icon: <Icon24Info />,
       color: '#00BCD4',
+      category: 'Политика и власть',
+      priority: 2,
       content: {
         title: 'Шесть Островов-Государств',
         description: 'Центр нового миропорядка после падения старых наций.',
@@ -211,6 +224,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Атрибуты',
       icon: <Icon24Users />,
       color: '#FF5722',
+      category: 'Боевая система',
+      priority: 1,
       content: {
         title: 'Влияние Атрибутов на Бой',
         description: 'Ваши Атрибуты — это основа, на которую накладываются сверхъестественные способности. Они определяют, как ваш персонаж действует в те моменты, когда Аура не используется.',
@@ -247,6 +262,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Теги и Ранги',
       icon: <Icon24Fire />,
       color: '#9C27B0',
+      category: 'Боевая система',
+      priority: 2,
       content: {
         title: 'Система Тегов',
         description: 'Каждая способность создается из Тегов в рамках «Бюджета Мощи». Стоимость растет экспоненциально, отражая огромную разницу в силе между рангами.',
@@ -364,6 +381,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Боевая Система',
       icon: <Icon24Fire />,
       color: '#E91E63',
+      category: 'Боевая система',
+      priority: 3,
       content: {
         title: 'Фундамент Боя',
         description: 'Система, основанная на атрибутах, рангах и ячейках Ауры.',
@@ -419,6 +438,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Экономика',
       icon: <Icon24Fire />,
       color: '#4CAF50',
+      category: 'Экономика и торговля',
+      priority: 1,
       content: {
         title: 'Кредиты и Аураномика',
         description: 'Двухуровневая экономическая система: стандартная и экономика Проводников.',
@@ -493,6 +514,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
       title: 'Острова (Детально)',
       icon: <Icon24Info />,
       color: '#00BCD4',
+      category: 'Политика и власть',
+      priority: 3,
       content: {
         title: 'Шесть Островов-Государств',
         description: 'Центр нового миропорядка после падения старых наций.',
@@ -602,6 +625,30 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
     section.content.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     section.content.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Группируем разделы по категориям и сортируем по приоритету
+  const groupedSections = filteredSections.reduce((groups, section) => {
+    const category = section.category || 'Другое';
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(section);
+    return groups;
+  }, {} as Record<string, typeof sections>);
+
+  // Сортируем разделы внутри каждой категории по приоритету
+  Object.keys(groupedSections).forEach(category => {
+    groupedSections[category].sort((a, b) => (a.priority || 999) - (b.priority || 999));
+  });
+
+  // Порядок категорий
+  const categoryOrder = [
+    'Основы мира',
+    'Политика и власть', 
+    'Боевая система',
+    'Экономика и торговля',
+    'Другое'
+  ];
 
   const renderMarkdownContent = (content: string) => {
     const lines = content.split('\n');
@@ -777,43 +824,84 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
               {renderSectionContent(sections.find(s => s.id === selectedSection)!)}
             </div>
           ) : (
-            <CardGrid size="s">
-              {filteredSections.map((section) => (
-                <Card
-                  key={section.id}
-                  style={{ 
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    border: `2px solid ${section.color}20`
-                  }}
-                  onClick={() => setSelectedSection(section.id)}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = `0 4px 12px ${section.color}30`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  <div style={{ padding: '16px', textAlign: 'center' }}>
-                    <div style={{ 
-                      color: section.color, 
-                      fontSize: '32px',
-                      marginBottom: '12px'
+            <div>
+              {categoryOrder.map(category => {
+                const categorySections = groupedSections[category];
+                if (!categorySections || categorySections.length === 0) return null;
+
+                return (
+                  <div key={category} style={{ marginBottom: '32px' }}>
+                    <Header style={{ 
+                      marginBottom: '16px', 
+                      padding: '8px 16px',
+                      backgroundColor: 'var(--vkui--color_background_secondary)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--vkui--color_field_border)'
                     }}>
-                      {section.icon}
-                    </div>
-                    <Header style={{ color: section.color, margin: 0 }}>
-                      {section.title}
+                      {category}
                     </Header>
-                    <Text style={{ marginTop: '8px', fontSize: '14px', opacity: 0.8 }}>
-                      {section.content.description.substring(0, 100)}...
-                    </Text>
+                    <CardGrid size="s">
+                      {categorySections.map((section) => (
+                        <Card
+                          key={section.id}
+                          style={{ 
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            border: `2px solid ${section.color}20`,
+                            height: '180px',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                          onClick={() => setSelectedSection(section.id)}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = `0 4px 12px ${section.color}30`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <div style={{ 
+                            padding: '16px', 
+                            textAlign: 'center',
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between'
+                          }}>
+                            <div>
+                              <div style={{ 
+                                color: section.color, 
+                                fontSize: '32px',
+                                marginBottom: '12px'
+                              }}>
+                                {section.icon}
+                              </div>
+                              <Header style={{ color: section.color, margin: 0, fontSize: '16px' }}>
+                                {section.title}
+                              </Header>
+                            </div>
+                            <Text style={{ 
+                              marginTop: '8px', 
+                              fontSize: '13px', 
+                              opacity: 0.8,
+                              lineHeight: '1.3',
+                              overflow: 'hidden',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: 'vertical'
+                            }}>
+                              {section.content.description.substring(0, 120)}...
+                            </Text>
+                          </div>
+                        </Card>
+                      ))}
+                    </CardGrid>
                   </div>
-                </Card>
-              ))}
-            </CardGrid>
+                );
+              })}
+            </div>
           )}
         </div>
       </Group>
