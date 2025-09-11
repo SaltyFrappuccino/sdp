@@ -323,11 +323,11 @@ export const ActivityRequestForm: FC<ActivityRequestFormProps> = ({ vkId, onRequ
               <div style={{ 
                 marginTop: '8px', 
                 padding: '8px', 
-                backgroundColor: 'var(--vkui--color_background_accent)', 
+                backgroundColor: 'var(--vkui--color_background_secondary)', 
                 borderRadius: '8px',
                 border: '1px solid var(--vkui--color_field_border)'
               }}>
-                <Text style={{ fontSize: '14px', color: 'var(--vkui--color_text_accent)' }}>
+                <Text style={{ fontSize: '14px', color: 'var(--vkui--color_text_primary)' }}>
                   🎯 Повышение Ранга {currentRank} → {targetRank}
                 </Text>
               </div>
