@@ -1599,4 +1599,192 @@ router.delete('/events/:id/participants/:participant_id', async (req: Request, r
   }
 });
 
+// ==================== MARKET API ====================
+
+// GET /api/market/stocks - Получить список всех акций
+router.get('/market/stocks', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const stocks = await db.all('SELECT id, name, ticker_symbol, description, current_price, exchange FROM Stocks ORDER BY exchange, name');
+    res.json(stocks);
+  } catch (error) {
+    console.error('Failed to fetch stocks:', error);
+    res.status(500).json({ error: 'Не удалось получить список акций' });
+  }
+});
+
+// GET /api/market/stocks/:ticker - Получить детали акции и историю цен
+router.get('/market/stocks/:ticker', async (req: Request, res: Response) => {
+  try {
+    const { ticker } = req.params;
+    const db = await initDB();
+    const stock = await db.get('SELECT * FROM Stocks WHERE ticker_symbol = ?', [ticker]);
+
+    if (!stock) {
+      return res.status(404).json({ error: 'Акция не найдена' });
+    }
+
+    const history = await db.all('SELECT price, timestamp FROM StockPriceHistory WHERE stock_id = ? ORDER BY timestamp DESC LIMIT 100', [stock.id]);
+    res.json({ ...stock, history });
+  } catch (error) {
+    console.error('Failed to fetch stock details:', error);
+    res.status(500).json({ error: 'Не удалось получить детали акции' });
+  }
+});
+
+// GET /api/market/portfolio/:character_id - Получить портфолио персонажа
+router.get('/market/portfolio/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    let portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
+    if (!portfolio) {
+      // Создаем портфолио, если его нет
+      const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+      if (!character) {
+        return res.status(404).json({ error: 'Персонаж не найден' });
+      }
+      const result = await db.run('INSERT INTO Portfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, character.currency || 0]);
+      portfolio = { id: result.lastID, character_id, cash_balance: character.currency || 0 };
+    }
+
+    const assets = await db.all(`
+      SELECT s.name, s.ticker_symbol, s.current_price, pa.quantity, pa.average_purchase_price
+      FROM PortfolioAssets pa
+      JOIN Stocks s ON pa.stock_id = s.id
+      WHERE pa.portfolio_id = ?
+    `, [portfolio.id]);
+
+    res.json({ ...portfolio, assets });
+  } catch (error) {
+    console.error('Failed to fetch portfolio:', error);
+    res.status(500).json({ error: 'Не удалось получить портфолио' });
+  }
+});
+
+// POST /api/market/trade - Совершить сделку
+router.post('/market/trade', async (req: Request, res: Response) => {
+  const { character_id, ticker_symbol, quantity, trade_type } = req.body; // trade_type: 'buy' or 'sell'
+  if (!character_id || !ticker_symbol || !quantity || !trade_type || quantity <= 0) {
+    return res.status(400).json({ error: 'Неверные параметры для сделки' });
+  }
+  const db = await initDB();
+  try {
+    await db.run('BEGIN TRANSACTION');
+
+    const stock = await db.get('SELECT * FROM Stocks WHERE ticker_symbol = ?', [ticker_symbol]);
+    if (!stock) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Акция не найдена' });
+    }
+
+    const portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
+    if (!portfolio) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Портфолио не найдено' });
+    }
+
+    const total_cost = stock.current_price * quantity;
+
+    if (trade_type === 'buy') {
+      if (portfolio.cash_balance < total_cost) {
+        await db.run('ROLLBACK');
+        return res.status(400).json({ error: 'Недостаточно средств' });
+      }
+
+      const new_balance = portfolio.cash_balance - total_cost;
+      await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [new_balance, portfolio.id]);
+      await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [new_balance, character_id]);
+
+      const existing_asset = await db.get('SELECT * FROM PortfolioAssets WHERE portfolio_id = ? AND stock_id = ?', [portfolio.id, stock.id]);
+      if (existing_asset) {
+        const new_quantity = existing_asset.quantity + quantity;
+        const new_avg_price = ((existing_asset.average_purchase_price * existing_asset.quantity) + total_cost) / new_quantity;
+        await db.run('UPDATE PortfolioAssets SET quantity = ?, average_purchase_price = ? WHERE id = ?', [new_quantity, new_avg_price, existing_asset.id]);
+      } else {
+        await db.run('INSERT INTO PortfolioAssets (portfolio_id, stock_id, quantity, average_purchase_price) VALUES (?, ?, ?, ?)', [portfolio.id, stock.id, quantity, stock.current_price]);
+      }
+
+    } else if (trade_type === 'sell') {
+      const existing_asset = await db.get('SELECT * FROM PortfolioAssets WHERE portfolio_id = ? AND stock_id = ?', [portfolio.id, stock.id]);
+      if (!existing_asset || existing_asset.quantity < quantity) {
+        await db.run('ROLLBACK');
+        return res.status(400).json({ error: 'Недостаточно акций для продажи' });
+      }
+
+      const new_balance = portfolio.cash_balance + total_cost;
+      await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [new_balance, portfolio.id]);
+      await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [new_balance, character_id]);
+
+      const new_quantity = existing_asset.quantity - quantity;
+      if (new_quantity > 0) {
+        await db.run('UPDATE PortfolioAssets SET quantity = ? WHERE id = ?', [new_quantity, existing_asset.id]);
+      } else {
+        await db.run('DELETE FROM PortfolioAssets WHERE id = ?', [existing_asset.id]);
+      }
+    } else {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Неверный тип сделки' });
+    }
+
+    await db.run('COMMIT');
+    res.json({ message: 'Сделка совершена успешно' });
+
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Trade failed:', error);
+    res.status(500).json({ error: 'Не удалось совершить сделку' });
+  }
+});
+
+// PUT /api/market/admin/stocks/:ticker - Обновить базовый тренд акции
+router.put('/market/admin/stocks/:ticker', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { ticker } = req.params;
+    const { base_trend } = req.body;
+    const db = await initDB();
+    const result = await db.run('UPDATE Stocks SET base_trend = ? WHERE ticker_symbol = ?', [base_trend, ticker]);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Акция не найдена' });
+    }
+    res.json({ message: 'Базовый тренд обновлен' });
+  } catch (error) {
+    console.error('Failed to update stock trend:', error);
+    res.status(500).json({ error: 'Не удалось обновить тренд' });
+  }
+});
+
+// POST /api/market/admin/events - Создать рыночное событие
+router.post('/market/admin/events', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { title, description, impacted_stock_id, impact_strength, duration_hours } = req.body;
+    const db = await initDB();
+
+    const start_time = new Date();
+    const end_time = new Date(start_time.getTime() + duration_hours * 60 * 60 * 1000);
+
+    const result = await db.run(`
+      INSERT INTO MarketEvents (title, description, impacted_stock_id, impact_strength, start_time, end_time, created_by_admin_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [title, description, impacted_stock_id, impact_strength, start_time.toISOString(), end_time.toISOString(), adminId]);
+    
+    res.status(201).json({ id: result.lastID, message: 'Рыночное событие создано' });
+  } catch (error) {
+    console.error('Failed to create market event:', error);
+    res.status(500).json({ error: 'Не удалось создать событие' });
+  }
+});
+
+
 export default router;

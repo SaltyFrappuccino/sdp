@@ -219,9 +219,84 @@ export async function initDB() {
       );
     `);
 
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS Stocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        ticker_symbol TEXT NOT NULL UNIQUE,
+        description TEXT,
+        current_price REAL NOT NULL,
+        market_cap REAL,
+        volume INTEGER,
+        exchange TEXT NOT NULL CHECK (exchange IN ('IGX', 'KSM', 'MCM', 'OSB')),
+        base_trend REAL DEFAULT 0.0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS StockPriceHistory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        stock_id INTEGER NOT NULL,
+        price REAL NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS Portfolios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL UNIQUE,
+        cash_balance REAL NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS PortfolioAssets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        portfolio_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        average_purchase_price REAL NOT NULL,
+        FOREIGN KEY(portfolio_id) REFERENCES Portfolios(id) ON DELETE CASCADE,
+        FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS MarketEvents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        impacted_stock_id INTEGER,
+        impact_strength REAL NOT NULL,
+        start_time DATETIME NOT NULL,
+        end_time DATETIME NOT NULL,
+        created_by_admin_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(impacted_stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
+      );
+    `);
+
+    await seedStocks(db);
+
     return db;
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
   }
+}
+
+export async function seedStocks(db: any) {
+  const stocks = [
+    { name: 'Arasaka', ticker_symbol: 'ARSK', description: 'Промышленный и военный гигант, производитель оружия, роботов и имплантов.', current_price: 150.75, exchange: 'IGX' },
+    { name: 'Sber', ticker_symbol: 'SBER', description: 'Цифровой гигант, контролирующий информацию, финансы и логистику.', current_price: 280.50, exchange: 'IGX' },
+    { name: 'Отражённый Свет Солнца', ticker_symbol: 'OSS', description: 'Религиозная и бизнес-сеть с огромным влиянием.', current_price: 120.00, exchange: 'IGX' },
+    { name: 'Стабилизационные Облигации Порядка', ticker_symbol: 'ORD-B', description: 'Надежные государственные облигации, поддерживаемые Порядком.', current_price: 100.00, exchange: 'OSB' },
+    { name: 'Индекс Влияния "Чёрной Лилии"', ticker_symbol: 'BLK-L', description: 'Высокорисковый индекс, отражающий успех теневых операций.', current_price: 50.25, exchange: 'KSM' },
+    { name: 'Редкие травы с Мидзу', ticker_symbol: 'MDZ-H', description: 'Товарный фьючерс на поставку уникальных лекарственных растений.', current_price: 3500.00, exchange: 'MCM' }
+  ];
+
+  const stmt = await db.prepare('INSERT OR IGNORE INTO Stocks (name, ticker_symbol, description, current_price, exchange) VALUES (?, ?, ?, ?, ?)');
+  for (const stock of stocks) {
+    await stmt.run(stock.name, stock.ticker_symbol, stock.description, stock.current_price, stock.exchange);
+  }
+  await stmt.finalize();
 }
