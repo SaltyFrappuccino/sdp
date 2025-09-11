@@ -173,6 +173,52 @@ export async function initDB() {
       );
     `);
 
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS Events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        event_type TEXT NOT NULL CHECK (event_type IN ('quest', 'gate', 'pvp', 'pve', 'social', 'auction', 'raid', 'special')),
+        status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'in_progress', 'completed', 'cancelled')),
+        difficulty TEXT NOT NULL CHECK (difficulty IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+        recommended_rank TEXT,
+        max_participants INTEGER,
+        min_participants INTEGER DEFAULT 1,
+        is_deadly BOOLEAN DEFAULT 0,
+        is_open_world BOOLEAN DEFAULT 0,
+        rewards TEXT DEFAULT '{}',
+        requirements TEXT DEFAULT '{}',
+        location TEXT,
+        location_description TEXT,
+        start_date DATETIME,
+        end_date DATETIME,
+        application_deadline DATETIME,
+        organizer_vk_id INTEGER NOT NULL,
+        organizer_name TEXT NOT NULL,
+        additional_info TEXT,
+        event_data TEXT DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS EventParticipants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        vk_id INTEGER NOT NULL,
+        character_name TEXT NOT NULL,
+        character_rank TEXT NOT NULL,
+        faction TEXT NOT NULL,
+        application_data TEXT DEFAULT '{}',
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'withdrawn')),
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(event_id) REFERENCES Events(id) ON DELETE CASCADE,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+    `);
+
     return db;
   } catch (error) {
     console.error('Error initializing database:', error);

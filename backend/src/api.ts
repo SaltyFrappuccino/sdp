@@ -1322,4 +1322,281 @@ router.get('/characters/accepted', async (req: Request, res: Response) => {
   }
 });
 
+// ==================== EVENTS API ====================
+
+// GET /api/events - Получить список ивентов
+router.get('/events', async (req: Request, res: Response) => {
+  try {
+    const { status, event_type, difficulty } = req.query;
+    const db = await initDB();
+    
+    let query = `
+      SELECT e.*, 
+             COUNT(ep.id) as participant_count
+      FROM Events e
+      LEFT JOIN EventParticipants ep ON e.id = ep.event_id AND ep.status = 'approved'
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (status) {
+      query += ' AND e.status = ?';
+      params.push(status);
+    }
+    if (event_type) {
+      query += ' AND e.event_type = ?';
+      params.push(event_type);
+    }
+    if (difficulty) {
+      query += ' AND e.difficulty = ?';
+      params.push(difficulty);
+    }
+
+    query += ' GROUP BY e.id ORDER BY e.created_at DESC';
+
+    const events = await db.all(query, params);
+    res.json(events);
+  } catch (error) {
+    console.error('Failed to fetch events:', error);
+    res.status(500).json({ error: 'Не удалось получить список ивентов' });
+  }
+});
+
+// GET /api/events/:id - Получить детали ивента
+router.get('/events/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const db = await initDB();
+    
+    const event = await db.get(`
+      SELECT e.*, 
+             COUNT(ep.id) as participant_count
+      FROM Events e
+      LEFT JOIN EventParticipants ep ON e.id = ep.event_id AND ep.status = 'approved'
+      WHERE e.id = ?
+      GROUP BY e.id
+    `, [id]);
+
+    if (!event) {
+      return res.status(404).json({ error: 'Ивент не найден' });
+    }
+
+    const participants = await db.all(`
+      SELECT ep.*, c.character_name, c.nickname, c.rank, c.faction
+      FROM EventParticipants ep
+      JOIN Characters c ON ep.character_id = c.id
+      WHERE ep.event_id = ?
+      ORDER BY ep.joined_at DESC
+    `, [id]);
+
+    res.json({ ...event, participants });
+  } catch (error) {
+    console.error('Failed to fetch event:', error);
+    res.status(500).json({ error: 'Не удалось получить ивент' });
+  }
+});
+
+// POST /api/events - Создать новый ивент
+router.post('/events', async (req: Request, res: Response) => {
+  try {
+    const {
+      title,
+      description,
+      event_type,
+      difficulty,
+      recommended_rank,
+      max_participants,
+      min_participants = 1,
+      is_deadly = false,
+      is_open_world = false,
+      rewards = {},
+      requirements = {},
+      location,
+      location_description,
+      start_date,
+      end_date,
+      application_deadline,
+      organizer_vk_id,
+      organizer_name,
+      additional_info,
+      event_data = {}
+    } = req.body;
+
+    const db = await initDB();
+    const result = await db.run(`
+      INSERT INTO Events (
+        title, description, event_type, difficulty, recommended_rank,
+        max_participants, min_participants, is_deadly, is_open_world,
+        rewards, requirements, location, location_description,
+        start_date, end_date, application_deadline, organizer_vk_id,
+        organizer_name, additional_info, event_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      title, description, event_type, difficulty, recommended_rank,
+      max_participants, min_participants, is_deadly ? 1 : 0, is_open_world ? 1 : 0,
+      JSON.stringify(rewards), JSON.stringify(requirements), location, location_description,
+      start_date, end_date, application_deadline, organizer_vk_id,
+      organizer_name, additional_info, JSON.stringify(event_data)
+    ]);
+
+    res.status(201).json({ id: result.lastID });
+  } catch (error) {
+    console.error('Failed to create event:', error);
+    res.status(500).json({ error: 'Не удалось создать ивент' });
+  }
+});
+
+// PUT /api/events/:id - Обновить ивент
+router.put('/events/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      event_type,
+      difficulty,
+      recommended_rank,
+      max_participants,
+      min_participants,
+      is_deadly,
+      is_open_world,
+      rewards,
+      requirements,
+      location,
+      location_description,
+      start_date,
+      end_date,
+      application_deadline,
+      additional_info,
+      event_data,
+      status
+    } = req.body;
+
+    const db = await initDB();
+    
+    const updateFields = [];
+    const params: any[] = [];
+
+    if (title !== undefined) { updateFields.push('title = ?'); params.push(title); }
+    if (description !== undefined) { updateFields.push('description = ?'); params.push(description); }
+    if (event_type !== undefined) { updateFields.push('event_type = ?'); params.push(event_type); }
+    if (difficulty !== undefined) { updateFields.push('difficulty = ?'); params.push(difficulty); }
+    if (recommended_rank !== undefined) { updateFields.push('recommended_rank = ?'); params.push(recommended_rank); }
+    if (max_participants !== undefined) { updateFields.push('max_participants = ?'); params.push(max_participants); }
+    if (min_participants !== undefined) { updateFields.push('min_participants = ?'); params.push(min_participants); }
+    if (is_deadly !== undefined) { updateFields.push('is_deadly = ?'); params.push(is_deadly ? 1 : 0); }
+    if (is_open_world !== undefined) { updateFields.push('is_open_world = ?'); params.push(is_open_world ? 1 : 0); }
+    if (rewards !== undefined) { updateFields.push('rewards = ?'); params.push(JSON.stringify(rewards)); }
+    if (requirements !== undefined) { updateFields.push('requirements = ?'); params.push(JSON.stringify(requirements)); }
+    if (location !== undefined) { updateFields.push('location = ?'); params.push(location); }
+    if (location_description !== undefined) { updateFields.push('location_description = ?'); params.push(location_description); }
+    if (start_date !== undefined) { updateFields.push('start_date = ?'); params.push(start_date); }
+    if (end_date !== undefined) { updateFields.push('end_date = ?'); params.push(end_date); }
+    if (application_deadline !== undefined) { updateFields.push('application_deadline = ?'); params.push(application_deadline); }
+    if (additional_info !== undefined) { updateFields.push('additional_info = ?'); params.push(additional_info); }
+    if (event_data !== undefined) { updateFields.push('event_data = ?'); params.push(JSON.stringify(event_data)); }
+    if (status !== undefined) { updateFields.push('status = ?'); params.push(status); }
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'Нет полей для обновления' });
+    }
+
+    updateFields.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+
+    await db.run(`
+      UPDATE Events 
+      SET ${updateFields.join(', ')}
+      WHERE id = ?
+    `, params);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to update event:', error);
+    res.status(500).json({ error: 'Не удалось обновить ивент' });
+  }
+});
+
+// DELETE /api/events/:id - Удалить ивент
+router.delete('/events/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const db = await initDB();
+    await db.run('DELETE FROM Events WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete event:', error);
+    res.status(500).json({ error: 'Не удалось удалить ивент' });
+  }
+});
+
+// POST /api/events/:id/participants - Подать заявку на участие в ивенте
+router.post('/events/:id/participants', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { character_id, vk_id, character_name, character_rank, faction, application_data = {} } = req.body;
+
+    const db = await initDB();
+    
+    // Check if already applied
+    const existing = await db.get(`
+      SELECT id FROM EventParticipants 
+      WHERE event_id = ? AND character_id = ?
+    `, [id, character_id]);
+
+    if (existing) {
+      return res.status(400).json({ error: 'Уже подана заявка на этот ивент' });
+    }
+
+    const result = await db.run(`
+      INSERT INTO EventParticipants (
+        event_id, character_id, vk_id, character_name, 
+        character_rank, faction, application_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [id, character_id, vk_id, character_name, character_rank, faction, JSON.stringify(application_data)]);
+
+    res.status(201).json({ id: result.lastID });
+  } catch (error) {
+    console.error('Failed to apply to event:', error);
+    res.status(500).json({ error: 'Не удалось подать заявку на ивент' });
+  }
+});
+
+// PUT /api/events/:id/participants/:participant_id - Обновить статус участника
+router.put('/events/:id/participants/:participant_id', async (req: Request, res: Response) => {
+  try {
+    const { id, participant_id } = req.params;
+    const { status } = req.body;
+
+    const db = await initDB();
+    await db.run(`
+      UPDATE EventParticipants 
+      SET status = ?
+      WHERE id = ? AND event_id = ?
+    `, [status, participant_id, id]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to update participant status:', error);
+    res.status(500).json({ error: 'Не удалось обновить статус участника' });
+  }
+});
+
+// DELETE /api/events/:id/participants/:participant_id - Удалить участника
+router.delete('/events/:id/participants/:participant_id', async (req: Request, res: Response) => {
+  try {
+    const { id, participant_id } = req.params;
+    const db = await initDB();
+    await db.run(`
+      DELETE FROM EventParticipants 
+      WHERE id = ? AND event_id = ?
+    `, [participant_id, id]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to remove participant:', error);
+    res.status(500).json({ error: 'Не удалось удалить участника' });
+  }
+});
+
 export default router;
