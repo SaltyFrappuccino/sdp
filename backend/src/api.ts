@@ -1154,11 +1154,6 @@ router.post('/updates/:update_id/reject', async (req: Request, res: Response) =>
 
 // GET /api/activity-requests - Получить все заявки на активности (для админов)
 router.get('/activity-requests', async (req: Request, res: Response) => {
-  const adminId = req.headers['x-admin-id'];
-  if (adminId !== ADMIN_VK_ID) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
   try {
     const db = await initDB();
     const requests = await db.all(`
