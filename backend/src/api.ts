@@ -1792,5 +1792,54 @@ router.post('/market/admin/events', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/market/events - Получить список рыночных событий
+router.get('/market/events', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const events = await db.all(`
+      SELECT 
+        me.id,
+        me.title,
+        me.description,
+        me.impact_strength,
+        me.start_time,
+        me.end_time,
+        s.name as impacted_stock_name,
+        s.ticker_symbol as impacted_stock_ticker
+      FROM MarketEvents me
+      LEFT JOIN Stocks s ON me.impacted_stock_id = s.id
+      ORDER BY me.start_time DESC
+      LIMIT 20
+    `);
+    res.json(events);
+  } catch (error) {
+    console.error('Failed to fetch market events:', error);
+    res.status(500).json({ error: 'Не удалось получить список рыночных событий' });
+  }
+});
+
+// GET /api/market/leaderboard - Получить рейтинг трейдеров
+router.get('/market/leaderboard', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const leaderboard = await db.all(`
+      SELECT
+        c.id as character_id,
+        c.character_name,
+        p.cash_balance + IFNULL(SUM(pa.quantity * s.current_price), 0) as total_value
+      FROM Characters c
+      JOIN Portfolios p ON c.id = p.character_id
+      LEFT JOIN PortfolioAssets pa ON p.id = pa.portfolio_id
+      LEFT JOIN Stocks s ON pa.stock_id = s.id
+      GROUP BY c.id, c.character_name, p.cash_balance
+      ORDER BY total_value DESC
+      LIMIT 20
+    `);
+    res.json(leaderboard);
+  } catch (error) {
+    console.error('Failed to fetch leaderboard:', error);
+    res.status(500).json({ error: 'Не удалось получить рейтинг трейдеров' });
+  }
+});
 
 export default router;
