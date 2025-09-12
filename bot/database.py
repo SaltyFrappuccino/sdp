@@ -37,11 +37,18 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             setter_vk_id INTEGER NOT NULL,
             target_vk_id INTEGER NOT NULL,
+            peer_id INTEGER NOT NULL,
             message TEXT NOT NULL,
             due_date TIMESTAMP NOT NULL,
             sent INTEGER DEFAULT 0
         )
     ''')
+    
+    # Добавляем столбец peer_id, если его нет (для обратной совместимости)
+    try:
+        cursor.execute("ALTER TABLE reminders ADD COLUMN peer_id INTEGER NOT NULL DEFAULT 0;")
+    except sqlite3.OperationalError:
+        pass # Столбец уже существует
 
     conn.commit()
     conn.close()

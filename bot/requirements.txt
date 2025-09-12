@@ -3,3 +3,4 @@ python-dotenv
 watchdog
 apscheduler
 requests
+pytz

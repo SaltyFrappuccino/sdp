@@ -1,72 +1,58 @@
 import json
 import logging
 from core.permissions import admin_required
-from core.utils import get_random_id
-from core.backend_api import (
-    get_characters_by_vk_id, 
-    find_character,
-    # update_character_data # Пока не используем
-)
+from core.utils import send_message
+from core.backend_api import get_characters_by_vk_id, find_character
 
 # --- Команды для игроков ---
 
 def my_characters(vk, event, args):
-    """Показывает список персонажей, привязанных к VK ID игрока, через API."""
-    try:
-        # Используем новую функцию для запроса к API
-        chars = get_characters_by_vk_id(event.user_id)
-        
-        # Обрабатываем случай, когда API недоступен или вернул ошибку
-        if chars is None:
-            vk.messages.send(peer_id=event.peer_id, message="⚠️ Не удалось связаться с сервером анкет. Попробуйте позже.", random_id=get_random_id())
-            return
-
-        if not chars:
-            message = "❌ У вас пока нет персонажей со статусом 'Принято'."
-        else:
-            message = "🎭 Ваши персонажи:\n"
-            for char in chars:
-                # Поля могут отличаться, берем из ответа API
-                message += f"• ID: {char.get('id')} | {char.get('character_name')} (Ранг: {char.get('rank', 'N/A')}, Статус: {char.get('status', 'N/A')})\n"
-        
-        vk.messages.send(peer_id=event.peer_id, message=message, random_id=get_random_id())
-    except Exception as e:
-        logging.error(f"Ошибка при получении персонажей для vk_id {event.user_id}: {e}")
-        vk.messages.send(peer_id=event.peer_id, message="⚠️ Произошла внутренняя ошибка бота.", random_id=get_random_id())
-
-def character_info(vk, event, args):
-    """Показывает информацию о конкретном персонаже по его ID или имени через API."""
-    if not args:
-        vk.messages.send(peer_id=event.peer_id, message="❓ Укажите ID или имя персонажа.", random_id=get_random_id())
+    """Показывает список персонажей пользователя."""
+    vk_id = event.user_id
+    characters = get_characters_by_vk_id(vk_id)
+    
+    if not characters:
+        send_message(vk, event.peer_id, "У вас пока нет персонажей.")
         return
 
-    identifier = " ".join(args)
-    try:
-        # Используем новую функцию для запроса к API
-        char = find_character(identifier)
+    char_list = "\n".join([f"- {char['name']} (ID: {char['id']})" for char in characters])
+    message = f"📜 Ваши персонажи:\n{char_list}"
+    send_message(vk, event.peer_id, message)
 
-        if char is None:
-             vk.messages.send(peer_id=event.peer_id, message="⚠️ Не удалось связаться с сервером анкет или персонаж не найден.", random_id=get_random_id())
-             return
+def character_info(vk, event, args):
+    """Показывает подробную информацию о персонаже."""
+    if not args:
+        send_message(vk, event.peer_id, "Пожалуйста, укажите имя или ID персонажа.")
+        return
 
-        # attributes и aura_cells теперь должны быть объектами, а не JSON-строками
-        attributes = char.get('attributes', {})
-        aura_cells = char.get('aura_cells', {})
-        
-        attr_str = ", ".join([f"{k}: {v}" for k, v in attributes.items()]) if attributes else "Нет"
-        cells_str = ", ".join([f"{k}: {v}" for k, v in aura_cells.items()]) if aura_cells else "Нет"
+    query = " ".join(args)
+    vk_id = event.user_id
+    
+    character = find_character(vk_id, query)
+
+    if character:
+        # Форматирование атрибутов
+        attributes_str = "\n".join([f"  - {attr}: {value}" for attr, value in character.get('attributes', {}).items()])
+        if not attributes_str:
+            attributes_str = "  (не указаны)"
+
+        # Форматирование ячеек ауры
+        aura_cells = character.get('aura_cells')
+        if isinstance(aura_cells, dict):
+             aura_cells_str = "\n".join([f"  - {cell}: {count}" for cell, count in aura_cells.items()])
+        else:
+             aura_cells_str = "  (не указаны)"
 
         message = (
-            f"👤 Персонаж: {char.get('character_name', 'N/A')} (ID: {char.get('id', 'N/A')})\n"
-            f"💰 Кредиты: {char.get('currency', 0)} ₭\n"
-            f"💪 Атрибуты: {attr_str}\n"
-            f"✨ Ячейки ауры: {cells_str}"
+            f"👤 Персонаж: {character['name']} (ID: {character['id']})\n"
+            f"💰 Кредиты: {character.get('credits', 'N/A')}\n"
+            f"✨ Очки атрибутов: {character.get('attribute_points_total', 'N/A')}\n\n"
+            f"📊 Атрибуты:\n{attributes_str}\n\n"
+            f"🔮 Ячейки ауры:\n{aura_cells_str}"
         )
-        
-        vk.messages.send(peer_id=event.peer_id, message=message, random_id=get_random_id())
-    except Exception as e:
-        logging.error(f"Ошибка при поиске персонажа '{identifier}': {e}")
-        vk.messages.send(peer_id=event.peer_id, message="⚠️ Произошла внутренняя ошибка бота при поиске персонажа.", random_id=get_random_id())
+        send_message(vk, event.peer_id, message)
+    else:
+        send_message(vk, event.peer_id, f"Персонаж с именем или ID '{query}' не найден среди ваших персонажей.")
 
 # --- Команды для админов ---
 
