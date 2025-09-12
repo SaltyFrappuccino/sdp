@@ -66,9 +66,9 @@ def _rp_ai_thread_target(vk: VkApiMethod, event: VkBotMessageEvent, text: str, e
         send_message(vk, event.peer_id, f"⌛️ Анализирую посты для режима «{mode}»... Это может занять некоторое время.")
 
         if mode == 'мнение':
-            response = asyncio.run(query_rp_opinion_ai(text, extra_instructions))
+            response = query_rp_opinion_ai(text, extra_instructions)
         elif mode == 'вердикт':
-            response = asyncio.run(query_rp_verdict_ai(text, extra_instructions))
+            response = query_rp_verdict_ai(text, extra_instructions)
         else:
             # Эта проверка дублируется, но она полезна для безопасности
             response = "❌ Неизвестный режим для RP AI."
@@ -86,7 +86,7 @@ def rp_ai_command(vk: VkApiMethod, vk_session: VkApi, event: VkBotMessageEvent, 
     """
     Обрабатывает команды 'sdp rp вердикт' и 'sdp rp мнение'.
     """
-    if not is_admin(event.peer_id, event.message['from_id']):
+    if not is_admin(event.peer_id, event.user_id):
         send_message(vk, event.peer_id, "🚫 У вас нет прав для использования этой команды.")
         return
 

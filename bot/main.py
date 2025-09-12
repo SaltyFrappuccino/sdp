@@ -269,24 +269,17 @@ def main():
             
             if command_func:
                 try:
-                    # Определяем, каким командам нужен полный объект сообщения
-                    if command_name in ["нейронка", "шедевр", "rp"]:
-                         # ИИ команды теперь вызываются через лямбды, которые уже содержат нужные объекты
+                    # Команды с разными сигнатурами вызываются по-разному
+                    if command_name in ["шедевр", "gif"]:
+                        command_func(vk, event_for_handler, args, vk_session)
+                    elif command_name == "rp":
+                        command_func(vk, vk_session, event_for_handler, args, event.message)
+                    else: # Для 'нейронка' и всех остальных стандартных команд
                         command_func(vk, event_for_handler, args)
-                    else:
-                        command_func(vk, event_for_handler, args)
-                    
-                    # Если команда выполнена успешно, устанавливаем кулдаун
-                    if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
-                        continue
 
                 except Exception as e:
                     logging.error(f"Ошибка при выполнении команды '{command_name}': {e}", exc_info=True)
-                    send_message(
-                        vk,
-                        event_for_handler.peer_id,
-                        "Произошла ошибка при выполнении команды. Администратор уже уведомлен."
-                    )
+                    send_message(vk, event_for_handler.peer_id, f"Произошла ошибка при выполнении команды '{command_name}'.")
             else:
                 # Если команда не найдена
                 send_message(vk, event_for_handler.peer_id, "иди нахуй")
