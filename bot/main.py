@@ -22,8 +22,8 @@ from handlers.ai_commands import sglypa_ai_command, grok_ai_command, image_gener
 from handlers.rp_ai_commands import rp_ai_command
 import core.cooldowns as cooldowns
 import core.sglypa as sglypa
-from vkbottle import Bot, Message
-from vkbottle.framework.bot import BotLabeler
+from vkbottle import Bot
+from vkbottle.bot import Message, BotLabeler
 
 # --- Адаптер для vkbottle ---
 # Создаем фейковый объект bot, чтобы можно было использовать labeler'ы
