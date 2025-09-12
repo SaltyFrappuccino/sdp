@@ -1,10 +1,11 @@
 import { FC, useState } from 'react';
-import { Panel, PanelHeader, Group, FormItem, Select, Header, Div, Button, Input, Textarea } from '@vkontakte/vkui';
+import { Panel, PanelHeader, Group, FormItem, Select, Header, Div, Button, Input, Textarea, PanelHeaderBack } from '@vkontakte/vkui';
 import { NavIdProps } from '@vkontakte/vkui';
 import { AttributeManager } from '../components/AttributeManager';
 import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { AbilityBuilder, Rank, CellType, SelectedTags } from '../components/AbilityBuilder';
 import { Icon24Add, Icon24Delete } from '@vkontakte/icons';
+import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 
 interface Ability {
   name: string;
@@ -15,6 +16,7 @@ interface Ability {
 }
 
 export const Calculator: FC<NavIdProps> = ({ id }) => {
+  const routeNavigator = useRouteNavigator();
   const [rank, setRank] = useState<Rank>('F');
   const [attributes, setAttributes] = useState<{ [key: string]: string }>({});
   const [abilities, setAbilities] = useState<Ability[]>([]);
@@ -63,7 +65,7 @@ export const Calculator: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader>Калькулятор Персонажа</PanelHeader>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>Калькулятор Персонажа</PanelHeader>
       <Group>
         <FormItem top="Ранг Персонажа">
           <Select

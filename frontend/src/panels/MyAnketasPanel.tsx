@@ -57,7 +57,7 @@ export const MyAnketasPanel: FC<MyAnketasPanelProps> = ({ id, fetchedUser }) => 
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>Мои анкеты</PanelHeader>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>Мои анкеты</PanelHeader>
       <Group header={<Header>Список ваших анкет</Header>}>
         {anketas.length > 0 ? (
           anketas.map(anketa => (

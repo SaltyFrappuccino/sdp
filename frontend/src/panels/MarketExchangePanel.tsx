@@ -1,9 +1,10 @@
 import { FC, useState, useEffect } from 'react';
-import { Panel, PanelHeader, Header, Group, Div, Select, CardGrid, Card, Text, Button, Spinner, ScreenSpinner, ButtonGroup, Snackbar, ModalRoot, ModalPage, ModalPageHeader, FormItem, Input, Cell, Avatar, Popover, SimpleCell } from '@vkontakte/vkui';
+import { Panel, PanelHeader, Header, Group, Div, Select, CardGrid, Card, Text, Button, Spinner, ScreenSpinner, ButtonGroup, Snackbar, ModalRoot, ModalPage, ModalPageHeader, FormItem, Input, Cell, Avatar, Popover, SimpleCell, PanelHeaderBack } from '@vkontakte/vkui';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Icon24CheckCircleOutline, Icon24ErrorCircle } from '@vkontakte/icons';
+import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 
 interface MarketExchangePanelProps {
   id: string;
@@ -67,6 +68,7 @@ interface LeaderboardEntry {
 }
 
 export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedUser }) => {
+  const routeNavigator = useRouteNavigator();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -218,7 +220,7 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
 
   return (
     <Panel id={id}>
-      <PanelHeader>Биржа</PanelHeader>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>Биржа</PanelHeader>
       {loading && <ScreenSpinner />}
       <Group>
         <Header>Выбор персонажа</Header>

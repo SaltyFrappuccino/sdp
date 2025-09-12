@@ -8,15 +8,18 @@ import {
   Header,
   Text,
   Button,
-  Search
+  Search,
+  PanelHeaderBack
 } from '@vkontakte/vkui';
 import { Icon24Info, Icon24Users, Icon24Fire, Icon24ChevronRight } from '@vkontakte/icons';
+import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 
 interface HandbookProps {
   id: string;
 }
 
 export const Handbook: React.FC<HandbookProps> = ({ id }) => {
+  const routeNavigator = useRouteNavigator();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
 
@@ -788,11 +791,8 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Icon24Info style={{ marginRight: '8px', color: '#4CAF50' }} />
-          Справочник
-        </div>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
+        Справочник
       </PanelHeader>
       
       <Group>

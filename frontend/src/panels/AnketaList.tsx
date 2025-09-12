@@ -66,7 +66,7 @@ export const AnketaList: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
         Реестр анкет
       </PanelHeader>
       {loading ? (

@@ -17,7 +17,8 @@ import {
   ModalPageHeader,
   FormItem,
   Textarea,
-  Select
+  Select,
+  PanelHeaderBack
 } from '@vkontakte/vkui';
 import { Icon24Add, Icon24Delete, Icon24Settings } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -238,7 +239,7 @@ export const ActivityRequestsPanel: FC<ActivityRequestsPanelProps> = ({ id, fetc
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<Button onClick={() => routeNavigator.back()}>Назад</Button>}>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
         {isAdmin ? 'Управление заявками' : 'Все Заявки в РП'}
       </PanelHeader>
 

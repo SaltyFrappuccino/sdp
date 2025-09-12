@@ -18,6 +18,7 @@ import {
   ModalPage,
   ModalPageHeader,
   IconButton,
+  FormLayoutGroup,
 } from '@vkontakte/vkui';
 import { Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
@@ -97,6 +98,12 @@ interface CharacterData {
     biography: string;
     archetypes: string[];
     attributes: { [key: string]: string };
+    attribute_points_total?: number;
+    aura_cells?: {
+      "Малые (I)": number;
+      "Значительные (II)": number;
+      "Предельные (III)": number;
+    };
     contracts: Contract[];
     inventory: Item[];
     currency: number;
@@ -177,6 +184,8 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
           biography: importedData.biography,
           archetypes: importedData.archetypes,
           attributes: importedData.attributes,
+          attribute_points_total: importedData.attribute_points_total,
+          aura_cells: importedData.aura_cells,
           contracts: importedData.contracts,
           inventory: importedData.inventory,
           currency: importedData.currency,
@@ -626,11 +635,42 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
               selectedArchetypes={character.archetypes}
               onArchetypeChange={handleArchetypeChange}
             />
+            <FormItem top="Всего очков атрибутов (ручная настройка)">
+              <Input
+                type="number"
+                value={String(character.attribute_points_total || '')}
+                onChange={(e) => setCharacter(prev => prev ? ({ ...prev, attribute_points_total: Number(e.target.value) }) : null)}
+              />
+            </FormItem>
             <AttributeManager
               attributes={character.attributes}
               onAttributeChange={handleAttributeChange}
-              totalPoints={getAttributePointsForRank(character.rank)}
+              totalPoints={character.attribute_points_total ?? getAttributePointsForRank(character.rank)}
             />
+            <Header>Ячейки Ауры (ручная настройка)</Header>
+            <FormLayoutGroup mode="horizontal">
+              <FormItem top="Малые (I)">
+                <Input
+                  type="number"
+                  value={String(character.aura_cells?.["Малые (I)"] || '')}
+                  onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Малые (I)": Number(e.target.value) } as any }) : null)}
+                />
+              </FormItem>
+              <FormItem top="Значительные (II)">
+                <Input
+                  type="number"
+                  value={String(character.aura_cells?.["Значительные (II)"] || '')}
+                  onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Значительные (II)": Number(e.target.value) } as any }) : null)}
+                />
+              </FormItem>
+              <FormItem top="Предельные (III)">
+                <Input
+                  type="number"
+                  value={String(character.aura_cells?.["Предельные (III)"] || '')}
+                  onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Предельные (III)": Number(e.target.value) } as any }) : null)}
+                />
+              </FormItem>
+            </FormLayoutGroup>
             <AuraCellsCalculator
               contracts={character.contracts}
               currentRank={character.rank}

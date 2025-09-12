@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { Panel, PanelHeader, Button, Div, Spacing, ScreenSpinner, Group, Cell, Header } from '@vkontakte/vkui';
+import { Panel, PanelHeader, Button, Div, Spacing, ScreenSpinner, Group, Cell, Header, PanelHeaderBack } from '@vkontakte/vkui';
 import { getVersionDiff } from '../utils/diff';
 import axios, { AxiosResponse } from 'axios';
 import { API_URL } from '../api';
@@ -99,7 +99,7 @@ const UpdateViewer = ({ id }: { id: string }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader>Просмотр изменений</PanelHeader>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/admin_panel')} />}>Просмотр изменений</PanelHeader>
       {update && diffResult && (
         <Div>
           <Group header={<Header>Измененные поля</Header>}>

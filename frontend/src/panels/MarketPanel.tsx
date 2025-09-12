@@ -50,6 +50,7 @@ interface Item {
     abilities?: ShinkiAbility[];
   };
   image_url: string[];
+  seller_character_id?: number;
 }
 
 interface MarketPanelProps extends NavIdProps {
@@ -188,6 +189,36 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
       
       setActiveModal(null);
       setItemToSell(null);
+    })
+    .catch(error => {
+      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      showResultSnackbar(`Ошибка: ${message}`, false);
+    });
+  };
+
+  const handleDelistItem = (itemId: number) => {
+    if (!selectedCharacter || !fetchedUser) return;
+
+    fetch(`${API_URL}/market/my-items/${itemId}`, {
+      method: 'DELETE',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-vk-id': String(fetchedUser.id)
+      },
+    })
+    .then(res => res.json())
+    .then(result => {
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      showResultSnackbar('Предмет снят с продажи!', true);
+      // Refresh market items and character inventory
+      fetch(`${API_URL}/market/items`).then(res => res.json()).then(data => setItems(data));
+      fetch(`${API_URL}/characters/${selectedCharacter.id}`).then(res => res.json()).then(data => {
+        const updatedCharacters = characters.map(c => c.id === selectedCharacter.id ? { ...c, inventory: data.inventory } : c);
+        setCharacters(updatedCharacters);
+        setSelectedCharacter(prev => prev ? { ...prev, inventory: data.inventory } : null);
+      });
     })
     .catch(error => {
       const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
@@ -334,9 +365,15 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
                 )}
                 <p><b>Цена: {item.price} кредитов</b></p>
                 <p><b>В наличии: {item.quantity}</b></p>
-                <Button stretched onClick={() => handlePurchase(item.id!)} disabled={selectedCharacter.currency < item.price || item.quantity <= 0}>
-                  Купить
-                </Button>
+                {item.seller_character_id === selectedCharacter.id ? (
+                  <Button stretched appearance="negative" onClick={() => handleDelistItem(item.id!)}>
+                    Снять с продажи
+                  </Button>
+                ) : (
+                  <Button stretched onClick={() => handlePurchase(item.id!)} disabled={selectedCharacter.currency < item.price || item.quantity <= 0}>
+                    Купить
+                  </Button>
+                )}
               </Div>
             </Card>
           ))}

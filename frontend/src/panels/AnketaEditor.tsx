@@ -558,7 +558,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
         Редактировать анкету
       </PanelHeader>
       {loading ? (
