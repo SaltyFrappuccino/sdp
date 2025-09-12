@@ -15,6 +15,7 @@ import {
   Header,
   Div,
   IconButton,
+  FormLayoutGroup,
 } from '@vkontakte/vkui';
 import { Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
@@ -117,6 +118,12 @@ interface CharacterData {
     biography: string;
     archetypes: string[];
     attributes: { [key: string]: string };
+    attribute_points_total?: number;
+    aura_cells?: {
+      "Малые (I)": number;
+      "Значительные (II)": number;
+      "Предельные (III)": number;
+    };
     contracts: Contract[];
     inventory: Item[];
     currency: number;
@@ -158,6 +165,12 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
   const [character, setCharacter] = useState<CharacterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const adminId = localStorage.getItem('adminId');
+    setIsAdmin(!!adminId);
+  }, []);
 
   const handleImportAnketa = async (event: Event) => {
     const target = event.target as HTMLInputElement;
@@ -191,6 +204,8 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
         biography: importedData.biography,
         archetypes: importedData.archetypes,
         attributes: importedData.attributes,
+        attribute_points_total: importedData.attribute_points_total,
+        aura_cells: importedData.aura_cells,
         contracts: importedData.contracts,
         inventory: importedData.inventory,
         currency: importedData.currency,
@@ -654,15 +669,57 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
               selectedArchetypes={character.archetypes}
               onArchetypeChange={handleArchetypeChange}
             />
+            {isAdmin ? (
+              <>
+                <Header>Атрибуты (ручная настройка)</Header>
+                <FormItem top="Всего очков атрибутов">
+                  <Input
+                    type="number"
+                    value={String(character.attribute_points_total ?? getAttributePointsForRank(character.rank))}
+                    onChange={(e) => setCharacter(prev => prev ? ({ ...prev, attribute_points_total: Number(e.target.value) }) : null)}
+                    placeholder="Автоматически по рангу"
+                  />
+                </FormItem>
+              </>
+            ) : null}
             <AttributeManager
               attributes={character.attributes}
               onAttributeChange={handleAttributeChange}
-              totalPoints={getAttributePointsForRank(character.rank)}
+              totalPoints={character.attribute_points_total ?? getAttributePointsForRank(character.rank)}
             />
-            <AuraCellsCalculator
-              contracts={character.contracts}
-              currentRank={character.rank}
-            />
+            {isAdmin ? (
+               <>
+                <Header>Ячейки Ауры (ручная настройка)</Header>
+                <FormLayoutGroup mode="horizontal">
+                  <FormItem top="Малые (I)">
+                    <Input
+                      type="number"
+                      value={String(character.aura_cells?.["Малые (I)"] ?? '')}
+                      onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Малые (I)": Number(e.target.value) } as any }) : null)}
+                    />
+                  </FormItem>
+                  <FormItem top="Значительные (II)">
+                    <Input
+                      type="number"
+                      value={String(character.aura_cells?.["Значительные (II)"] ?? '')}
+                      onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Значительные (II)": Number(e.target.value) } as any }) : null)}
+                    />
+                  </FormItem>
+                  <FormItem top="Предельные (III)">
+                    <Input
+                      type="number"
+                      value={String(character.aura_cells?.["Предельные (III)"] ?? '')}
+                      onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Предельные (III)": Number(e.target.value) } as any }) : null)}
+                    />
+                  </FormItem>
+                </FormLayoutGroup>
+              </>
+            ) : (
+              <AuraCellsCalculator
+                contracts={character.contracts}
+                currentRank={character.rank}
+              />
+            )}
           </Group>
 
           <Group header={<Header>IV. КОНТРАКТ(Ы)</Header>}>
