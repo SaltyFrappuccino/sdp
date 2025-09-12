@@ -687,6 +687,10 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
               onAttributeChange={handleAttributeChange}
               totalPoints={character.attribute_points_total ?? getAttributePointsForRank(character.rank)}
             />
+            <AuraCellsCalculator
+              contracts={character.contracts}
+              currentRank={character.rank}
+            />
             {isAdmin ? (
                <>
                 <Header>Ячейки Ауры (ручная настройка)</Header>
@@ -714,12 +718,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
                   </FormItem>
                 </FormLayoutGroup>
               </>
-            ) : (
-              <AuraCellsCalculator
-                contracts={character.contracts}
-                currentRank={character.rank}
-              />
-            )}
+            ) : null}
           </Group>
 
           <Group header={<Header>IV. КОНТРАКТ(Ы)</Header>}>
