@@ -1,0 +1,5 @@
+vk-api
+python-dotenv
+watchdog
+apscheduler
+requests
