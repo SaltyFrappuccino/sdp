@@ -14,7 +14,7 @@ import time
 
 from database import get_or_create_user, init_db, set_user_role
 from core.utils import get_random_id, send_message
-from handlers import admin, general, dice, character, reminders, help, gifs, handbook, ai_commands
+from handlers import admin, general, dice, character, reminders, help, gifs, handbook, ai_commands, games
 from handlers.help import help_command, admin_help_command
 from handlers.gifs import get_gif
 from handlers.handbook import handbook_command
@@ -22,6 +22,32 @@ from handlers.ai_commands import sglypa_ai_command, grok_ai_command, image_gener
 from handlers.rp_ai_commands import rp_ai_command
 import core.cooldowns as cooldowns
 import core.sglypa as sglypa
+from vkbottle import Bot, Message
+from vkbottle.framework.bot import BotLabeler
+
+# --- Адаптер для vkbottle ---
+# Создаем фейковый объект bot, чтобы можно было использовать labeler'ы
+bot = Bot(token="fake")
+labeler = BotLabeler()
+
+# --- Асинхронный обработчик для игр ---
+# Так как новые хендлеры асинхронные, их нужно запускать в event loop'е
+import asyncio
+
+async def run_game_command(command_func, message_obj):
+    """Запускает асинхронную команду игры."""
+    # Создаем фейковый объект Message, совместимый с vkbottle
+    vkbottle_message = Message(**message_obj)
+    # Имитируем получение user'а, т.к. в старом коде этого нет напрямую в объекте
+    vkbottle_message.from_id = message_obj['from_id']
+    
+    # Для /кости <num>
+    args = message_obj['text'].split()
+    kwargs = {}
+    if len(args) > 1 and args[1].isdigit():
+        kwargs['num'] = int(args[1])
+
+    await command_func(vkbottle_message, **kwargs)
 
 
 # Настройка логирования
@@ -40,6 +66,10 @@ COMMANDS = {
     'помощь': help_command,
     'gif': get_gif,
     'справочник': handbook_command,
+    # Игровые команды
+    'блэкджек': games.start_blackjack,
+    'взять': games.blackjack_hit,
+    'хватит': games.blackjack_stand,
     # Админ-команды
     'датьадминку': admin.promote_to_admin,
     'снятьадминку': admin.demote_to_user,
@@ -166,7 +196,8 @@ def main():
     try:
         vk_session = vk_api.VkApi(token=vk_token)
         # Используем VkBotLongPoll для работы от имени сообщества
-        longpoll = VkBotLongPoll(vk_session, group_id)
+        # Увеличиваем wait до 90 секунд, чтобы избежать ReadTimeout
+        longpoll = VkBotLongPoll(vk_session, group_id, wait=90)
         vk = vk_session.get_api()
         logging.info("Авторизация в VK прошла успешно.")
     except Exception as error_msg:
@@ -192,97 +223,134 @@ def main():
 
     logging.info("Бот запущен и слушает сообщения...")
 
-    for event in longpoll.listen():
-        # Используем VkBotEventType.MESSAGE_NEW
-        if event.type == VkBotEventType.MESSAGE_NEW:
-            
-            # Игнорируем сообщения из личных чатов
-            if event.obj.message['peer_id'] < 2000000000:
-                continue
-
-            message_obj = event.obj.message
-            from_id = message_obj.get('from_id')
-
-            # Адаптируем структуру event'а, чтобы не переписывать обработчики
-            event_for_handler = SimpleNamespace(
-                user_id=from_id,
-                peer_id=message_obj.get('peer_id'),
-                text=message_obj.get('text')
-            )
-            # Для команд, работающих с ответами, нам нужен полный объект сообщения
-            full_message_object = message_obj
-
-            logging.info(f"Новое сообщение от {event_for_handler.user_id} в чате {event_for_handler.peer_id}: '{event_for_handler.text}'")
-            
-            message_text = event_for_handler.text
-            user_id = event_for_handler.user_id
-
-            # --- Обработка команд без префикса ---
-            lower_message = message_text.lower().strip()
-
-            # GROK
-            if lower_message in ["grok это правда?", "грок это правда?"]:
-                command_name = "grok"
-                if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
-                    continue
-                ai_commands.grok_ai_command(vk, event.obj.message, [])
-                cooldowns.set_cooldown(user_id, command_name)
-                continue
-
-            # DOES HE KNOW?
-            if lower_message in ["does he know?", "знает ли он?"]:
-                command_name = "doesheknow"
-                if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
-                    continue
-                ai_commands.does_he_know_command(vk, event.obj.message, [])
-                cooldowns.set_cooldown(user_id, command_name)
-                continue
-
-            # --- Обработка команд с префиксом ---
-            used_prefix = None
-            for prefix in PREFIXES:
-                if message_text.lower().startswith(prefix.lower()):
-                    used_prefix = prefix
-                    command_body = message_text[len(prefix):].strip()
-                    break
-                elif message_text.lower().startswith(prefix + ' '):
-                    used_prefix = prefix
-                    command_body = message_text[len(prefix):].strip()
-                    break
-
-            if used_prefix is None:
-                continue
-
-            command_parts = command_body.split()
-            if not command_parts:
-                continue
-            
-            command_name = command_parts[0].lower()
-            args = command_parts[1:]
-
-            # --- Проверка кулдаунов (кроме админов) ---
-            if get_or_create_user(user_id).get('role') != 'admin':
-                if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
-                    continue
-
-            command_func = COMMANDS.get(command_name)
-            
-            if command_func:
+    while True:
+        try:
+            for event in longpoll.listen():
                 try:
-                    # Команды с разными сигнатурами вызываются по-разному
-                    if command_name in ["шедевр", "gif"]:
-                        command_func(vk, event_for_handler, args, vk_session)
-                    elif command_name == "rp":
-                        command_func(vk, vk_session, event_for_handler, args, event.message)
-                    else: # Для 'нейронка' и всех остальных стандартных команд
-                        command_func(vk, event_for_handler, args)
+                    # Используем VkBotEventType.MESSAGE_NEW
+                    if event.type == VkBotEventType.MESSAGE_NEW:
+                        
+                        # Игнорируем сообщения из личных чатов
+                        if event.obj.message['peer_id'] < 2000000000:
+                            continue
+
+                        message_obj = event.obj.message
+                        from_id = message_obj.get('from_id')
+
+                        # Адаптируем структуру event'а, чтобы не переписывать обработчики
+                        event_for_handler = SimpleNamespace(
+                            user_id=from_id,
+                            peer_id=message_obj.get('peer_id'),
+                            text=message_obj.get('text')
+                        )
+                        # Для команд, работающих с ответами, нам нужен полный объект сообщения
+                        full_message_object = message_obj
+
+                        logging.info(f"Новое сообщение от {event_for_handler.user_id} в чате {event_for_handler.peer_id}: '{event_for_handler.text}'")
+                        
+                        message_text = event_for_handler.text
+                        user_id = event_for_handler.user_id
+
+                        # --- Обработка команд без префикса ---
+                        lower_message = message_text.lower().strip()
+
+                        # GROK
+                        if lower_message in ["grok это правда?", "грок это правда?"]:
+                            command_name = "grok"
+                            if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
+                                continue
+                            ai_commands.grok_ai_command(vk, event.obj.message, [])
+                            cooldowns.set_cooldown(user_id, command_name)
+                            continue
+
+                        # DOES HE KNOW?
+                        if lower_message in ["does he know?", "знает ли он?"]:
+                            command_name = "doesheknow"
+                            if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
+                                continue
+                            ai_commands.does_he_know_command(vk, event.obj.message, [])
+                            cooldowns.set_cooldown(user_id, command_name)
+                            continue
+
+                        # --- Обработка команд с префиксом ---
+                        used_prefix = None
+                        for prefix in PREFIXES:
+                            if message_text.lower().startswith(prefix.lower()):
+                                used_prefix = prefix
+                                command_body = message_text[len(prefix):].strip()
+                                break
+                            elif message_text.lower().startswith(prefix + ' '):
+                                used_prefix = prefix
+                                command_body = message_text[len(prefix):].strip()
+                                break
+
+                        if used_prefix is None:
+                            continue
+
+                        command_parts = command_body.split()
+                        if not command_parts:
+                            continue
+                        
+                        command_name = command_parts[0].lower()
+                        args = command_parts[1:]
+
+                        # --- Проверка кулдаунов (кроме админов) ---
+                        if get_or_create_user(user_id).get('role') != 'admin':
+                            if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
+                                continue
+
+                        command_func = COMMANDS.get(command_name)
+                        
+                        if command_func:
+                            try:
+                                # --- Обработка игровых асинхронных команд ---
+                                if command_name in ['блэкджек', 'взять', 'хватит']:
+                                    # Для асинхронных функций нужен event loop
+                                    asyncio.run(run_game_command(command_func, event.obj.message))
+                                    cooldowns.set_cooldown(user_id, command_name) # Ставим кулдаун после вызова
+                                    continue # Переходим к следующему событию
+
+                                # Команды с разными сигнатурами вызываются по-разному
+                                if command_name in ["шедевр", "gif"]:
+                                    command_func(vk, event_for_handler, args, vk_session)
+                                elif command_name == "rp":
+                                    command_func(vk, vk_session, event_for_handler, args, event.message)
+                                else: # Для 'нейронка' и всех остальных стандартных команд
+                                    command_func(vk, event_for_handler, args)
+
+                                # Устанавливаем кулдаун после успешного выполнения
+                                if get_or_create_user(user_id).get('role') != 'admin':
+                                     cooldowns.set_cooldown(user_id, command_name)
+
+                            except Exception as e:
+                                logging.error(f"Ошибка при выполнении команды '{command_name}': {e}", exc_info=True)
+                                send_message(vk, event_for_handler.peer_id, f"Произошла ошибка при выполнении команды '{command_name}'. Администратор уже уведомлен.")
+                        else:
+                            # Если команда не найдена
+                            send_message(vk, event_for_handler.peer_id, "иди нахуй")
 
                 except Exception as e:
-                    logging.error(f"Ошибка при выполнении команды '{command_name}': {e}", exc_info=True)
-                    send_message(vk, event_for_handler.peer_id, f"Произошла ошибка при выполнении команды '{command_name}'.")
-            else:
-                # Если команда не найдена
-                send_message(vk, event_for_handler.peer_id, "иди нахуй")
+                    logging.critical(f"Критическая ошибка при обработке события: {e}", exc_info=True)
+                    peer_id = None
+                    try:
+                        # Пытаемся извлечь peer_id из события, чтобы уведомить чат
+                        if event and hasattr(event, 'obj') and hasattr(event.obj, 'message'):
+                            peer_id = event.obj.message.get('peer_id')
+                    except Exception:
+                        pass  # Игнорируем, если не удалось получить peer_id
+                    
+                    if peer_id and vk:
+                        try:
+                            error_message = f"💥 Произошла критическая ошибка. Бот продолжает работать. Администратор уведомлен."
+                            send_message(vk, peer_id, error_message)
+                        except Exception as notify_error:
+                            logging.error(f"Не удалось отправить уведомление об ошибке в чат {peer_id}: {notify_error}")
+
+        except Exception as e:
+            logging.critical(f"Критическая ошибка в цикле longpoll.listen() (возможно, проблема с сетью): {e}", exc_info=True)
+            logging.info("Переподключение через 15 секунд...")
+            time.sleep(15)
+
 
 if __name__ == '__main__':
     main()
