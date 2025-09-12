@@ -524,12 +524,20 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
         }
     }
     characterFields.attribute_points_spent = spentPoints;
-    characterFields.attribute_points_total = getAttributePointsForRank(characterFields.rank);
+    
+    // Если в запросе не передано новое значение, не перезаписываем его из ранга
+    if (characterFields.attribute_points_total === undefined) {
+      delete characterFields.attribute_points_total;
+    }
 
-    // Пересчет ячеек ауры
+    // Пересчет ячеек ауры, только если переданы контракты
     if (contracts) {
         characterFields.aura_cells = calculateAuraCells(characterFields.rank, contracts);
+    } else if (characterFields.aura_cells === undefined) {
+      // Если ячейки не переданы в запросе, не трогаем их
+      delete characterFields.aura_cells;
     }
+
 
     // Удаляем поля, которые не должны обновляться напрямую
     delete characterFields.id;
@@ -929,8 +937,8 @@ router.post('/market/sell', async (req: Request, res: Response) => {
     await db.run('UPDATE Characters SET inventory = ? WHERE id = ?', [JSON.stringify(inventory), character_id]);
 
     const marketItemSql = `
-      INSERT INTO MarketItems (name, description, price, item_type, item_data, image_url, quantity)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO MarketItems (name, description, price, item_type, item_data, image_url, quantity, seller_character_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     await db.run(marketItemSql, [
       itemToSell.name,
@@ -939,7 +947,8 @@ router.post('/market/sell', async (req: Request, res: Response) => {
       itemToSell.type,
       JSON.stringify(itemToSell), // Сохраняем все данные о предмете
       JSON.stringify(itemToSell.image_url || []),
-      1 // Всегда продаем по 1 штуке
+      1, // Всегда продаем по 1 штуке
+      character_id
     ]);
 
     res.json({ message: 'Item listed for sale successfully' });
@@ -947,6 +956,53 @@ router.post('/market/sell', async (req: Request, res: Response) => {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     console.error('Failed to sell item:', error);
     res.status(500).json({ error: 'Не удалось выставить предмет на продажу', details: errorMessage });
+  }
+});
+
+router.delete('/market/my-items/:itemId', async (req: Request, res: Response) => {
+  const userVkId = req.headers['x-user-vk-id'];
+  if (!userVkId) {
+    return res.status(403).json({ error: 'Forbidden: User VK ID is required' });
+  }
+
+  try {
+    const db = await initDB();
+    const { itemId } = req.params;
+    const vkId = parseInt(userVkId as string, 10);
+
+    const item = await db.get('SELECT * FROM MarketItems WHERE id = ?', [itemId]);
+    if (!item) {
+      return res.status(404).json({ error: 'Предмет не найден на рынке' });
+    }
+    
+    // Проверяем, что персонаж, выставивший товар, принадлежит текущему пользователю
+    const sellerCharacter = await db.get('SELECT * FROM Characters WHERE id = ?', [item.seller_character_id]);
+    if (!sellerCharacter || sellerCharacter.vk_id !== vkId) {
+      return res.status(403).json({ error: 'Вы не можете снять этот товар с продажи' });
+    }
+
+    // Возвращаем предмет в инвентарь
+    const inventory = JSON.parse(sellerCharacter.inventory || '[]');
+    const returnedItem = {
+      name: item.name,
+      description: item.description,
+      type: item.item_type,
+      ...JSON.parse(item.item_data || '{}'),
+      image_url: JSON.parse(item.image_url || '[]')
+    };
+    inventory.push(returnedItem);
+
+    await db.run('UPDATE Characters SET inventory = ? WHERE id = ?', [JSON.stringify(inventory), item.seller_character_id]);
+    
+    // Удаляем предмет с рынка
+    await db.run('DELETE FROM MarketItems WHERE id = ?', [itemId]);
+
+    res.json({ message: 'Предмет успешно снят с продажи и возвращен в инвентарь' });
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    console.error('Failed to delist item:', error);
+    res.status(500).json({ error: 'Не удалось снять предмет с продажи', details: errorMessage });
   }
 });
 
@@ -1069,11 +1125,18 @@ router.post('/updates/:update_id/approve', async (req: Request, res: Response) =
         }
     }
     characterFields.attribute_points_spent = spentPoints;
-    characterFields.attribute_points_total = getAttributePointsForRank(characterFields.rank);
+    
+    // Если в запросе не передано новое значение, не перезаписываем его из ранга
+    if (characterFields.attribute_points_total === undefined) {
+      delete characterFields.attribute_points_total;
+    }
 
-    // Пересчет ячеек ауры, если переданы контракты
+    // Пересчет ячеек ауры, только если переданы контракты
     if (contracts) {
         characterFields.aura_cells = calculateAuraCells(characterFields.rank, contracts);
+    } else if (characterFields.aura_cells === undefined) {
+      // Если ячейки не переданы в запросе, не трогаем их
+      delete characterFields.aura_cells;
     }
 
 

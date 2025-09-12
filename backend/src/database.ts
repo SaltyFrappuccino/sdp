@@ -118,7 +118,10 @@ export async function initDB() {
         price INTEGER NOT NULL,
         item_type TEXT NOT NULL,
         item_data TEXT,
-        image_url TEXT
+        image_url TEXT,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        seller_character_id INTEGER,
+        FOREIGN KEY(seller_character_id) REFERENCES Characters(id) ON DELETE SET NULL
       );
     `);
 
