@@ -134,6 +134,15 @@ export async function initDB() {
       }
     }
 
+    try {
+      await db.exec('ALTER TABLE MarketItems ADD COLUMN seller_character_id INTEGER REFERENCES Characters(id) ON DELETE SET NULL');
+    } catch (error) {
+      // Игнорируем ошибку, если колонка уже существует
+      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
+        throw error;
+      }
+    }
+
     await db.exec(`
       CREATE TABLE IF NOT EXISTS ai_analysis (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

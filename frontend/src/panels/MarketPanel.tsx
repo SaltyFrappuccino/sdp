@@ -138,22 +138,46 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
       }
       showResultSnackbar('Покупка совершена успешно!', true);
       // Refresh character data and item quantity
-      const newCurrency = selectedCharacter.currency - items.find(i => i.id === itemId)!.price;
-      const updatedCharacters = characters.map(c =>
-        c.id === selectedCharacter.id ? { ...c, currency: newCurrency } : c
-      );
-      setCharacters(updatedCharacters);
-      setSelectedCharacter(prev => prev ? { ...prev, currency: newCurrency } : null);
-
-      const updatedItems = items.map(i =>
-        i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
-      );
-      setItems(updatedItems);
+      fetchData();
     })
     .catch(error => {
       const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
       showResultSnackbar(`Ошибка: ${message}`, false);
     });
+  };
+
+  const fetchData = () => {
+    if (!fetchedUser) return;
+    setLoading(true);
+
+    const fetchCharactersAndInventories = fetch(`${API_URL}/characters/by-vk/${fetchedUser.id}`)
+      .then(res => res.json())
+      .then(data =>
+        Promise.all(data.map(async (char: Character) => {
+          const inventoryRes = await fetch(`${API_URL}/characters/${char.id}`);
+          const inventoryData = await inventoryRes.json();
+          return { ...char, inventory: inventoryData.inventory };
+        }))
+      );
+
+    const fetchItems = fetch(`${API_URL}/market/items`).then(res => res.json());
+
+    Promise.all([fetchCharactersAndInventories, fetchItems])
+      .then(([charactersWithInventory, marketItems]) => {
+        setCharacters(charactersWithInventory);
+        setItems(marketItems);
+        if (selectedCharacter) {
+          const updatedSelected = charactersWithInventory.find(c => c.id === selectedCharacter.id);
+          if (updatedSelected) {
+            setSelectedCharacter(updatedSelected);
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Failed to fetch data:', error);
+        showResultSnackbar('Не удалось обновить данные', false);
+      })
+      .finally(() => setLoading(false));
   };
 
   const handleSellItem = () => {
@@ -175,18 +199,8 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
       }
       showResultSnackbar('Предмет выставлен на продажу!', true);
       // Refresh character inventory and market items
-      const updatedInventory = selectedCharacter.inventory.filter((_, i) => i !== itemToSell.index);
-      const updatedCharacters = characters.map(c =>
-        c.id === selectedCharacter.id ? { ...c, inventory: updatedInventory } : c
-      );
-      setCharacters(updatedCharacters);
-      setSelectedCharacter(prev => prev ? { ...prev, inventory: updatedInventory } : null);
-      
-      // Optimistically add to market items list
-      fetch(`${API_URL}/market/items`)
-        .then(res => res.json())
-        .then(data => setItems(data));
-      
+      fetchData();
+
       setActiveModal(null);
       setItemToSell(null);
     })
@@ -201,7 +215,7 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
 
     fetch(`${API_URL}/market/my-items/${itemId}`, {
       method: 'DELETE',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-vk-id': String(fetchedUser.id)
       },
@@ -213,12 +227,7 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
       }
       showResultSnackbar('Предмет снят с продажи!', true);
       // Refresh market items and character inventory
-      fetch(`${API_URL}/market/items`).then(res => res.json()).then(data => setItems(data));
-      fetch(`${API_URL}/characters/${selectedCharacter.id}`).then(res => res.json()).then(data => {
-        const updatedCharacters = characters.map(c => c.id === selectedCharacter.id ? { ...c, inventory: data.inventory } : c);
-        setCharacters(updatedCharacters);
-        setSelectedCharacter(prev => prev ? { ...prev, inventory: data.inventory } : null);
-      });
+      fetchData();
     })
     .catch(error => {
       const message = error instanceof Error ? error.message : 'Неизвестная ошибка';

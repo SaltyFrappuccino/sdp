@@ -31,7 +31,6 @@ import { ContractForm } from '../components/ContractForm';
 import { AttributeManager } from '../components/AttributeManager';
 import { ArchetypeSelector } from '../components/ArchetypeSelector';
 import { InventoryManager } from '../components/InventoryManager';
-import AuraCellsCalculator from '../components/AuraCellsCalculator';
 import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 import { readJsonFile } from '../utils/anketaExport';
@@ -635,11 +634,13 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
               selectedArchetypes={character.archetypes}
               onArchetypeChange={handleArchetypeChange}
             />
-            <FormItem top="Всего очков атрибутов (ручная настройка)">
+            <Header>Атрибуты (ручная настройка)</Header>
+            <FormItem top="Всего очков атрибутов">
               <Input
                 type="number"
-                value={String(character.attribute_points_total || '')}
+                value={String(character.attribute_points_total ?? getAttributePointsForRank(character.rank))}
                 onChange={(e) => setCharacter(prev => prev ? ({ ...prev, attribute_points_total: Number(e.target.value) }) : null)}
+                placeholder="Автоматически по рангу"
               />
             </FormItem>
             <AttributeManager
@@ -652,29 +653,25 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
               <FormItem top="Малые (I)">
                 <Input
                   type="number"
-                  value={String(character.aura_cells?.["Малые (I)"] || '')}
+                  value={String(character.aura_cells?.["Малые (I)"] ?? '')}
                   onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Малые (I)": Number(e.target.value) } as any }) : null)}
                 />
               </FormItem>
               <FormItem top="Значительные (II)">
                 <Input
                   type="number"
-                  value={String(character.aura_cells?.["Значительные (II)"] || '')}
+                  value={String(character.aura_cells?.["Значительные (II)"] ?? '')}
                   onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Значительные (II)": Number(e.target.value) } as any }) : null)}
                 />
               </FormItem>
               <FormItem top="Предельные (III)">
                 <Input
                   type="number"
-                  value={String(character.aura_cells?.["Предельные (III)"] || '')}
+                  value={String(character.aura_cells?.["Предельные (III)"] ?? '')}
                   onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Предельные (III)": Number(e.target.value) } as any }) : null)}
                 />
               </FormItem>
             </FormLayoutGroup>
-            <AuraCellsCalculator
-              contracts={character.contracts}
-              currentRank={character.rank}
-            />
           </Group>
 
           <Group header={<Header>IV. КОНТРАКТ(Ы)</Header>}>
