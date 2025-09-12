@@ -76,7 +76,9 @@ interface Contract {
     contract_name: string;
     creature_name: string;
     creature_rank: string;
+    creature_spectrum: string;
     creature_description: string;
+    gift: string;
     sync_level: number;
     unity_stage: string;
     abilities: Ability[];
@@ -377,8 +379,14 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
                         )}
                         <Div>
                           <Title level="3" style={{ marginBottom: 8 }}>{contract.creature_name} ({contract.creature_rank})</Title>
-                          <Text style={{ marginBottom: 16 }}>{contract.creature_description}</Text>
+                          <Text style={{ whiteSpace: 'pre-wrap', marginBottom: 8 }}><b>Спектр:</b> {contract.creature_spectrum}</Text>
+                          <Text style={{ whiteSpace: 'pre-wrap', marginBottom: 16 }}>{contract.creature_description}</Text>
                           
+                          <Card mode="outline" style={{ padding: '8px 12px', marginBottom: 16, background: 'var(--vkui--color_background_secondary)' }}>
+                            <Subhead weight="1">🎁 Дар</Subhead>
+                            <Text style={{ whiteSpace: 'pre-wrap' }}>{contract.gift}</Text>
+                          </Card>
+
                           <Subhead weight="1">Синхронизация: {contract.sync_level}%</Subhead>
                           <Progress value={contract.sync_level} style={{ marginBottom: 8 }} />
 
