@@ -12,7 +12,10 @@ COMMAND_COOLDOWNS = {
     # Устанавливаем кулдауны по умолчанию для самых "спамных" команд
     "roll": 30,
     "r": 30,
-    "gif": 30
+    "gif": 30,
+    "grok": 30,
+    "нейронка": 30,
+    "doesheknow": 30,
 }
 DEFAULT_COOLDOWN = 0 # По умолчанию кулдауна нет
 SETTINGS_FILE = "settings.json"
@@ -60,6 +63,23 @@ def check_cooldown(user_id: int, command: str) -> float:
         return round(cooldown_duration - time_since_last_use, 1) # Возвращаем оставшееся время
     
     return 0 # Кулдаун прошел
+
+def check_cooldown_and_notify(vk, user_id, peer_id, command_name) -> bool:
+    """
+    Проверяет кулдаун и отправляет уведомление, если он активен.
+    Возвращает True, если кулдаун активен (команду выполнять НЕЛЬЗЯ), иначе False.
+    """
+    remaining_time = check_cooldown(user_id, command_name)
+    if remaining_time > 0:
+        from core.utils import send_message # Локальный импорт для избежания циклической зависимости
+        send_message(
+            vk,
+            peer_id,
+            f"⏳ Команда на перезарядке. Пожалуйста, подождите {remaining_time} сек."
+        )
+        return True
+    return False
+
 
 def set_cooldown(user_id: int, command: str):
     """Устанавливает временную метку последнего использования команды."""

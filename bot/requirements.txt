@@ -4,3 +4,4 @@ watchdog
 apscheduler
 requests
 pytz
+openai

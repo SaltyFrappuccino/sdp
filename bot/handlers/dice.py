@@ -29,7 +29,7 @@ def roll(vk, event, args):
         modifier = int(data['mod_op'] + data['mod_val'])
 
     # Проверка на адекватность значений
-    if num_dice > 1000000 or sides > 1000000:
+    if num_dice > 10000 or sides > 1000000000:
         utils.send_message(vk, event.peer_id, "✋ Слишком много кубиков или граней. Максимум: 100d1000.")
         return
 

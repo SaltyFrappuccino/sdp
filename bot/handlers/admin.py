@@ -147,3 +147,18 @@ def show_admins(vk, event, args):
     except Exception as e:
         logging.error(f"Ошибка при получении списка админов: {e}")
         send_message(vk, event.peer_id, "⚠️ Не удалось получить список администраторов.")
+
+
+@admin_required
+def autism_command(vk, event, args):
+    """Включает/выключает режим Аутизма для Сглыпы в текущем чате."""
+    peer_id = event.peer_id
+    if peer_id in sglypa.AUTISM_MODE_CHATS:
+        sglypa.AUTISM_MODE_CHATS.remove(peer_id)
+        message = "Режим Аутизма для Сглыпы ВЫКЛЮЧЕН. (´-ω-`)"
+    else:
+        sglypa.AUTISM_MODE_CHATS.add(peer_id)
+        message = "Режим Аутизма для Сглыпы ВКЛЮЧЕН. (^ω^)"
+    
+    sglypa.save_sglypa_data()
+    send_message(vk, peer_id, message)

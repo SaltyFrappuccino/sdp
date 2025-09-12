@@ -1,7 +1,6 @@
 import re
 import logging
-from core.utils import get_random_id, send_message
-from ._handbook_parser import search_in_handbook, get_handbook_data
+from core.utils import send_message
 
 # Кэш для данных справочника, чтобы не читать файл каждый раз
 _handbook_data = None
@@ -215,6 +214,11 @@ def handbook_command(vk, event, args):
         send_message(vk, event.peer_id, "⏳ Первый запуск, индексирую справочник... Это может занять несколько секунд.")
     
     # Поиск
-    result_message = search_in_handbook(query)
+    result_section, sub_title, sub_content = search_in_handbook(query)
     
+    if result_section:
+        result_message = format_section_for_vk(result_section, sub_title, sub_content)
+    else:
+        result_message = f"ℹ️ По вашему запросу «{query}» ничего не найдено в справочнике. Попробуйте использовать другие ключевые слова."
+
     send_message(vk, event.peer_id, result_message)

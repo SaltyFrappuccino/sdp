@@ -20,3 +20,11 @@ def admin_required(func):
             return
         return func(vk, event, args, **kwargs)
     return wrapper
+
+def is_admin(peer_id, user_id):
+    """
+    Проверяет, является ли пользователь админом в данном чате.
+    """
+    user = get_or_create_user(user_id)
+    # TODO: Добавить проверку админов самого чата VK
+    return user and user.get('role') == 'admin'

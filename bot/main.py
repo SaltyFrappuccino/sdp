@@ -12,10 +12,17 @@ import random
 import re
 import time
 
-from database import init_db, set_user_role
+from database import get_or_create_user, init_db, set_user_role
 from core.utils import get_random_id, send_message
-from handlers import admin, general, dice, character, reminders, help, gifs, handbook
-from core import cooldowns, sglypa
+from handlers import admin, general, dice, character, reminders, help, gifs, handbook, ai_commands
+from handlers.help import help_command, admin_help_command
+from handlers.gifs import get_gif
+from handlers.handbook import handbook_command
+from handlers.ai_commands import sglypa_ai_command, grok_ai_command, image_generation_command, does_he_know_command
+from handlers.rp_ai_commands import rp_ai_command
+import core.cooldowns as cooldowns
+import core.sglypa as sglypa
+
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -30,17 +37,22 @@ COMMANDS = {
     'напомнить': reminders.remind_command,
     'персонажи': character.my_characters,
     'инфо': character.character_info,
-    'помощь': help.help_command,
-    'gif': gifs.get_gif,
-    'справочник': handbook.handbook_command,
+    'помощь': help_command,
+    'gif': get_gif,
+    'справочник': handbook_command,
     # Админ-команды
     'датьадминку': admin.promote_to_admin,
     'снятьадминку': admin.demote_to_user,
     'админы': admin.show_admins,
-    'помощьадминам': help.admin_help_command,
+    'помощьадминам': admin_help_command,
     'setcd': admin.set_cooldown_command,
     'cd': admin.list_cooldowns_command,
-    'sglypa': admin.sglypa_mode_command
+    'sglypa': admin.sglypa_mode_command,
+    'аутизм': admin.autism_command,
+    # Нейро-команды
+    'нейронка': sglypa_ai_command,
+    'шедевр': image_generation_command,
+    'rp': rp_ai_command
 }
 PREFIXES = ['sdp', '&']
 
@@ -133,6 +145,7 @@ def setup_admins(vk, group_id):
         logging.error(f"Неизвестная ошибка при назначении админов: {e}")
 
 
+# === ГЛАВНЫЙ ЦИКЛ ОБРАБОТКИ СООБЩЕНИЙ ===
 def main():
     """Основная функция запуска бота."""
     load_dotenv()
@@ -193,116 +206,90 @@ def main():
             # Адаптируем структуру event'а, чтобы не переписывать обработчики
             event_for_handler = SimpleNamespace(
                 user_id=from_id,
-                peer_id=event.obj.message['peer_id'],
-                text=event.obj.message['text']
+                peer_id=message_obj.get('peer_id'),
+                text=message_obj.get('text')
             )
+            # Для команд, работающих с ответами, нам нужен полный объект сообщения
+            full_message_object = message_obj
 
             logging.info(f"Новое сообщение от {event_for_handler.user_id} в чате {event_for_handler.peer_id}: '{event_for_handler.text}'")
             
             message_text = event_for_handler.text
-            
-            # Проверяем, начинается ли сообщение с префикса
-            is_command = False
+            user_id = event_for_handler.user_id
+
+            # --- Обработка команд без префикса ---
+            lower_message = message_text.lower().strip()
+
+            # GROK
+            if lower_message in ["grok это правда?", "грок это правда?"]:
+                command_name = "grok"
+                if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
+                    continue
+                ai_commands.grok_ai_command(vk, event.obj.message, [])
+                cooldowns.set_cooldown(user_id, command_name)
+                continue
+
+            # DOES HE KNOW?
+            if lower_message in ["does he know?", "знает ли он?"]:
+                command_name = "doesheknow"
+                if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
+                    continue
+                ai_commands.does_he_know_command(vk, event.obj.message, [])
+                cooldowns.set_cooldown(user_id, command_name)
+                continue
+
+            # --- Обработка команд с префиксом ---
+            used_prefix = None
             for prefix in PREFIXES:
-                if message_text.lower().startswith(prefix):
-                    is_command = True
+                if message_text.lower().startswith(prefix.lower()):
+                    used_prefix = prefix
+                    command_body = message_text[len(prefix):].strip()
                     break
+                elif message_text.lower().startswith(prefix + ' '):
+                    used_prefix = prefix
+                    command_body = message_text[len(prefix):].strip()
+                    break
+
+            if used_prefix is None:
+                continue
+
+            command_parts = command_body.split()
+            if not command_parts:
+                continue
             
-            # Если режим Сглыпы включен для чата
-            if event_for_handler.peer_id in sglypa.SGLYPA_MODE_CHATS:
-                # --- Логика Сглыпы ---
-                # Она срабатывает только если это НЕ команда
-                if not is_command:
-                    is_from_bot = (from_id == BOT_ID)
-                    # Простое регулярное выражение для фильтрации строк, похожих на логи
-                    is_log_message = bool(re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', message_text))
+            command_name = command_parts[0].lower()
+            args = command_parts[1:]
 
-                    # Учимся и отвечаем только на сообщения от людей, не похожие на логи
-                    if not is_from_bot and not is_log_message:
-                        
-                        # --- Логика ответов Сглыпы ---
-                        
-                        # 1. С некоторой вероятностью отвечаем сгенерированной фразой
-                        if random.random() < 0.2: # 20% шанс ответа
-                            response = sglypa.generate_response(event_for_handler.peer_id)
-                            if response:
-                                send_message(vk, event_for_handler.peer_id, response)
-
-                        # 2. С другой, меньшей вероятностью, кидаем "подкол"
-                        if random.random() < 0.05: # 1% шанс
-                            members = get_chat_members(vk, event_for_handler.peer_id)
-                            if members:
-                                random_member_id = random.choice(members)
-                                troll_message = f"Я знаю, что [id{random_member_id}|Ты] дрочишь."
-                                send_message(vk, event_for_handler.peer_id, troll_message)
-                        
-                        # 3. В любом случае сразу обучаемся на сообщении
-                        if message_text:
-                            sglypa.build_model(event_for_handler.peer_id, [message_text])
-
-                    continue # Переходим к следующему сообщению, т.к. это было не-командное сообщение
-
-            # Если это команда, обрабатываем ее
-            if is_command:
-                used_prefix = None
-                for prefix in PREFIXES:
-                    if message_text.lower().startswith(prefix) and not prefix.endswith(' '):
-                        used_prefix = prefix
-                        command_body = message_text[len(prefix):].strip()
-                        break
-                    elif message_text.lower().startswith(prefix + ' '):
-                        used_prefix = prefix
-                        command_body = message_text[len(prefix):].strip()
-                        break
-
-                if used_prefix is None:
+            # --- Проверка кулдаунов (кроме админов) ---
+            if get_or_create_user(user_id).get('role') != 'admin':
+                if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
                     continue
 
-                command_parts = command_body.split()
-                command = command_parts[0].lower()
-                args = command_parts[1:]
-                
-                command_func = COMMANDS.get(command)
-                
-                if command_func:
-                    # Админские команды и команда помощи не имеют кулдауна
-                    is_admin_command = command_func in [
-                        admin.promote_to_admin, admin.demote_to_user, admin.show_admins, 
-                        help.admin_help_command, admin.set_cooldown_command, admin.list_cooldowns_command
-                    ]
+            command_func = COMMANDS.get(command_name)
+            
+            if command_func:
+                try:
+                    # Определяем, каким командам нужен полный объект сообщения
+                    if command_name in ["нейронка", "шедевр", "rp"]:
+                         # ИИ команды теперь вызываются через лямбды, которые уже содержат нужные объекты
+                        command_func(vk, event_for_handler, args)
+                    else:
+                        command_func(vk, event_for_handler, args)
                     
-                    if not is_admin_command:
-                        # Проверяем кулдаун для обычных команд
-                        remaining_time = cooldowns.check_cooldown(event_for_handler.user_id, command)
-                        if remaining_time > 0:
-                            send_message(
-                                vk,
-                                event_for_handler.peer_id,
-                                f"⏳ Команда `{command}` на перезарядке. Пожалуйста, подождите {remaining_time} сек."
-                            )
-                            continue # Прерываем выполнение команды
+                    # Если команда выполнена успешно, устанавливаем кулдаун
+                    if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
+                        continue
 
-                    try:
-                        # Передаем vk_session в обработчики, которым это нужно
-                        if command_func == gifs.get_gif:
-                            command_func(vk, event_for_handler, args, vk_session=vk_session)
-                        else:
-                            command_func(vk, event_for_handler, args)
-                        
-                        # Если команда выполнена успешно, устанавливаем кулдаун
-                        if not is_admin_command:
-                            cooldowns.set_cooldown(event_for_handler.user_id, command)
-
-                    except Exception as e:
-                        logging.error(f"Ошибка при выполнении команды '{command}': {e}")
-                        send_message(
-                            vk,
-                            event_for_handler.peer_id,
-                            "Произошла ошибка при выполнении команды. Администратор уже уведомлен."
-                        )
-                else:
-                    # Если команда не найдена
-                    send_message(vk, event_for_handler.peer_id, "иди нахуй")
+                except Exception as e:
+                    logging.error(f"Ошибка при выполнении команды '{command_name}': {e}", exc_info=True)
+                    send_message(
+                        vk,
+                        event_for_handler.peer_id,
+                        "Произошла ошибка при выполнении команды. Администратор уже уведомлен."
+                    )
+            else:
+                # Если команда не найдена
+                send_message(vk, event_for_handler.peer_id, "иди нахуй")
 
 if __name__ == '__main__':
     main()
