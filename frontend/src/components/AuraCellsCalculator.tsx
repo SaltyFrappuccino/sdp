@@ -16,6 +16,11 @@ interface Contract {
 interface Props {
   contracts: Contract[];
   currentRank: string;
+  manualAuraCells?: {
+    "Малые (I)": number;
+    "Значительные (II)": number;
+    "Предельные (III)": number;
+  };
 }
 
 const tableStyle: React.CSSProperties = {
@@ -41,7 +46,7 @@ const highlightedRowStyle: React.CSSProperties = {
   backgroundColor: 'var(--background_secondary)'
 };
 
-const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank }) => {
+const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank, manualAuraCells }) => {
   const auraCellsData: AuraCellData[] = [
     { rank: 'F', small: 2, significant: 0, ultimate: 0 },
     { rank: 'E', small: 4, significant: 0, ultimate: 0 },
@@ -84,26 +89,41 @@ const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank }) => {
           <tbody>
             {auraCellsData.map((row) => {
               const calculated = getCalculatedCells(row);
+              const isCurrentRank = row.rank === currentRank;
+
+              const displaySmall = isCurrentRank 
+                ? manualAuraCells?.["Малые (I)"] ?? calculated.small 
+                : (row.small === Infinity ? '∞' : row.small);
+
+              const displaySignificant = isCurrentRank
+                ? manualAuraCells?.["Значительные (II)"] ?? calculated.significant
+                : (row.significant === Infinity ? '∞' : row.significant);
+
+              const displayUltimate = isCurrentRank
+                ? manualAuraCells?.["Предельные (III)"] ?? calculated.ultimate
+                : row.ultimate;
+
+
               return (
                 <tr 
                   key={row.rank} 
-                  style={row.rank === currentRank ? highlightedRowStyle : undefined}
+                  style={isCurrentRank ? highlightedRowStyle : undefined}
                 >
                   <td style={cellStyle}>{row.rank}</td>
                   <td style={cellStyle}>
-                    {row.rank === currentRank ? 
-                      (row.small === Infinity ? `∞ (∞ + ${bonusSmallCells})` : `${calculated.small} (${row.small} + ${bonusSmallCells})`) : 
+                    {isCurrentRank ? 
+                      `${displaySmall} (${row.small === Infinity ? '∞' : row.small} + ${bonusSmallCells})` : 
                       (row.small === Infinity ? '∞' : row.small)
                     }
                   </td>
                   <td style={cellStyle}>
-                    {row.rank === currentRank ? 
-                      (row.significant === Infinity ? `∞ (∞ + ${bonusSignificantCells})` : `${calculated.significant} (${row.significant} + ${bonusSignificantCells})`) : 
+                    {isCurrentRank ? 
+                      `${displaySignificant} (${row.significant === Infinity ? '∞' : row.significant} + ${bonusSignificantCells})` :
                       (row.significant === Infinity ? '∞' : row.significant)
                     }
                   </td>
                   <td style={cellStyle}>
-                    {row.rank === currentRank ? `${calculated.ultimate} (${row.ultimate} + ${bonusUltimateCells})` : row.ultimate}
+                    {isCurrentRank ? `${displayUltimate} (${row.ultimate} + ${bonusUltimateCells})` : row.ultimate}
                   </td>
                 </tr>
               )

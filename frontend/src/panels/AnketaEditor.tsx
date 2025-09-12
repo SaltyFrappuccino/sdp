@@ -690,6 +690,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
             <AuraCellsCalculator
               contracts={character.contracts}
               currentRank={character.rank}
+              manualAuraCells={character.aura_cells}
             />
             {isAdmin ? (
                <>
