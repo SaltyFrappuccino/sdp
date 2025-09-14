@@ -1,48 +1,53 @@
 import React, { FC, useState, useEffect } from 'react';
-import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar, ModalCard, ModalPageContent } from '@vkontakte/vkui';
-import { API_URL } from '../api';
+import {
+  Panel, PanelHeader, Div, Card, Text, Button, Textarea, Snackbar,
+  ModalRoot, ModalPage, ModalPageHeader, FormItem
+} from '@vkontakte/vkui';
 import { Icon28CalendarOutline, Icon28UsersOutline } from '@vkontakte/icons';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 interface NavIdProps {
   id: string;
 }
 
-interface Character {
-  id: number;
-  character_name: string;
-  nickname: string;
-  rank: string;
-  faction: string;
-  vk_id: number;
+interface EventsPanelProps extends NavIdProps {
+  fetchedUser?: any;
 }
 
 interface Event {
   id: number;
   title: string;
   description: string;
-  event_type: string;
+  registration_instructions: string;
   status: string;
-  difficulty: string;
-  recommended_rank: string;
+  min_rank: string;
+  max_rank: string;
   max_participants: number;
-  min_participants: number;
-  is_deadly: boolean;
-  is_open_world: boolean;
-  rewards: any;
-  requirements: any;
-  location: string;
-  location_description: string;
   start_date: string;
   end_date: string;
-  application_deadline: string;
+  registration_deadline: string;
   organizer_name: string;
-  additional_info: string;
   participant_count: number;
+  participants?: EventParticipant[];
 }
 
+interface EventParticipant {
+  id: number;
+  character_id: number;
+  character_name: string;
+  character_rank: string;
+  faction: string;
+  registration_text: string;
+  status: string;
+  registered_at: string;
+}
 
-interface EventsPanelProps extends NavIdProps {
-  fetchedUser?: any;
+interface Character {
+  id: number;
+  character_name: string;
+  rank: string;
+  faction: string;
 }
 
 export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
@@ -50,10 +55,11 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
-  const [applicationData, setApplicationData] = useState<string>('');
+  const [registrationText, setRegistrationText] = useState('');
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<React.ReactNode>(null);
-  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
 
   useEffect(() => {
     fetchEvents();
@@ -62,11 +68,15 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
 
   const fetchEvents = async () => {
     try {
+      setLoading(true);
       const response = await fetch(`${API_URL}/events?status=open`);
       const data = await response.json();
       setEvents(data);
     } catch (error) {
       console.error('Failed to fetch events:', error);
+      showResultSnackbar('Ошибка загрузки событий', false);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,6 +91,17 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
     }
   };
 
+  const fetchEventDetails = async (eventId: number) => {
+    try {
+      const response = await fetch(`${API_URL}/events/${eventId}`);
+      const data = await response.json();
+      setSelectedEvent(data);
+    } catch (error) {
+      console.error('Failed to fetch event details:', error);
+      showResultSnackbar('Ошибка загрузки деталей события', false);
+    }
+  };
+
   const showResultSnackbar = (message: string, _isSuccess: boolean) => {
     setSnackbar(
       <Snackbar
@@ -92,92 +113,119 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
     );
   };
 
-  const applyToEvent = async () => {
-    if (!selectedEvent || !selectedCharacter || !applicationData.trim()) return;
+  const openRegistrationModal = (event: Event) => {
+    if (!characters.length) {
+      showResultSnackbar('У вас нет персонажей для регистрации', false);
+      return;
+    }
+    setSelectedEvent(event);
+    setSelectedCharacter(null);
+    setRegistrationText('');
+    setShowRegistrationModal(true);
+  };
 
-    setLoading(true);
+  const openParticipantsModal = async (event: Event) => {
+    await fetchEventDetails(event.id);
+    setShowParticipantsModal(true);
+  };
+
+  const registerForEvent = async () => {
+    if (!selectedEvent || !selectedCharacter || !registrationText.trim()) {
+      showResultSnackbar('Заполните все поля', false);
+      return;
+    }
+
     try {
-      const character = characters.find(c => c.id === selectedCharacter);
-      if (!character) return;
-
-      const response = await fetch(`${API_URL}/events/${selectedEvent.id}/participants`, {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/events/${selectedEvent.id}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           character_id: selectedCharacter,
           vk_id: fetchedUser?.id,
-          character_name: character.character_name,
-          character_rank: character.rank,
-          faction: character.faction,
-          application_data: { details: applicationData }
+          registration_text: registrationText
         })
       });
 
       if (response.ok) {
-        showResultSnackbar('Заявка подана успешно!', true);
-        setShowApplicationModal(false);
-        setApplicationData('');
-        setSelectedCharacter(null);
+        showResultSnackbar('Регистрация прошла успешно!', true);
+        setShowRegistrationModal(false);
+        fetchEvents();
       } else {
-        const error = await response.json();
-        showResultSnackbar(error.error || 'Ошибка подачи заявки', false);
+        const errorData = await response.json();
+        showResultSnackbar(errorData.error || 'Ошибка регистрации', false);
       }
     } catch (error) {
+      console.error('Failed to register for event:', error);
       showResultSnackbar('Ошибка соединения', false);
     } finally {
       setLoading(false);
     }
   };
 
-  const openApplicationModal = (event: Event) => {
-    setSelectedEvent(event);
-    setShowApplicationModal(true);
-  };
+  const withdrawFromEvent = async (eventId: number, characterId: number) => {
+    try {
+      const response = await fetch(`${API_URL}/events/${eventId}/register`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ character_id: characterId })
+      });
 
-  const getEventTypeIcon = (type: string) => {
-    switch (type) {
-      case 'quest': return '⚔️';
-      case 'gate': return '🚪';
-      case 'pvp': return '⚡';
-      case 'pve': return '👹';
-      case 'social': return '🎭';
-      case 'auction': return '💰';
-      case 'raid': return '🏰';
-      case 'special': return '⭐';
-      default: return '📅';
+      if (response.ok) {
+        showResultSnackbar('Регистрация отменена', true);
+        fetchEvents();
+        if (selectedEvent) {
+          await fetchEventDetails(selectedEvent.id);
+        }
+      } else {
+        const errorData = await response.json();
+        showResultSnackbar(errorData.error || 'Ошибка отмены регистрации', false);
+      }
+    } catch (error) {
+      console.error('Failed to withdraw from event:', error);
+      showResultSnackbar('Ошибка соединения', false);
     }
-  };
-
-  const getDifficultyColor = (difficulty: string) => {
-    const colors: { [key: string]: string } = {
-      'F': '#4CAF50',
-      'E': '#8BC34A',
-      'D': '#FFC107',
-      'C': '#FF9800',
-      'B': '#FF5722',
-      'A': '#F44336',
-      'S': '#9C27B0',
-      'SS': '#673AB7',
-      'SSS': '#3F51B5'
-    };
-    return colors[difficulty] || '#666';
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('ru-RU');
   };
 
+  const isCharacterRegistered = (event: Event, characterId: number) => {
+    if (!event.participants) return false;
+    return event.participants.some(p => p.character_id === characterId && p.status === 'registered');
+  };
+
+  const canRegister = (event: Event) => {
+    if (event.status !== 'open') return false;
+    if (event.registration_deadline && new Date() > new Date(event.registration_deadline)) return false;
+    if (event.max_participants && event.participant_count >= event.max_participants) return false;
+    return true;
+  };
+
+  const getRankText = (minRank: string, maxRank: string) => {
+    if (!minRank && !maxRank) return 'Любой ранг';
+    if (minRank && maxRank) return `Ранг: ${minRank}-${maxRank}`;
+    if (minRank) return `Ранг: ${minRank}+`;
+    if (maxRank) return `Ранг: до ${maxRank}`;
+    return '';
+  };
+
   return (
     <Panel id={id}>
-      <PanelHeader>📅 Ивенты</PanelHeader>
+      <PanelHeader>📅 События</PanelHeader>
       
       <Div>
-        {events.length === 0 ? (
+        {loading ? (
           <Card>
             <Div>
-              <Text style={{ textAlign: 'center', color: '#666' }}>
-                Нет доступных ивентов
-              </Text>
+              <Text>Загрузка...</Text>
+            </Div>
+          </Card>
+        ) : events.length === 0 ? (
+          <Card>
+            <Div>
+              <Text>Нет доступных событий</Text>
             </Div>
           </Card>
         ) : (
@@ -185,36 +233,47 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
             <Card key={event.id} style={{ marginBottom: 16 }}>
               <Div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 24 }}>{getEventTypeIcon(event.event_type)}</Text>
-                    <div>
-                      <Text weight="2" style={{ fontSize: 16 }}>
-                        {event.title}
-                      </Text>
-                      <Text style={{ color: '#666', fontSize: 14 }}>
-                        {event.organizer_name}
-                      </Text>
-                    </div>
+                  <div>
+                    <Text weight="2" style={{ fontSize: 16, marginBottom: 4 }}>
+                      {event.title}
+                    </Text>
+                    <Text style={{ color: '#666', fontSize: 14, marginBottom: 8 }}>
+                      Организатор: {event.organizer_name}
+                    </Text>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <Text 
-                      style={{ 
-                        color: getDifficultyColor(event.difficulty),
-                        fontWeight: 'bold',
-                        fontSize: 14
-                      }}
-                    >
-                      {event.difficulty}
-                    </Text>
-                    <Text style={{ color: '#666', fontSize: 12 }}>
-                      {event.recommended_rank}
-                    </Text>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button
+                        size="s"
+                        mode="secondary"
+                        onClick={() => openParticipantsModal(event)}
+                      >
+                        Участники
+                      </Button>
+                      {canRegister(event) && (
+                        <Button
+                          size="s"
+                          onClick={() => openRegistrationModal(event)}
+                        >
+                          Зарегистрироваться
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 <Text style={{ marginBottom: 12 }}>
                   {event.description}
                 </Text>
+
+                <div style={{ marginBottom: 12 }}>
+                  <Text weight="2" style={{ fontSize: 14, marginBottom: 4 }}>
+                    Инструкции для регистрации:
+                  </Text>
+                  <Text style={{ fontSize: 14, color: '#666' }}>
+                    {event.registration_instructions}
+                  </Text>
+                </div>
 
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -231,109 +290,186 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
                     </Text>
                   </div>
 
-                  {event.location && (
+                  {(event.min_rank || event.max_rank) && (
                     <Text style={{ fontSize: 14, color: '#666' }}>
-                      📍 {event.location}
+                      {getRankText(event.min_rank, event.max_rank)}
                     </Text>
                   )}
                 </div>
 
-                {event.is_deadly && (
-                  <Text style={{ color: '#f44336', fontSize: 14, marginBottom: 8 }}>
-                    ⚠️ Смертельный ивент
+                {event.registration_deadline && (
+                  <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
+                    Регистрация до: {formatDate(event.registration_deadline)}
                   </Text>
                 )}
 
-                {event.is_open_world && (
-                  <Text style={{ color: '#2196F3', fontSize: 14, marginBottom: 8 }}>
-                    🌍 Открытый мир
+                {!canRegister(event) && (
+                  <Text style={{ fontSize: 14, color: '#f44336', marginBottom: 8 }}>
+                    {event.status !== 'open' ? 'Регистрация закрыта' :
+                     event.registration_deadline && new Date() > new Date(event.registration_deadline) ? 'Срок регистрации истек' :
+                     event.max_participants && event.participant_count >= event.max_participants ? 'Места закончились' :
+                     'Регистрация недоступна'}
                   </Text>
                 )}
 
-                {event.additional_info && (
-                  <Text style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
-                    {event.additional_info}
-                  </Text>
-                )}
-
-                <Button
-                  size="l"
-                  onClick={() => openApplicationModal(event)}
-                  disabled={!characters.length}
-                >
-                  Подать заявку
-                </Button>
+                {/* Показываем зарегистрированных персонажей */}
+                {characters.map(character => {
+                  const isRegistered = isCharacterRegistered(event, character.id);
+                  if (!isRegistered) return null;
+                  
+                  return (
+                    <div key={character.id} style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      padding: '8px 12px',
+                      backgroundColor: '#f0f0f0',
+                      borderRadius: '8px',
+                      marginBottom: 8
+                    }}>
+                      <div>
+                        <Text weight="2" style={{ fontSize: 14 }}>
+                          {character.character_name} ({character.rank})
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#666' }}>
+                          {character.faction}
+                        </Text>
+                      </div>
+                      <Button
+                        size="s"
+                        mode="secondary"
+                        onClick={() => withdrawFromEvent(event.id, character.id)}
+                      >
+                        Отменить
+                      </Button>
+                    </div>
+                  );
+                })}
               </Div>
             </Card>
           ))
         )}
       </Div>
 
-      {showApplicationModal && selectedEvent && (
-        <ModalCard
-          id="application-modal"
-          onClose={() => setShowApplicationModal(false)}
+      {/* Модальное окно регистрации */}
+      <ModalRoot activeModal={showRegistrationModal ? 'register-event' : null}>
+        <ModalPage
+          id="register-event"
+          onClose={() => setShowRegistrationModal(false)}
+          header={
+            <ModalPageHeader>
+              Регистрация на событие
+            </ModalPageHeader>
+          }
         >
-          <ModalPageContent>
-            <div style={{ marginBottom: 16 }}>
-              <Text weight="2" style={{ marginBottom: 8 }}>
-                Ивент: {selectedEvent.title}
-              </Text>
-              <Text style={{ color: '#666', fontSize: 14 }}>
-                {selectedEvent.description}
-              </Text>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <Text weight="2" style={{ marginBottom: 8 }}>
-                Выберите персонажа
-              </Text>
-              <Select
-                placeholder="Выберите персонажа"
-                value={selectedCharacter?.toString() || ''}
-                onChange={(e) => setSelectedCharacter(parseInt(e.target.value))}
-                options={characters.map(char => ({
-                  label: `${char.character_name} (${char.rank}, ${char.faction})`,
-                  value: char.id.toString()
-                }))}
-              />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <Text weight="2" style={{ marginBottom: 8 }}>
-                Детали заявки
-              </Text>
-              <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
-                Опишите, почему ваш персонаж подходит для этого ивента, его мотивацию и планы участия.
-              </Text>
-              <Input
-                type="textarea"
-                placeholder="Введите детали заявки..."
-                value={applicationData}
-                onChange={(e) => setApplicationData(e.target.value)}
-              />
-            </div>
-          </ModalPageContent>
-          
           <Div>
-            <Button
-              size="l"
-              mode="secondary"
-              onClick={() => setShowApplicationModal(false)}
-            >
-              Отмена
-            </Button>
-            <Button
-              size="l"
-              onClick={applyToEvent}
-              disabled={!selectedCharacter || !applicationData.trim()}
-              loading={loading}
-            >
-              Подать заявку
-            </Button>
+            {selectedEvent && (
+              <div>
+                <FormItem top="Событие">
+                  <Text weight="2">{selectedEvent.title}</Text>
+                </FormItem>
+
+                <FormItem top="Выберите персонажа *">
+                  <select
+                    value={selectedCharacter || ''}
+                    onChange={(e) => setSelectedCharacter(parseInt(e.target.value))}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    <option value="">Выберите персонажа</option>
+                    {characters.map(character => (
+                      <option key={character.id} value={character.id}>
+                        {character.character_name} ({character.rank}) - {character.faction}
+                      </option>
+                    ))}
+                  </select>
+                </FormItem>
+
+                <FormItem top="Инструкции для регистрации">
+                  <Text style={{ fontSize: 14, color: '#666' }}>
+                    {selectedEvent.registration_instructions}
+                  </Text>
+                </FormItem>
+
+                <FormItem top="Ваш ответ *">
+                  <Textarea
+                    value={registrationText}
+                    onChange={(e) => setRegistrationText(e.target.value)}
+                    placeholder="Введите ваш ответ согласно инструкциям выше"
+                    rows={4}
+                  />
+                </FormItem>
+
+                <FormItem>
+                  <Button
+                    size="l"
+                    onClick={registerForEvent}
+                    disabled={loading || !selectedCharacter || !registrationText.trim()}
+                    style={{ width: '100%' }}
+                  >
+                    {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+                  </Button>
+                </FormItem>
+              </div>
+            )}
           </Div>
-        </ModalCard>
-      )}
+        </ModalPage>
+      </ModalRoot>
+
+      {/* Модальное окно участников */}
+      <ModalRoot activeModal={showParticipantsModal ? 'event-participants' : null}>
+        <ModalPage
+          id="event-participants"
+          onClose={() => setShowParticipantsModal(false)}
+          header={
+            <ModalPageHeader>
+              Участники события
+            </ModalPageHeader>
+          }
+        >
+          <Div>
+            {selectedEvent && (
+              <div>
+                <Text weight="2" style={{ fontSize: 18, marginBottom: 16 }}>
+                  {selectedEvent.title}
+                </Text>
+                
+                {selectedEvent.participants && selectedEvent.participants.length > 0 ? (
+                  selectedEvent.participants.map(participant => (
+                    <Card key={participant.id} style={{ marginBottom: 12 }}>
+                      <Div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                          <div>
+                            <Text weight="2" style={{ fontSize: 16 }}>
+                              {participant.character_name}
+                            </Text>
+                            <Text style={{ fontSize: 14, color: '#666' }}>
+                              {participant.character_rank} - {participant.faction}
+                            </Text>
+                          </div>
+                          <Text style={{ fontSize: 12, color: '#666' }}>
+                            {formatDate(participant.registered_at)}
+                          </Text>
+                        </div>
+                        
+                        <div style={{ marginTop: 8 }}>
+                          <Text weight="2" style={{ fontSize: 14, marginBottom: 4 }}>
+                            Ответ:
+                          </Text>
+                          <Text style={{ fontSize: 14, color: '#666' }}>
+                            {participant.registration_text}
+                          </Text>
+                        </div>
+                      </Div>
+                    </Card>
+                  ))
+                ) : (
+                  <Text>Участников пока нет</Text>
+                )}
+              </div>
+            )}
+          </Div>
+        </ModalPage>
+      </ModalRoot>
 
       {snackbar}
     </Panel>

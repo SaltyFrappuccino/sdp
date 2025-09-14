@@ -1404,14 +1404,14 @@ router.get('/characters/accepted', async (req: Request, res: Response) => {
 // GET /api/events - Получить список ивентов
 router.get('/events', async (req: Request, res: Response) => {
   try {
-    const { status, event_type, difficulty } = req.query;
+    const { status } = req.query;
     const db = await initDB();
     
     let query = `
       SELECT e.*, 
              COUNT(ep.id) as participant_count
       FROM Events e
-      LEFT JOIN EventParticipants ep ON e.id = ep.event_id AND ep.status = 'approved'
+      LEFT JOIN EventParticipants ep ON e.id = ep.event_id AND ep.status = 'registered'
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -1419,14 +1419,6 @@ router.get('/events', async (req: Request, res: Response) => {
     if (status) {
       query += ' AND e.status = ?';
       params.push(status);
-    }
-    if (event_type) {
-      query += ' AND e.event_type = ?';
-      params.push(event_type);
-    }
-    if (difficulty) {
-      query += ' AND e.difficulty = ?';
-      params.push(difficulty);
     }
 
     query += ' GROUP BY e.id ORDER BY e.created_at DESC';
@@ -1449,7 +1441,7 @@ router.get('/events/:id', async (req: Request, res: Response) => {
       SELECT e.*, 
              COUNT(ep.id) as participant_count
       FROM Events e
-      LEFT JOIN EventParticipants ep ON e.id = ep.event_id AND ep.status = 'approved'
+      LEFT JOIN EventParticipants ep ON e.id = ep.event_id AND ep.status = 'registered'
       WHERE e.id = ?
       GROUP BY e.id
     `, [id]);
@@ -1463,7 +1455,7 @@ router.get('/events/:id', async (req: Request, res: Response) => {
       FROM EventParticipants ep
       JOIN Characters c ON ep.character_id = c.id
       WHERE ep.event_id = ?
-      ORDER BY ep.joined_at DESC
+      ORDER BY ep.registered_at DESC
     `, [id]);
 
     res.json({ ...event, participants });
@@ -1479,47 +1471,134 @@ router.post('/events', async (req: Request, res: Response) => {
     const {
       title,
       description,
-      event_type,
-      difficulty,
-      recommended_rank,
+      registration_instructions,
+      min_rank,
+      max_rank,
       max_participants,
-      min_participants = 1,
-      is_deadly = false,
-      is_open_world = false,
-      rewards = {},
-      requirements = {},
-      location,
-      location_description,
       start_date,
       end_date,
-      application_deadline,
+      registration_deadline,
       organizer_vk_id,
-      organizer_name,
-      additional_info,
-      event_data = {}
+      organizer_name
     } = req.body;
 
     const db = await initDB();
     const result = await db.run(`
       INSERT INTO Events (
-        title, description, event_type, difficulty, recommended_rank,
-        max_participants, min_participants, is_deadly, is_open_world,
-        rewards, requirements, location, location_description,
-        start_date, end_date, application_deadline, organizer_vk_id,
-        organizer_name, additional_info, event_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        title, description, registration_instructions, min_rank, max_rank,
+        max_participants, start_date, end_date, registration_deadline,
+        organizer_vk_id, organizer_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      title, description, event_type, difficulty, recommended_rank,
-      max_participants, min_participants, is_deadly ? 1 : 0, is_open_world ? 1 : 0,
-      JSON.stringify(rewards), JSON.stringify(requirements), location, location_description,
-      start_date, end_date, application_deadline, organizer_vk_id,
-      organizer_name, additional_info, JSON.stringify(event_data)
+      title, description, registration_instructions, min_rank, max_rank,
+      max_participants, start_date, end_date, registration_deadline,
+      organizer_vk_id, organizer_name
     ]);
 
     res.status(201).json({ id: result.lastID });
   } catch (error) {
     console.error('Failed to create event:', error);
     res.status(500).json({ error: 'Не удалось создать ивент' });
+  }
+});
+
+// POST /api/events/:id/register - Зарегистрироваться на событие
+router.post('/events/:id/register', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { character_id, vk_id, registration_text } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !vk_id || !registration_text) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    // Проверяем, что событие существует и открыто для регистрации
+    const event = await db.get('SELECT * FROM Events WHERE id = ? AND status = "open"', [id]);
+    if (!event) {
+      return res.status(404).json({ error: 'Событие не найдено или закрыто для регистрации' });
+    }
+
+    // Проверяем, что не истек срок регистрации
+    if (event.registration_deadline && new Date() > new Date(event.registration_deadline)) {
+      return res.status(400).json({ error: 'Срок регистрации истек' });
+    }
+
+    // Проверяем, что не превышено максимальное количество участников
+    if (event.max_participants) {
+      const participantCount = await db.get(
+        'SELECT COUNT(*) as count FROM EventParticipants WHERE event_id = ? AND status = "registered"',
+        [id]
+      );
+      if (participantCount.count >= event.max_participants) {
+        return res.status(400).json({ error: 'Достигнуто максимальное количество участников' });
+      }
+    }
+
+    // Получаем данные персонажа
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    // Проверяем ранг персонажа
+    if (event.min_rank && character.rank < event.min_rank) {
+      return res.status(400).json({ error: 'Ранг персонажа слишком низкий для этого события' });
+    }
+    if (event.max_rank && character.rank > event.max_rank) {
+      return res.status(400).json({ error: 'Ранг персонажа слишком высокий для этого события' });
+    }
+
+    // Проверяем, что персонаж еще не зарегистрирован
+    const existingRegistration = await db.get(
+      'SELECT * FROM EventParticipants WHERE event_id = ? AND character_id = ? AND status = "registered"',
+      [id, character_id]
+    );
+    if (existingRegistration) {
+      return res.status(400).json({ error: 'Персонаж уже зарегистрирован на это событие' });
+    }
+
+    // Регистрируем персонажа
+    await db.run(`
+      INSERT INTO EventParticipants (
+        event_id, character_id, vk_id, character_name, character_rank, faction, registration_text
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      id, character_id, vk_id, character.character_name, character.rank, character.faction, registration_text
+    ]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to register for event:', error);
+    res.status(500).json({ error: 'Не удалось зарегистрироваться на событие' });
+  }
+});
+
+// DELETE /api/events/:id/register - Отменить регистрацию на событие
+router.delete('/events/:id/register', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { character_id } = req.body;
+    const db = await initDB();
+
+    if (!character_id) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    // Отменяем регистрацию
+    const result = await db.run(
+      'UPDATE EventParticipants SET status = "withdrawn" WHERE event_id = ? AND character_id = ? AND status = "registered"',
+      [id, character_id]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Регистрация не найдена' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to withdraw from event:', error);
+    res.status(500).json({ error: 'Не удалось отменить регистрацию' });
   }
 });
 
