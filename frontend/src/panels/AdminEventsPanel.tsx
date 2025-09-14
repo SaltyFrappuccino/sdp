@@ -1,5 +1,6 @@
 import React, { FC, useState, useEffect } from 'react';
 import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar, ModalCard, ModalPageContent } from '@vkontakte/vkui';
+import { API_URL } from '../api';
 import { Icon28CalendarOutline, Icon28UsersOutline, Icon28AddOutline, Icon28DeleteOutline } from '@vkontakte/icons';
 
 interface NavIdProps {
@@ -74,7 +75,7 @@ export const AdminEventsPanel: FC<NavIdProps> = ({ id }) => {
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/events`);
+      const response = await fetch(`${API_URL}/events`);
       const data = await response.json();
       setEvents(data);
     } catch (error) {
@@ -84,7 +85,7 @@ export const AdminEventsPanel: FC<NavIdProps> = ({ id }) => {
 
   const fetchEventParticipants = async (eventId: number) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${eventId}`);
+      const response = await fetch(`${API_URL}/events/${eventId}`);
       const data = await response.json();
       setParticipants(data.participants || []);
     } catch (error) {
@@ -111,7 +112,7 @@ export const AdminEventsPanel: FC<NavIdProps> = ({ id }) => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/events`, {
+      const response = await fetch(`${API_URL}/events`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -161,7 +162,7 @@ export const AdminEventsPanel: FC<NavIdProps> = ({ id }) => {
 
   const updateEventStatus = async (eventId: number, status: string) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${eventId}`, {
+      const response = await fetch(`${API_URL}/events/${eventId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -183,7 +184,7 @@ export const AdminEventsPanel: FC<NavIdProps> = ({ id }) => {
 
   const updateParticipantStatus = async (eventId: number, participantId: number, status: string) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${eventId}/participants/${participantId}`, {
+      const response = await fetch(`${API_URL}/events/${eventId}/participants/${participantId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -207,7 +208,7 @@ export const AdminEventsPanel: FC<NavIdProps> = ({ id }) => {
     if (!confirm('Вы уверены, что хотите удалить этот ивент?')) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${eventId}`, {
+      const response = await fetch(`${API_URL}/events/${eventId}`, {
         method: 'DELETE',
         headers: { 'x-admin-id': '1' }
       });

@@ -1,5 +1,6 @@
 import React, { FC, useState, useEffect } from 'react';
 import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar, ModalCard, ModalPageContent } from '@vkontakte/vkui';
+import { API_URL } from '../api';
 import { Icon28CalendarOutline, Icon28UsersOutline } from '@vkontakte/icons';
 
 interface NavIdProps {
@@ -61,7 +62,7 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/events?status=open`);
+      const response = await fetch(`${API_URL}/events?status=open`);
       const data = await response.json();
       setEvents(data);
     } catch (error) {
@@ -71,7 +72,7 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
 
   const fetchCharacters = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/characters/by-vk/${fetchedUser?.id}`);
+      const response = await fetch(`${API_URL}/characters/by-vk/${fetchedUser?.id}`);
       const data = await response.json();
       setCharacters(data);
     } catch (error) {
@@ -98,7 +99,7 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
       const character = characters.find(c => c.id === selectedCharacter);
       if (!character) return;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${selectedEvent.id}/participants`, {
+      const response = await fetch(`${API_URL}/events/${selectedEvent.id}/participants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

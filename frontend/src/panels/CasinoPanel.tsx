@@ -1,5 +1,6 @@
 import React, { FC, useState, useEffect } from 'react';
 import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar } from '@vkontakte/vkui';
+import { API_URL } from '../api';
 import { Icon28GameOutline, Icon28Dice1Outline, Icon28Cards2Outline } from '@vkontakte/icons';
 
 interface NavIdProps {
@@ -43,7 +44,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
 
   const fetchCharacters = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/characters/by-vk/${fetchedUser?.id}`);
+      const response = await fetch(`${API_URL}/characters/by-vk/${fetchedUser?.id}`);
       const data = await response.json();
       setCharacters(data);
     } catch (error) {
@@ -53,7 +54,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
 
   const fetchGameHistory = async (characterId: number) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/casino/history/${characterId}`);
+      const response = await fetch(`${API_URL}/casino/history/${characterId}`);
       const data = await response.json();
       setGameHistory(data);
     } catch (error) {
@@ -77,7 +78,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/casino/blackjack`, {
+      const response = await fetch(`${API_URL}/casino/blackjack`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -111,7 +112,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/casino/slots`, {
+      const response = await fetch(`${API_URL}/casino/slots`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -143,7 +144,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     
     setLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/casino/dice`, {
+      const response = await fetch(`${API_URL}/casino/dice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
