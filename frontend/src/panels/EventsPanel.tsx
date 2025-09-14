@@ -58,7 +58,7 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
   useEffect(() => {
     fetchEvents();
     fetchCharacters();
-  }, []);
+  }, [fetchedUser]);
 
   const fetchEvents = async () => {
     try {
@@ -71,8 +71,9 @@ export const EventsPanel: FC<EventsPanelProps> = ({ id, fetchedUser }) => {
   };
 
   const fetchCharacters = async () => {
+    if (!fetchedUser) return;
     try {
-      const response = await fetch(`${API_URL}/characters/by-vk/${fetchedUser?.id}`);
+      const response = await fetch(`${API_URL}/characters/by-vk/${fetchedUser.id}`);
       const data = await response.json();
       setCharacters(data);
     } catch (error) {
