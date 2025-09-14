@@ -287,9 +287,10 @@ export async function initDB() {
       // Проверяем есть ли колонка game_type
       const tableInfo = await db.all("PRAGMA table_info(CasinoGames)");
       const hasGameType = tableInfo.some((col: any) => col.name === 'game_type');
+      const hasGameState = tableInfo.some((col: any) => col.name === 'game_state');
       
-      if (!hasGameType) {
-        console.log('CasinoGames table missing game_type column, recreating table...');
+      if (!hasGameType || hasGameState) {
+        console.log('CasinoGames table needs migration (missing game_type or has game_state), recreating table...');
         
         // Создаем временную таблицу с правильной схемой
         await db.exec(`
@@ -307,9 +308,23 @@ export async function initDB() {
         `);
         
         // Копируем данные из старой таблицы (если есть)
+        // Проверяем какие поля есть в старой таблице
+        const oldTableInfo = await db.all("PRAGMA table_info(CasinoGames)");
+        const oldColumns = oldTableInfo.map((col: any) => col.name);
+        
+        // Строим список полей для копирования
+        const columnsToCopy = ['id', 'character_id', 'created_at'];
+        if (oldColumns.includes('bet_amount')) columnsToCopy.push('bet_amount');
+        if (oldColumns.includes('win_amount')) columnsToCopy.push('win_amount');
+        if (oldColumns.includes('game_data')) columnsToCopy.push('game_data');
+        if (oldColumns.includes('result')) columnsToCopy.push('result');
+        
+        const selectColumns = columnsToCopy.join(', ');
+        const insertColumns = columnsToCopy.join(', ');
+        
         await db.exec(`
-          INSERT INTO CasinoGames_new (id, character_id, created_at)
-          SELECT id, character_id, created_at FROM CasinoGames;
+          INSERT INTO CasinoGames_new (${insertColumns})
+          SELECT ${selectColumns} FROM CasinoGames;
         `);
         
         // Удаляем старую таблицу и переименовываем новую

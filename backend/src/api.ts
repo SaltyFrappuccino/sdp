@@ -2000,7 +2000,7 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
     const playerValue = getHandValue(playerCards);
     const dealerValue = getHandValue(dealerCards);
 
-    let result = 'lose';
+    let result: 'win' | 'lose' | 'push' = 'lose';
     let winAmount = 0;
 
     if (playerValue === 21 && dealerValue !== 21) {
@@ -2017,6 +2017,9 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
     } else if (playerValue === dealerValue) {
       result = 'push';
       winAmount = bet_amount;
+    } else {
+      // Если дилер выиграл (dealerValue > playerValue)
+      result = 'lose';
     }
 
     const newCurrency = character.currency - bet_amount + winAmount;
