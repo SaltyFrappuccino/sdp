@@ -1,7 +1,10 @@
 import React, { FC, useState, useEffect } from 'react';
-import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar } from '@vkontakte/vkui';
+import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar, ModalRoot, ModalPage, ModalPageHeader } from '@vkontakte/vkui';
 import { API_URL } from '../api';
 import { Icon28GameOutline, Icon28Dice1Outline, Icon28Cards2Outline } from '@vkontakte/icons';
+import { BlackjackGame } from '../components/BlackjackGame';
+import { SlotsGame } from '../components/SlotsGame';
+import { DiceGame } from '../components/DiceGame';
 
 interface NavIdProps {
   id: string;
@@ -31,12 +34,11 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState<string>('100');
-  const [dicePrediction, setDicePrediction] = useState<number>(1);
-  const [gameResult, setGameResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [dicePrediction] = useState<number>(1);
   const [snackbar, setSnackbar] = useState<React.ReactNode>(null);
   const [gameHistory, setGameHistory] = useState<CasinoGame[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCharacters();
@@ -74,24 +76,36 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     );
   };
 
-  const playBlackjack = async () => {
+  const playBlackjack = () => {
     if (!selectedCharacter || !betAmount) return;
-    
-    setLoading(true);
+    setActiveModal('blackjack');
+  };
+
+  const playSlots = () => {
+    if (!selectedCharacter || !betAmount) return;
+    setActiveModal('slots');
+  };
+
+  const playDice = () => {
+    if (!selectedCharacter || !betAmount) return;
+    setActiveModal('dice');
+  };
+
+  const handleGameEnd = async (gameType: string, result: any) => {
     try {
-      const response = await fetch(`${API_URL}/casino/blackjack`, {
+      const response = await fetch(`${API_URL}/casino/${gameType}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           character_id: selectedCharacter,
-          bet_amount: parseInt(betAmount)
+          bet_amount: parseInt(betAmount),
+          ...(gameType === 'dice' && { prediction: dicePrediction })
         })
       });
 
-      const result = await response.json();
       if (response.ok) {
-        setGameResult(result);
         await fetchCharacters(); // Обновляем валюту
+        await fetchGameHistory(selectedCharacter!); // Обновляем историю
         showResultSnackbar(
           result.result === 'win' ? `Выигрыш! +${result.winAmount} 💰` :
           result.result === 'push' ? `Ничья! Возврат ${result.winAmount} 💰` :
@@ -99,78 +113,14 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
           result.result !== 'lose'
         );
       } else {
-        showResultSnackbar(result.error || 'Ошибка игры', false);
+        const errorData = await response.json();
+        showResultSnackbar(errorData.error || 'Ошибка игры', false);
       }
     } catch (error) {
       showResultSnackbar('Ошибка соединения', false);
-    } finally {
-      setLoading(false);
     }
-  };
-
-  const playSlots = async () => {
-    if (!selectedCharacter || !betAmount) return;
     
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/casino/slots`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          character_id: selectedCharacter,
-          bet_amount: parseInt(betAmount)
-        })
-      });
-
-      const result = await response.json();
-      if (response.ok) {
-        setGameResult(result);
-        await fetchCharacters();
-        showResultSnackbar(
-          result.result === 'win' ? `Выигрыш! +${result.winAmount} 💰` : `Проигрыш! -${betAmount} 💸`, 
-          result.result === 'win'
-        );
-      } else {
-        showResultSnackbar(result.error || 'Ошибка игры', false);
-      }
-    } catch (error) {
-      showResultSnackbar('Ошибка соединения', false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const playDice = async () => {
-    if (!selectedCharacter || !betAmount) return;
-    
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/casino/dice`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          character_id: selectedCharacter,
-          bet_amount: parseInt(betAmount),
-          prediction: dicePrediction
-        })
-      });
-
-      const result = await response.json();
-      if (response.ok) {
-        setGameResult(result);
-        await fetchCharacters();
-        showResultSnackbar(
-          result.result === 'win' ? `Выигрыш! +${result.winAmount} 💰` : `Проигрыш! -${betAmount} 💸`, 
-          result.result === 'win'
-        );
-      } else {
-        showResultSnackbar(result.error || 'Ошибка игры', false);
-      }
-    } catch (error) {
-      showResultSnackbar('Ошибка соединения', false);
-    } finally {
-      setLoading(false);
-    }
+    setActiveModal(null);
   };
 
   const selectedCharacterData = characters.find(c => c.id === selectedCharacter);
@@ -235,8 +185,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                     size="l"
                     before={<Icon28Cards2Outline />}
                     onClick={playBlackjack}
-                    disabled={loading || !betAmount || parseInt(betAmount) > selectedCharacterData.currency}
-                    loading={loading}
+                    disabled={!betAmount || parseInt(betAmount) > selectedCharacterData.currency}
                   >
                     🃏 Блэкджек
                   </Button>
@@ -245,75 +194,23 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                     size="l"
                     before={<Icon28GameOutline />}
                     onClick={playSlots}
-                    disabled={loading || !betAmount || parseInt(betAmount) > selectedCharacterData.currency}
-                    loading={loading}
+                    disabled={!betAmount || parseInt(betAmount) > selectedCharacterData.currency}
                   >
                     🎰 Слоты (777)
                   </Button>
                   
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <Button
-                      size="l"
-                      before={<Icon28Dice1Outline />}
-                      onClick={playDice}
-                      disabled={loading || !betAmount || parseInt(betAmount) > selectedCharacterData.currency}
-                      loading={loading}
-                      style={{ flex: 1 }}
-                    >
-                      🎲 Кости
-                    </Button>
-                    <Select
-                      value={dicePrediction.toString()}
-                      onChange={(e) => setDicePrediction(parseInt(e.target.value))}
-                      options={[1,2,3,4,5,6].map(num => ({
-                        label: num.toString(),
-                        value: num.toString()
-                      }))}
-                      style={{ width: 60 }}
-                    />
-                  </div>
+                  <Button
+                    size="l"
+                    before={<Icon28Dice1Outline />}
+                    onClick={playDice}
+                    disabled={!betAmount || parseInt(betAmount) > selectedCharacterData.currency}
+                  >
+                    🎲 Кости
+                  </Button>
                 </div>
               </Div>
             </Card>
 
-            {gameResult && (
-              <Card style={{ marginTop: 16, backgroundColor: gameResult.result === 'win' ? '#e8f5e8' : gameResult.result === 'lose' ? '#ffeaea' : '#fff3cd' }}>
-                <Div>
-                  <Text weight="2" style={{ marginBottom: 8 }}>
-                    {gameResult.result === 'win' ? '🎉 Поздравляем!' : 
-                     gameResult.result === 'lose' ? '😔 Не повезло' : '🤝 Ничья'}
-                  </Text>
-                  
-                  {gameResult.gameData && (
-                    <div style={{ marginBottom: 8 }}>
-                      {gameResult.game_type === 'blackjack' && (
-                        <Text>
-                          Ваши карты: {gameResult.gameData.playerCards.join(', ')} ({gameResult.gameData.playerValue})<br/>
-                          Карты дилера: {gameResult.gameData.dealerCards.join(', ')} ({gameResult.gameData.dealerValue})
-                        </Text>
-                      )}
-                      {gameResult.game_type === 'slots' && (
-                        <Text>
-                          Результат: {gameResult.gameData.reels.join(' | ')}
-                        </Text>
-                      )}
-                      {gameResult.game_type === 'dice' && (
-                        <Text>
-                          Кости: {gameResult.gameData.dice1} + {gameResult.gameData.dice2} = {gameResult.gameData.total}<br/>
-                          Предсказание: {gameResult.gameData.prediction * 2}
-                        </Text>
-                      )}
-                    </div>
-                  )}
-                  
-                  <Text>
-                    Ставка: {gameResult.bet_amount} 💰<br/>
-                    {gameResult.win_amount > 0 && `Выигрыш: ${gameResult.win_amount} 💰`}<br/>
-                    Новый баланс: {gameResult.newCurrency} 💰
-                  </Text>
-                </Div>
-              </Card>
-            )}
 
             <Card style={{ marginTop: 16 }}>
               <Div>
@@ -365,6 +262,50 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
       </Div>
 
       {snackbar}
+
+      <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
+        <ModalPage id="blackjack" onClose={() => setActiveModal(null)}>
+          <ModalPageHeader>
+            <Button onClick={() => setActiveModal(null)}>✕</Button>
+          </ModalPageHeader>
+          {selectedCharacter && (
+            <BlackjackGame
+              characterId={selectedCharacter}
+              betAmount={parseInt(betAmount)}
+              onGameEnd={(result) => handleGameEnd('blackjack', result)}
+              onClose={() => setActiveModal(null)}
+            />
+          )}
+        </ModalPage>
+
+        <ModalPage id="slots" onClose={() => setActiveModal(null)}>
+          <ModalPageHeader>
+            <Button onClick={() => setActiveModal(null)}>✕</Button>
+          </ModalPageHeader>
+          {selectedCharacter && (
+            <SlotsGame
+              characterId={selectedCharacter}
+              betAmount={parseInt(betAmount)}
+              onGameEnd={(result) => handleGameEnd('slots', result)}
+              onClose={() => setActiveModal(null)}
+            />
+          )}
+        </ModalPage>
+
+        <ModalPage id="dice" onClose={() => setActiveModal(null)}>
+          <ModalPageHeader>
+            <Button onClick={() => setActiveModal(null)}>✕</Button>
+          </ModalPageHeader>
+          {selectedCharacter && (
+            <DiceGame
+              characterId={selectedCharacter}
+              betAmount={parseInt(betAmount)}
+              onGameEnd={(result) => handleGameEnd('dice', result)}
+              onClose={() => setActiveModal(null)}
+            />
+          )}
+        </ModalPage>
+      </ModalRoot>
     </Panel>
   );
 };

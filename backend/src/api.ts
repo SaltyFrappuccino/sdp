@@ -1983,19 +1983,45 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Недостаточно средств' });
     }
 
-    // Простая реализация блэкджека
-    const playerCards = [Math.floor(Math.random() * 13) + 1, Math.floor(Math.random() * 13) + 1];
-    const dealerCards = [Math.floor(Math.random() * 13) + 1, Math.floor(Math.random() * 13) + 1];
+    // Улучшенная реализация блэкджека с правильными картами
+    const suits = ['♠️', '♥️', '♦️', '♣️'];
+    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    
+    const createDeck = () => {
+      const deck = [];
+      for (let suit = 0; suit < 4; suit++) {
+        for (let rank = 0; rank < 13; rank++) {
+          deck.push({
+            suit: suits[suit],
+            rank: ranks[rank],
+            value: Math.min(rank + 1, 10)
+          });
+        }
+      }
+      return shuffleDeck(deck);
+    };
 
-    const getCardValue = (card: number) => Math.min(card, 10);
-    const getHandValue = (cards: number[]) => {
-      let value = cards.reduce((sum, card) => sum + getCardValue(card), 0);
-      const aces = cards.filter(card => card === 1).length;
+    const shuffleDeck = (deck: any[]) => {
+      const shuffled = [...deck];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    const getHandValue = (cards: any[]) => {
+      let value = cards.reduce((sum, card) => sum + card.value, 0);
+      const aces = cards.filter(card => card.rank === 'A').length;
       for (let i = 0; i < aces && value + 10 <= 21; i++) {
         value += 10;
       }
       return value;
     };
+
+    const deck = createDeck();
+    const playerCards = [deck.pop(), deck.pop()];
+    const dealerCards = [deck.pop(), deck.pop()];
 
     const playerValue = getHandValue(playerCards);
     const dealerValue = getHandValue(dealerCards);
@@ -2061,27 +2087,58 @@ router.post('/casino/slots', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Недостаточно средств' });
     }
 
-    // Генерируем 3 символа
-    const symbols = [1, 2, 3, 4, 5, 6, 7];
+    // Улучшенная логика слотов с весами символов
+    const symbols = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐', '💎'];
+    const symbolWeights = [30, 25, 20, 15, 8, 1.5, 0.5]; // Веса для символов
+    
+    const getWeightedSymbol = () => {
+      const random = Math.random() * 100;
+      let cumulative = 0;
+      
+      for (let i = 0; i < symbolWeights.length; i++) {
+        cumulative += symbolWeights[i];
+        if (random <= cumulative) {
+          return i;
+        }
+      }
+      return symbolWeights.length - 1;
+    };
+
+    const getSymbolMultiplier = (symbolIndex: number): number => {
+      switch (symbolIndex) {
+        case 6: return 50; // 💎
+        case 5: return 20; // ⭐
+        case 4: return 10; // 🔔
+        case 3: return 5;  // 🍇
+        case 2: return 3;  // 🍊
+        case 1: return 2;  // 🍋
+        case 0: return 1.5; // 🍒
+        default: return 1;
+      }
+    };
+
     const reels = [
-      symbols[Math.floor(Math.random() * symbols.length)],
-      symbols[Math.floor(Math.random() * symbols.length)],
-      symbols[Math.floor(Math.random() * symbols.length)]
+      getWeightedSymbol(),
+      getWeightedSymbol(),
+      getWeightedSymbol()
     ];
 
     let result = 'lose';
     let winAmount = 0;
 
     // Проверяем выигрышные комбинации
-    if (reels[0] === 7 && reels[1] === 7 && reels[2] === 7) {
+    if (reels[0] === 6 && reels[1] === 6 && reels[2] === 6) { // Три алмаза
       result = 'win';
-      winAmount = bet_amount * 100; // Джекпот
-    } else if (reels[0] === reels[1] && reels[1] === reels[2]) {
+      winAmount = Math.floor(bet_amount * 100); // Джекпот
+    } else if (reels[0] === reels[1] && reels[1] === reels[2]) { // Три одинаковых
       result = 'win';
-      winAmount = bet_amount * 10; // Три одинаковых
-    } else if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2]) {
+      const multiplier = getSymbolMultiplier(reels[0]);
+      winAmount = Math.floor(bet_amount * multiplier);
+    } else if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2]) { // Два одинаковых
       result = 'win';
-      winAmount = bet_amount * 2; // Два одинаковых
+      const symbol = reels[0] === reels[1] ? reels[0] : reels[1];
+      const multiplier = getSymbolMultiplier(symbol) * 0.3;
+      winAmount = Math.floor(bet_amount * multiplier);
     }
 
     const newCurrency = character.currency - bet_amount + winAmount;
