@@ -91,7 +91,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     setActiveModal('dice');
   };
 
-  const handleGameEnd = async (gameType: string, result: any) => {
+  const handleGameEnd = async (gameType: string, _result: any) => {
     try {
       const response = await fetch(`${API_URL}/casino/${gameType}`, {
         method: 'POST',
@@ -104,13 +104,14 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
       });
 
       if (response.ok) {
+        const backendResult = await response.json();
         await fetchCharacters(); // Обновляем валюту
         await fetchGameHistory(selectedCharacter!); // Обновляем историю
         showResultSnackbar(
-          result.result === 'win' ? `Выигрыш! +${result.winAmount} 💰` :
-          result.result === 'push' ? `Ничья! Возврат ${result.winAmount} 💰` :
+          backendResult.result === 'win' ? `Выигрыш! +${backendResult.winAmount} 💰` :
+          backendResult.result === 'push' ? `Ничья! Возврат ${backendResult.winAmount} 💰` :
           `Проигрыш! -${betAmount} 💸`, 
-          result.result !== 'lose'
+          backendResult.result !== 'lose'
         );
       } else {
         const errorData = await response.json();
@@ -264,9 +265,22 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
       {snackbar}
 
       <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
-        <ModalPage id="blackjack" onClose={() => setActiveModal(null)}>
-          <ModalPageHeader>
-            <Button onClick={() => setActiveModal(null)}>✕</Button>
+        <ModalPage 
+          id="blackjack" 
+          onClose={() => setActiveModal(null)}
+          style={{ backgroundColor: '#1a1a1a' }}
+        >
+          <ModalPageHeader style={{ backgroundColor: '#2a2a2a', borderBottom: '1px solid #444' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <Text weight="2" style={{ color: '#fff' }}>🃏 Блэкджек</Text>
+              <Button 
+                size="s" 
+                onClick={() => setActiveModal(null)}
+                style={{ backgroundColor: '#444', color: '#fff' }}
+              >
+                ✕
+              </Button>
+            </div>
           </ModalPageHeader>
           {selectedCharacter && (
             <BlackjackGame
@@ -278,9 +292,22 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
           )}
         </ModalPage>
 
-        <ModalPage id="slots" onClose={() => setActiveModal(null)}>
-          <ModalPageHeader>
-            <Button onClick={() => setActiveModal(null)}>✕</Button>
+        <ModalPage 
+          id="slots" 
+          onClose={() => setActiveModal(null)}
+          style={{ backgroundColor: '#1a1a1a' }}
+        >
+          <ModalPageHeader style={{ backgroundColor: '#2a2a2a', borderBottom: '1px solid #444' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <Text weight="2" style={{ color: '#fff' }}>🎰 Слоты</Text>
+              <Button 
+                size="s" 
+                onClick={() => setActiveModal(null)}
+                style={{ backgroundColor: '#444', color: '#fff' }}
+              >
+                ✕
+              </Button>
+            </div>
           </ModalPageHeader>
           {selectedCharacter && (
             <SlotsGame
@@ -292,9 +319,22 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
           )}
         </ModalPage>
 
-        <ModalPage id="dice" onClose={() => setActiveModal(null)}>
-          <ModalPageHeader>
-            <Button onClick={() => setActiveModal(null)}>✕</Button>
+        <ModalPage 
+          id="dice" 
+          onClose={() => setActiveModal(null)}
+          style={{ backgroundColor: '#1a1a1a' }}
+        >
+          <ModalPageHeader style={{ backgroundColor: '#2a2a2a', borderBottom: '1px solid #444' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <Text weight="2" style={{ color: '#fff' }}>🎲 Кости</Text>
+              <Button 
+                size="s" 
+                onClick={() => setActiveModal(null)}
+                style={{ backgroundColor: '#444', color: '#fff' }}
+              >
+                ✕
+              </Button>
+            </div>
           </ModalPageHeader>
           {selectedCharacter && (
             <DiceGame

@@ -116,16 +116,22 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameEnd, onClose }) =
   };
 
   return (
-    <Card>
-      <Div>
+    <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
+      <Div style={{ backgroundColor: '#2a2a2a' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <Text weight="2" style={{ fontSize: 18 }}>🎲 Кости</Text>
-          <Button size="s" onClick={onClose}>✕</Button>
+          <Text weight="2" style={{ fontSize: 18, color: '#fff' }}>🎲 Кости</Text>
+          <Button 
+            size="s" 
+            onClick={onClose}
+            style={{ backgroundColor: '#444', color: '#fff' }}
+          >
+            ✕
+          </Button>
         </div>
 
         {/* Выбор предсказания */}
         <div style={{ marginBottom: 20 }}>
-          <Text weight="2" style={{ marginBottom: 8 }}>Предскажите сумму костей:</Text>
+          <Text weight="2" style={{ marginBottom: 8, color: '#fff' }}>Предскажите сумму костей:</Text>
           <Select
             value={prediction.toString()}
             onChange={(e) => setPrediction(parseInt(e.target.value))}
@@ -134,7 +140,7 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameEnd, onClose }) =
               value: num.toString()
             }))}
           />
-          <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+          <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>
             Множитель: x{getMultiplier(prediction)} | Шанс: {getProbability(prediction)}%
           </Text>
         </div>
@@ -237,7 +243,7 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameEnd, onClose }) =
         {/* История бросков */}
         {rollHistory.length > 0 && (
           <div style={{ marginTop: 20 }}>
-            <Text weight="2" style={{ marginBottom: 8, fontSize: 14 }}>Последние броски:</Text>
+            <Text weight="2" style={{ marginBottom: 8, fontSize: 14, color: '#fff' }}>Последние броски:</Text>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {rollHistory.map((roll, index) => (
                 <div
@@ -258,16 +264,16 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameEnd, onClose }) =
         )}
 
         {/* Информация о ставке */}
-        <div style={{ textAlign: 'center', marginTop: 16, color: '#666' }}>
+        <div style={{ textAlign: 'center', marginTop: 16, color: '#ccc' }}>
           <Text style={{ fontSize: 14 }}>
             Ставка: {betAmount} 💰
           </Text>
         </div>
 
         {/* Правила */}
-        <div style={{ marginTop: 20, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
-          <Text weight="2" style={{ marginBottom: 8, fontSize: 14 }}>Правила:</Text>
-          <Text style={{ fontSize: 12, lineHeight: 1.4 }}>
+        <div style={{ marginTop: 20, padding: 12, backgroundColor: '#2a2a2a', borderRadius: 8, border: '1px solid #444' }}>
+          <Text weight="2" style={{ marginBottom: 8, fontSize: 14, color: '#fff' }}>Правила:</Text>
+          <Text style={{ fontSize: 12, lineHeight: 1.4, color: '#ccc' }}>
             Угадайте сумму двух костей (2-12)<br/>
             Чем меньше число, тем больше множитель:<br/>
             2 = x12 | 4 = x8 | 6 = x6 | 8 = x4 | 10 = x3 | 12 = x2

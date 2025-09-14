@@ -2136,12 +2136,24 @@ router.post('/casino/slots', async (req: Request, res: Response) => {
       winAmount = Math.floor(bet_amount * multiplier);
     } else if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2]) { // Два одинаковых
       result = 'win';
-      const symbol = reels[0] === reels[1] ? reels[0] : reels[1];
+      let symbol;
+      if (reels[0] === reels[1]) {
+        symbol = reels[0];
+      } else if (reels[1] === reels[2]) {
+        symbol = reels[1];
+      } else {
+        symbol = reels[0]; // reels[0] === reels[2]
+      }
       const multiplier = getSymbolMultiplier(symbol) * 0.3;
       winAmount = Math.floor(bet_amount * multiplier);
     }
 
     const newCurrency = character.currency - bet_amount + winAmount;
+    
+    console.log(`Slots game: character_id=${character_id}, bet_amount=${bet_amount}, winAmount=${winAmount}, result=${result}`);
+    console.log(`Currency: ${character.currency} - ${bet_amount} + ${winAmount} = ${newCurrency}`);
+    console.log(`Reels: [${reels.join(', ')}]`);
+    
     await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
 
     await db.run(`

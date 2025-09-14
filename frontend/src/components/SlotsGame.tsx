@@ -93,7 +93,7 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose })
       onGameEnd({
         result: gameResult.type === 'lose' ? 'lose' : 'win',
         winAmount: gameResult.winAmount,
-        gameData: { reels: finalReels.map(symbol => SYMBOLS.indexOf(symbol) + 1) }
+        gameData: { reels: finalReels.map(symbol => SYMBOLS.indexOf(symbol)) }
       });
     }, 2000);
   };
@@ -214,11 +214,17 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose })
   };
 
   return (
-    <Card>
-      <Div>
+    <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
+      <Div style={{ backgroundColor: '#2a2a2a' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <Text weight="2" style={{ fontSize: 18 }}>🎰 Слоты 777</Text>
-          <Button size="s" onClick={onClose}>✕</Button>
+          <Text weight="2" style={{ fontSize: 18, color: '#fff' }}>🎰 Слоты 777</Text>
+          <Button 
+            size="s" 
+            onClick={onClose}
+            style={{ backgroundColor: '#444', color: '#fff' }}
+          >
+            ✕
+          </Button>
         </div>
 
         {/* Слот машина */}
@@ -283,16 +289,16 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose })
         </div>
 
         {/* Информация о ставке */}
-        <div style={{ textAlign: 'center', marginTop: 16, color: '#666' }}>
+        <div style={{ textAlign: 'center', marginTop: 16, color: '#ccc' }}>
           <Text style={{ fontSize: 14 }}>
             Ставка: {betAmount} 💰
           </Text>
         </div>
 
         {/* Правила */}
-        <div style={{ marginTop: 20, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
-          <Text weight="2" style={{ marginBottom: 8, fontSize: 14 }}>Правила:</Text>
-          <Text style={{ fontSize: 12, lineHeight: 1.4 }}>
+        <div style={{ marginTop: 20, padding: 12, backgroundColor: '#2a2a2a', borderRadius: 8, border: '1px solid #444' }}>
+          <Text weight="2" style={{ marginBottom: 8, fontSize: 14, color: '#fff' }}>Правила:</Text>
+          <Text style={{ fontSize: 12, lineHeight: 1.4, color: '#ccc' }}>
             💎💎💎 = x100 (Джекпот)<br/>
             ⭐⭐⭐ = x20 | 🔔🔔🔔 = x10 | 🍇🍇🍇 = x5<br/>
             🍊🍊🍊 = x3 | 🍋🍋🍋 = x2 | 🍒🍒🍒 = x1.5<br/>

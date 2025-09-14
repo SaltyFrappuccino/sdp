@@ -257,16 +257,22 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameEnd, on
   }
 
   return (
-    <Card>
-      <Div>
+    <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
+      <Div style={{ backgroundColor: '#2a2a2a' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <Text weight="2" style={{ fontSize: 18 }}>🃏 Блэкджек</Text>
-          <Button size="s" onClick={onClose}>✕</Button>
+          <Text weight="2" style={{ fontSize: 18, color: '#fff' }}>🃏 Блэкджек</Text>
+          <Button 
+            size="s" 
+            onClick={onClose}
+            style={{ backgroundColor: '#444', color: '#fff' }}
+          >
+            ✕
+          </Button>
         </div>
 
         {/* Карты дилера */}
         <div style={{ marginBottom: 20 }}>
-          <Text weight="2" style={{ marginBottom: 8 }}>
+          <Text weight="2" style={{ marginBottom: 8, color: '#fff' }}>
             Дилер {gameState.gameStatus === 'dealerTurn' || gameState.gameStatus === 'finished' ? 
               `(${gameState.dealerValue})` : '(?)'}
           </Text>
@@ -279,7 +285,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameEnd, on
 
         {/* Карты игрока */}
         <div style={{ marginBottom: 20 }}>
-          <Text weight="2" style={{ marginBottom: 8 }}>
+          <Text weight="2" style={{ marginBottom: 8, color: '#fff' }}>
             Ваши карты ({gameState.playerValue})
           </Text>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -348,7 +354,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameEnd, on
           </div>
         )}
 
-        <div style={{ textAlign: 'center', marginTop: 16, color: '#666' }}>
+        <div style={{ textAlign: 'center', marginTop: 16, color: '#ccc' }}>
           <Text style={{ fontSize: 14 }}>
             Ставка: {betAmount} 💰
           </Text>
