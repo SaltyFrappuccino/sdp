@@ -13,3 +13,6 @@ export { AdminActivityRequestsPanel } from './AdminActivityRequestsPanel';
 export { Handbook } from './Handbook';
 export { MarketExchangePanel } from './MarketExchangePanel';
 export { AdminMarketPanel } from './AdminMarketPanel';
+export { AdminEventsPanel } from './AdminEventsPanel';
+export { CasinoPanel } from './CasinoPanel';
+export { EventsPanel } from './EventsPanel';

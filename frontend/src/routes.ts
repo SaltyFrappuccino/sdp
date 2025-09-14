@@ -28,6 +28,9 @@ export const DEFAULT_VIEW_PANELS = {
   HANDBOOK: 'handbook',
   MARKET_EXCHANGE: 'market_exchange',
   ADMIN_MARKET: 'admin_market',
+  CASINO: 'casino',
+  EVENTS: 'events',
+  ADMIN_EVENTS: 'admin_events',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -50,6 +53,9 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.HANDBOOK, `/${DEFAULT_VIEW_PANELS.HANDBOOK}`, []),
       createPanel(DEFAULT_VIEW_PANELS.MARKET_EXCHANGE, `/${DEFAULT_VIEW_PANELS.MARKET_EXCHANGE}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_MARKET, `/${DEFAULT_VIEW_PANELS.ADMIN_MARKET}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.CASINO, `/${DEFAULT_VIEW_PANELS.CASINO}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.EVENTS, `/${DEFAULT_VIEW_PANELS.EVENTS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_EVENTS, `/${DEFAULT_VIEW_PANELS.ADMIN_EVENTS}`, []),
     ]),
   ]),
 ]);

@@ -451,6 +451,16 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
             Управление Биржей
           </Button>
         </Div>
+        <Div>
+          <Button
+            size="l"
+            stretched
+            mode="secondary"
+            onClick={() => routeNavigator.push('/admin_events')}
+          >
+            Управление Ивентами
+          </Button>
+        </Div>
       </Group>
       
       {snackbar}

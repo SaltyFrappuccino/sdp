@@ -285,6 +285,18 @@ export async function initDB() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(impacted_stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
       );
+
+      CREATE TABLE IF NOT EXISTS CasinoGames (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        game_type TEXT NOT NULL CHECK (game_type IN ('blackjack', 'slots', 'dice')),
+        bet_amount REAL NOT NULL,
+        win_amount REAL DEFAULT 0,
+        game_data TEXT DEFAULT '{}',
+        result TEXT NOT NULL CHECK (result IN ('win', 'lose', 'push')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
     `);
 
     await seedStocks(db);

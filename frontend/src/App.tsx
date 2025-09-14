@@ -3,7 +3,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { View, SplitLayout, SplitCol, ScreenSpinner, ModalRoot, ModalPage, ModalPageHeader, Div, Group, Panel } from '@vkontakte/vkui';
 import { useActiveVkuiLocation } from '@vkontakte/vk-mini-apps-router';
 
-import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, AnketaEditor, Calculator, MarketPanel, MyAnketasPanel, ActivityRequestsPanel, AdminActivityRequestsPanel, Handbook, MarketExchangePanel, AdminMarketPanel } from './panels';
+import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, AnketaEditor, Calculator, MarketPanel, MyAnketasPanel, ActivityRequestsPanel, AdminActivityRequestsPanel, Handbook, MarketExchangePanel, AdminMarketPanel, CasinoPanel, EventsPanel, AdminEventsPanel } from './panels';
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { API_URL } from './api';
 import UpdateViewer from './panels/UpdateViewer';
@@ -82,6 +82,9 @@ export const App = () => {
             <Handbook id="handbook" />
             <MarketExchangePanel id="market_exchange" fetchedUser={fetchedUser} />
             <AdminMarketPanel id="admin_market" />
+            <CasinoPanel id="casino" fetchedUser={fetchedUser} />
+            <EventsPanel id="events" fetchedUser={fetchedUser} />
+            <AdminEventsPanel id="admin_events" />
             <UpdateViewer id="update_viewer" />
           </View>
         ) : (

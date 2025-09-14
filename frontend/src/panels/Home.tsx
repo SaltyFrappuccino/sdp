@@ -45,34 +45,44 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
           </ButtonGroup>
         </Div>
         <Div>
-          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('anketa_list')}>
-            Реестр анкет
-          </Button>
+          <ButtonGroup stretched mode="horizontal">
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('anketa_list')}>
+              Реестр анкет
+            </Button>
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('calculator')}>
+              Калькулятор
+            </Button>
+          </ButtonGroup>
         </Div>
         <Div>
-          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('calculator')}>
-            Калькулятор
-          </Button>
+          <ButtonGroup stretched mode="horizontal">
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('market')}>
+              Рынок
+            </Button>
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('market_exchange')}>
+              Биржа
+            </Button>
+          </ButtonGroup>
         </Div>
         <Div>
-          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('market')}>
-            Рынок
-          </Button>
+          <ButtonGroup stretched mode="horizontal">
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('activity_requests')}>
+              Заявки на Активности
+            </Button>
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('events')}>
+              Ивенты
+            </Button>
+          </ButtonGroup>
         </Div>
         <Div>
-          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('market_exchange')}>
-            Биржа
-          </Button>
-        </Div>
-        <Div>
-          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('activity_requests')}>
-            Заявки на Активности
-          </Button>
-        </Div>
-        <Div>
-          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('handbook')}>
-            Справочник
-          </Button>
+          <ButtonGroup stretched mode="horizontal">
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('handbook')}>
+              Справочник
+            </Button>
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('casino')}>
+              Казино
+            </Button>
+          </ButtonGroup>
         </Div>
         <Div>
           <Button stretched size="l" mode="tertiary" onClick={() => routeNavigator.push('admin_login')}>

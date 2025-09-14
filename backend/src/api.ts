@@ -1925,7 +1925,7 @@ router.get('/market/leaderboard', async (req: Request, res: Response) => {
       LEFT JOIN PortfolioAssets pa ON p.id = pa.portfolio_id
       LEFT JOIN Stocks s ON pa.stock_id = s.id
       WHERE c.status = 'Принято'
-      GROUP BY c.id, c.character_name
+      GROUP BY c.id, c.character_name, c.currency
       ORDER BY total_value DESC
       LIMIT 20
     `);
@@ -1939,6 +1939,229 @@ router.get('/market/leaderboard', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to fetch leaderboard:', error);
     res.status(500).json({ error: 'Не удалось получить рейтинг трейдеров' });
+  }
+});
+
+// ==================== CASINO API ====================
+
+// POST /api/casino/blackjack - Играть в блэкджек
+router.post('/casino/blackjack', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < bet_amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Простая реализация блэкджека
+    const playerCards = [Math.floor(Math.random() * 13) + 1, Math.floor(Math.random() * 13) + 1];
+    const dealerCards = [Math.floor(Math.random() * 13) + 1, Math.floor(Math.random() * 13) + 1];
+
+    const getCardValue = (card: number) => Math.min(card, 10);
+    const getHandValue = (cards: number[]) => {
+      let value = cards.reduce((sum, card) => sum + getCardValue(card), 0);
+      const aces = cards.filter(card => card === 1).length;
+      for (let i = 0; i < aces && value + 10 <= 21; i++) {
+        value += 10;
+      }
+      return value;
+    };
+
+    const playerValue = getHandValue(playerCards);
+    const dealerValue = getHandValue(dealerCards);
+
+    let result = 'lose';
+    let winAmount = 0;
+
+    if (playerValue === 21 && dealerValue !== 21) {
+      result = 'win';
+      winAmount = bet_amount * 2.5; // Блэкджек
+    } else if (playerValue > 21) {
+      result = 'lose';
+    } else if (dealerValue > 21) {
+      result = 'win';
+      winAmount = bet_amount * 2;
+    } else if (playerValue > dealerValue) {
+      result = 'win';
+      winAmount = bet_amount * 2;
+    } else if (playerValue === dealerValue) {
+      result = 'push';
+      winAmount = bet_amount;
+    }
+
+    const newCurrency = character.currency - bet_amount + winAmount;
+    await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
+
+    await db.run(`
+      INSERT INTO CasinoGames (character_id, game_type, bet_amount, win_amount, game_data, result)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [character_id, 'blackjack', bet_amount, winAmount, JSON.stringify({ playerCards, dealerCards, playerValue, dealerValue }), result]);
+
+    res.json({
+      result,
+      winAmount,
+      newCurrency,
+      gameData: { playerCards, dealerCards, playerValue, dealerValue }
+    });
+  } catch (error) {
+    console.error('Blackjack game failed:', error);
+    res.status(500).json({ error: 'Не удалось сыграть в блэкджек' });
+  }
+});
+
+// POST /api/casino/slots - Играть в слоты
+router.post('/casino/slots', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < bet_amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Генерируем 3 символа
+    const symbols = [1, 2, 3, 4, 5, 6, 7];
+    const reels = [
+      symbols[Math.floor(Math.random() * symbols.length)],
+      symbols[Math.floor(Math.random() * symbols.length)],
+      symbols[Math.floor(Math.random() * symbols.length)]
+    ];
+
+    let result = 'lose';
+    let winAmount = 0;
+
+    // Проверяем выигрышные комбинации
+    if (reels[0] === 7 && reels[1] === 7 && reels[2] === 7) {
+      result = 'win';
+      winAmount = bet_amount * 100; // Джекпот
+    } else if (reels[0] === reels[1] && reels[1] === reels[2]) {
+      result = 'win';
+      winAmount = bet_amount * 10; // Три одинаковых
+    } else if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2]) {
+      result = 'win';
+      winAmount = bet_amount * 2; // Два одинаковых
+    }
+
+    const newCurrency = character.currency - bet_amount + winAmount;
+    await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
+
+    await db.run(`
+      INSERT INTO CasinoGames (character_id, game_type, bet_amount, win_amount, game_data, result)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [character_id, 'slots', bet_amount, winAmount, JSON.stringify({ reels }), result]);
+
+    res.json({
+      result,
+      winAmount,
+      newCurrency,
+      gameData: { reels }
+    });
+  } catch (error) {
+    console.error('Slots game failed:', error);
+    res.status(500).json({ error: 'Не удалось сыграть в слоты' });
+  }
+});
+
+// POST /api/casino/dice - Играть в кости
+router.post('/casino/dice', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount, prediction } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0 || !prediction) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    if (prediction < 1 || prediction > 6) {
+      return res.status(400).json({ error: 'Предсказание должно быть от 1 до 6' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < bet_amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    const dice1 = Math.floor(Math.random() * 6) + 1;
+    const dice2 = Math.floor(Math.random() * 6) + 1;
+    const total = dice1 + dice2;
+
+    let result = 'lose';
+    let winAmount = 0;
+
+    // Простая логика: если сумма костей равна предсказанию * 2, то выигрыш
+    if (total === prediction * 2) {
+      result = 'win';
+      winAmount = bet_amount * 6; // Высокий множитель за точное попадание
+    } else if (Math.abs(total - prediction * 2) <= 1) {
+      result = 'win';
+      winAmount = bet_amount * 2; // Частичный выигрыш
+    }
+
+    const newCurrency = character.currency - bet_amount + winAmount;
+    await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
+
+    await db.run(`
+      INSERT INTO CasinoGames (character_id, game_type, bet_amount, win_amount, game_data, result)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [character_id, 'dice', bet_amount, winAmount, JSON.stringify({ dice1, dice2, total, prediction }), result]);
+
+    res.json({
+      result,
+      winAmount,
+      newCurrency,
+      gameData: { dice1, dice2, total, prediction }
+    });
+  } catch (error) {
+    console.error('Dice game failed:', error);
+    res.status(500).json({ error: 'Не удалось сыграть в кости' });
+  }
+});
+
+// GET /api/casino/history/:character_id - Получить историю игр
+router.get('/casino/history/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+
+    const history = await db.all(`
+      SELECT * FROM CasinoGames 
+      WHERE character_id = ? 
+      ORDER BY created_at DESC 
+      LIMIT 50
+    `, [character_id]);
+
+    const historyWithParsedData = history.map(game => ({
+      ...game,
+      game_data: JSON.parse(game.game_data || '{}')
+    }));
+
+    res.json(historyWithParsedData);
+  } catch (error) {
+    console.error('Failed to fetch casino history:', error);
+    res.status(500).json({ error: 'Не удалось получить историю игр' });
   }
 });
 
