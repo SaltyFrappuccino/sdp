@@ -4,8 +4,7 @@ import {
   ModalRoot, ModalPage, ModalPageHeader, FormItem
 } from '@vkontakte/vkui';
 import { Icon28CalendarOutline, Icon28UsersOutline } from '@vkontakte/icons';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+import { API_URL } from '../api';
 
 interface NavIdProps {
   id: string;
