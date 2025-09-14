@@ -282,46 +282,44 @@ export async function initDB() {
       );
     `);
 
-    // Миграция для CasinoGames - добавляем недостающие колонки
+    // Миграция для CasinoGames - проверяем и пересоздаем таблицу если нужно
     try {
-      await db.exec('ALTER TABLE CasinoGames ADD COLUMN game_type TEXT');
-    } catch (error) {
-      // Игнорируем ошибку, если колонка уже существует
-      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
-        console.log('CasinoGames game_type column already exists or error:', error);
+      // Проверяем есть ли колонка game_type
+      const tableInfo = await db.all("PRAGMA table_info(CasinoGames)");
+      const hasGameType = tableInfo.some((col: any) => col.name === 'game_type');
+      
+      if (!hasGameType) {
+        console.log('CasinoGames table missing game_type column, recreating table...');
+        
+        // Создаем временную таблицу с правильной схемой
+        await db.exec(`
+          CREATE TABLE IF NOT EXISTS CasinoGames_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            character_id INTEGER NOT NULL,
+            game_type TEXT NOT NULL CHECK (game_type IN ('blackjack', 'slots', 'dice')),
+            bet_amount REAL NOT NULL,
+            win_amount REAL DEFAULT 0,
+            game_data TEXT DEFAULT '{}',
+            result TEXT NOT NULL CHECK (result IN ('win', 'lose', 'push')),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+          );
+        `);
+        
+        // Копируем данные из старой таблицы (если есть)
+        await db.exec(`
+          INSERT INTO CasinoGames_new (id, character_id, created_at)
+          SELECT id, character_id, created_at FROM CasinoGames;
+        `);
+        
+        // Удаляем старую таблицу и переименовываем новую
+        await db.exec('DROP TABLE IF EXISTS CasinoGames;');
+        await db.exec('ALTER TABLE CasinoGames_new RENAME TO CasinoGames;');
+        
+        console.log('CasinoGames table recreated successfully');
       }
-    }
-
-    try {
-      await db.exec('ALTER TABLE CasinoGames ADD COLUMN bet_amount REAL');
     } catch (error) {
-      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
-        console.log('CasinoGames bet_amount column already exists or error:', error);
-      }
-    }
-
-    try {
-      await db.exec('ALTER TABLE CasinoGames ADD COLUMN win_amount REAL DEFAULT 0');
-    } catch (error) {
-      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
-        console.log('CasinoGames win_amount column already exists or error:', error);
-      }
-    }
-
-    try {
-      await db.exec('ALTER TABLE CasinoGames ADD COLUMN game_data TEXT DEFAULT "{}"');
-    } catch (error) {
-      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
-        console.log('CasinoGames game_data column already exists or error:', error);
-      }
-    }
-
-    try {
-      await db.exec('ALTER TABLE CasinoGames ADD COLUMN result TEXT');
-    } catch (error) {
-      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
-        console.log('CasinoGames result column already exists or error:', error);
-      }
+      console.error('Error migrating CasinoGames table:', error);
     }
 
     await seedStocks(db);
