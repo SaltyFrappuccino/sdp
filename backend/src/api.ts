@@ -1967,10 +1967,10 @@ router.get('/market/leaderboard', async (req: Request, res: Response) => {
 // POST /api/casino/blackjack - Сохранить результат игры в блэкджек
 router.post('/casino/blackjack', async (req: Request, res: Response) => {
   try {
-    const { character_id, bet_amount, game_result, win_amount, game_data } = req.body;
+    const { character_id, bet_amount, result, winAmount, gameData } = req.body;
     const db = await initDB();
 
-    if (!character_id || !bet_amount || bet_amount <= 0 || !game_result || win_amount === undefined) {
+    if (!character_id || !bet_amount || bet_amount <= 0 || !result || winAmount === undefined) {
       return res.status(400).json({ error: 'Неверные параметры' });
     }
 
@@ -1983,20 +1983,20 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Недостаточно средств' });
     }
 
-    const newCurrency = character.currency - bet_amount + win_amount;
+    const newCurrency = character.currency - bet_amount + winAmount;
     
     await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
 
     await db.run(`
       INSERT INTO CasinoGames (character_id, game_type, bet_amount, win_amount, game_data, result)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [character_id, 'blackjack', bet_amount, win_amount, JSON.stringify(game_data), game_result]);
+    `, [character_id, 'blackjack', bet_amount, winAmount, JSON.stringify(gameData), result]);
 
     res.json({
-      result: game_result,
-      winAmount: win_amount,
+      result: result,
+      winAmount: winAmount,
       newCurrency,
-      gameData: game_data
+      gameData: gameData
     });
   } catch (error) {
     console.error('Blackjack game failed:', error);
@@ -2007,10 +2007,10 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
 // POST /api/casino/slots - Сохранить результат игры в слоты
 router.post('/casino/slots', async (req: Request, res: Response) => {
   try {
-    const { character_id, bet_amount, game_result, win_amount, game_data } = req.body;
+    const { character_id, bet_amount, result, winAmount, gameData } = req.body;
     const db = await initDB();
 
-    if (!character_id || !bet_amount || bet_amount <= 0 || !game_result || win_amount === undefined) {
+    if (!character_id || !bet_amount || bet_amount <= 0 || !result || winAmount === undefined) {
       return res.status(400).json({ error: 'Неверные параметры' });
     }
 
@@ -2023,20 +2023,20 @@ router.post('/casino/slots', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Недостаточно средств' });
     }
 
-    const newCurrency = character.currency - bet_amount + win_amount;
+    const newCurrency = character.currency - bet_amount + winAmount;
     
     await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
 
     await db.run(`
       INSERT INTO CasinoGames (character_id, game_type, bet_amount, win_amount, game_data, result)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [character_id, 'slots', bet_amount, win_amount, JSON.stringify(game_data), game_result]);
+    `, [character_id, 'slots', bet_amount, winAmount, JSON.stringify(gameData), result]);
 
     res.json({
-      result: game_result,
-      winAmount: win_amount,
+      result: result,
+      winAmount: winAmount,
       newCurrency,
-      gameData: game_data
+      gameData: gameData
     });
   } catch (error) {
     console.error('Slots game failed:', error);
@@ -2047,10 +2047,10 @@ router.post('/casino/slots', async (req: Request, res: Response) => {
 // POST /api/casino/dice - Сохранить результат игры в кости
 router.post('/casino/dice', async (req: Request, res: Response) => {
   try {
-    const { character_id, bet_amount, game_result, win_amount, game_data } = req.body;
+    const { character_id, bet_amount, result, winAmount, gameData } = req.body;
     const db = await initDB();
 
-    if (!character_id || !bet_amount || bet_amount <= 0 || !game_result || win_amount === undefined) {
+    if (!character_id || !bet_amount || bet_amount <= 0 || !result || winAmount === undefined) {
       return res.status(400).json({ error: 'Неверные параметры' });
     }
 
@@ -2063,20 +2063,20 @@ router.post('/casino/dice', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Недостаточно средств' });
     }
 
-    const newCurrency = character.currency - bet_amount + win_amount;
+    const newCurrency = character.currency - bet_amount + winAmount;
     
     await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
 
     await db.run(`
       INSERT INTO CasinoGames (character_id, game_type, bet_amount, win_amount, game_data, result)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [character_id, 'dice', bet_amount, win_amount, JSON.stringify(game_data), game_result]);
+    `, [character_id, 'dice', bet_amount, winAmount, JSON.stringify(gameData), result]);
 
     res.json({
-      result: game_result,
-      winAmount: win_amount,
+      result: result,
+      winAmount: winAmount,
       newCurrency,
-      gameData: game_data
+      gameData: gameData
     });
   } catch (error) {
     console.error('Dice game failed:', error);

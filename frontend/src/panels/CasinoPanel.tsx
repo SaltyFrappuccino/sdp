@@ -99,9 +99,9 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
         body: JSON.stringify({
           character_id: selectedCharacter,
           bet_amount: parseInt(betAmount),
-          game_result: result.result,
-          win_amount: result.winAmount,
-          game_data: result.gameData,
+          result: result.result,
+          winAmount: result.winAmount,
+          gameData: result.gameData,
           ...(gameType === 'dice' && { prediction: dicePrediction })
         })
       });
