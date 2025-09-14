@@ -149,7 +149,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameEnd, on
     
     setTimeout(() => {
       setAnimating(false);
-      if (newGameStatus === 'playerBust' || newGameStatus === 'finished') {
+      if (newGameStatus === 'playerBust') {
         setTimeout(() => {
           onGameEnd({ result, winAmount, gameData: { playerCards: newPlayerCards, dealerCards: gameState.dealerCards, playerValue: newPlayerValue, dealerValue: gameState.dealerValue } });
         }, 1000);

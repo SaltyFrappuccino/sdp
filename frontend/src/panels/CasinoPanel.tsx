@@ -91,7 +91,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     setActiveModal('dice');
   };
 
-  const handleGameEnd = async (gameType: string, _result: any) => {
+  const handleGameEnd = async (gameType: string, result: any) => {
     try {
       const response = await fetch(`${API_URL}/casino/${gameType}`, {
         method: 'POST',
@@ -99,20 +99,23 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
         body: JSON.stringify({
           character_id: selectedCharacter,
           bet_amount: parseInt(betAmount),
+          game_result: result.result,
+          win_amount: result.winAmount,
+          game_data: result.gameData,
           ...(gameType === 'dice' && { prediction: dicePrediction })
         })
       });
 
       if (response.ok) {
-        const backendResult = await response.json();
+        await response.json(); // Получаем ответ, но не используем
         await fetchCharacters(); // Обновляем валюту
         await fetchGameHistory(selectedCharacter!); // Обновляем историю
-        const netChange = backendResult.winAmount - parseInt(betAmount);
+        const netChange = result.winAmount - parseInt(betAmount);
         showResultSnackbar(
-          backendResult.result === 'win' ? `Выигрыш! +${netChange} 💰 (чистый)` :
-          backendResult.result === 'push' ? `Ничья! 0 💰 (возврат ставки)` :
+          result.result === 'win' ? `Выигрыш! +${netChange} 💰 (чистый)` :
+          result.result === 'push' ? `Ничья! 0 💰 (возврат ставки)` :
           `Проигрыш! -${parseInt(betAmount)} 💸`, 
-          backendResult.result !== 'lose'
+          result.result !== 'lose'
         );
       } else {
         const errorData = await response.json();
