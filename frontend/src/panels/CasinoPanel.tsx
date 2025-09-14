@@ -107,10 +107,11 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
         const backendResult = await response.json();
         await fetchCharacters(); // Обновляем валюту
         await fetchGameHistory(selectedCharacter!); // Обновляем историю
+        const netChange = backendResult.winAmount - parseInt(betAmount);
         showResultSnackbar(
-          backendResult.result === 'win' ? `Выигрыш! +${backendResult.winAmount} 💰` :
-          backendResult.result === 'push' ? `Ничья! Возврат ${backendResult.winAmount} 💰` :
-          `Проигрыш! -${betAmount} 💸`, 
+          backendResult.result === 'win' ? `Выигрыш! +${netChange} 💰 (чистый)` :
+          backendResult.result === 'push' ? `Ничья! 0 💰 (возврат ставки)` :
+          `Проигрыш! -${parseInt(betAmount)} 💸`, 
           backendResult.result !== 'lose'
         );
       } else {

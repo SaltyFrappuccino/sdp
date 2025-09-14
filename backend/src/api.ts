@@ -2049,6 +2049,11 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
     }
 
     const newCurrency = character.currency - bet_amount + winAmount;
+    
+    console.log(`Blackjack game: character_id=${character_id}, bet_amount=${bet_amount}, winAmount=${winAmount}, result=${result}`);
+    console.log(`Player: ${playerValue}, Dealer: ${dealerValue}`);
+    console.log(`Currency: ${character.currency} - ${bet_amount} + ${winAmount} = ${newCurrency}`);
+    
     await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
 
     await db.run(`
