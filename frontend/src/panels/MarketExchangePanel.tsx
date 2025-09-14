@@ -1,8 +1,32 @@
 import { FC, useState, useEffect } from 'react';
-import { Panel, PanelHeader, Header, Group, Div, Select, CardGrid, Card, Text, Button, Spinner, ScreenSpinner, ButtonGroup, Snackbar, ModalRoot, ModalPage, ModalPageHeader, FormItem, Input, Cell, Avatar, Popover, SimpleCell, PanelHeaderBack } from '@vkontakte/vkui';
+import {
+  Panel,
+  PanelHeader,
+  Group,
+  SimpleCell,
+  CardGrid,
+  Card,
+  Header,
+  Text,
+  Spinner,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader,
+  FormItem,
+  Input,
+  Button,
+  Select,
+  Avatar,
+  Tooltip,
+  PanelHeaderBack,
+  Div,
+  ButtonGroup,
+  ScreenSpinner,
+  Snackbar,
+} from '@vkontakte/vkui';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Icon24CheckCircleOutline, Icon24ErrorCircle } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 
@@ -57,6 +81,7 @@ interface LeaderboardAsset {
   ticker: string;
   quantity: number;
   value: number;
+  average_purchase_price: number;
 }
 
 interface LeaderboardEntry {
@@ -81,6 +106,7 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
   const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
   const [marketEvents, setMarketEvents] = useState<MarketEvent[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [hoveredCharacterId, setHoveredCharacterId] = useState<number | null>(null);
 
   const groupedStocks = stocks.reduce((acc, stock) => {
     (acc[stock.exchange] = acc[stock.exchange] || []).push(stock);
@@ -218,6 +244,8 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
     return <Panel id={id}><PanelHeader>Биржа</PanelHeader><Spinner/></Panel>;
   }
 
+  const hoveredCharacter = hoveredCharacterId ? leaderboard.find(c => c.character_id === hoveredCharacterId) : null;
+
   return (
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>Биржа</PanelHeader>
@@ -241,39 +269,24 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
       {leaderboard.length > 0 && (
         <Group header={<Header>Рейтинг Трейдеров</Header>}>
           {leaderboard.map((entry, index) => (
-            <Popover
+            <Tooltip
               key={entry.character_id}
-              trigger="hover"
-              placement="left-start"
-              content={
-                <Div style={{ minWidth: 200, maxWidth: 300 }}>
-                  <SimpleCell disabled>
-                    <Header>Портфель</Header>
-                  </SimpleCell>
-                  <SimpleCell disabled after={`${entry.cash_balance.toLocaleString('ru-RU')} ₭`}>
-                    Наличные
-                  </SimpleCell>
-                  
-                  {entry.assets && entry.assets.length > 0 && entry.assets.map(asset => (
-                    <SimpleCell 
-                      key={asset.ticker}
-                      disabled 
-                      subtitle={`${asset.quantity} шт.`}
-                      after={`${asset.value.toLocaleString('ru-RU')} ₭`}
-                    >
-                      {asset.name}
-                    </SimpleCell>
-                  ))}
-                </Div>
-              }
+              shown={hoveredCharacterId === entry.character_id}
+              placement="right"
+              content={hoveredCharacter ? `Портфолио: ${hoveredCharacter.character_name}` : ""}
             >
-              <Cell
-                before={<Avatar size={28}>{index + 1}</Avatar>}
-                subtitle={`${entry.total_value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`}
+              <div
+                onMouseEnter={() => setHoveredCharacterId(entry.character_id)}
+                onMouseLeave={() => setHoveredCharacterId(null)}
               >
-                {entry.character_name}
-              </Cell>
-            </Popover>
+                <SimpleCell
+                  before={<Avatar size={28}>{index + 1}</Avatar>}
+                  subtitle={`${entry.total_value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`}
+                >
+                  {entry.character_name}
+                </SimpleCell>
+              </div>
+            </Tooltip>
           ))}
         </Group>
       )}
@@ -322,7 +335,7 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                                <AreaChart data={stock.history.slice().reverse()} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                                 <XAxis dataKey="timestamp" hide />
                                 <YAxis domain={['dataMin', 'dataMax']} hide />
-                                <Tooltip
+                                <RechartsTooltip
                                   formatter={(value: any) => {
                                     if (typeof value === 'number') {
                                       return [`${value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`, "Цена"];

@@ -1737,7 +1737,7 @@ router.get('/market/portfolio/:character_id', async (req: Request, res: Response
       FROM PortfolioAssets pa
       JOIN Stocks s ON pa.stock_id = s.id
       WHERE pa.portfolio_id = ?
-    `, [portfolio.id]);
+    `, [portfolio.id])
 
     res.json({ ...portfolio, assets });
   } catch (error) {
@@ -1903,27 +1903,29 @@ router.get('/market/leaderboard', async (req: Request, res: Response) => {
       SELECT
         c.id as character_id,
         c.character_name,
-        p.cash_balance,
-        (p.cash_balance + IFNULL(SUM(pa.quantity * s.current_price), 0)) as total_value,
+        c.currency as cash_balance,
+        (IFNULL(c.currency, 0) + IFNULL(SUM(pa.quantity * s.current_price), 0)) as total_value,
         (
           SELECT json_group_array(
               json_object(
                   'name', s_inner.name,
                   'ticker', s_inner.ticker_symbol,
                   'quantity', pa_inner.quantity,
-                  'value', pa_inner.quantity * s_inner.current_price
+                  'value', pa_inner.quantity * s_inner.current_price,
+                  'average_purchase_price', pa_inner.average_purchase_price
               )
           )
           FROM PortfolioAssets pa_inner
           JOIN Stocks s_inner ON pa_inner.stock_id = s_inner.id
-          WHERE pa_inner.portfolio_id = p.id
+          LEFT JOIN Portfolios p_inner ON pa_inner.portfolio_id = p_inner.id
+          WHERE p_inner.character_id = c.id
         ) as assets
       FROM Characters c
-      JOIN Portfolios p ON c.id = p.character_id
+      LEFT JOIN Portfolios p ON c.id = p.character_id
       LEFT JOIN PortfolioAssets pa ON p.id = pa.portfolio_id
       LEFT JOIN Stocks s ON pa.stock_id = s.id
       WHERE c.status = 'Принято'
-      GROUP BY c.id, c.character_name, p.id
+      GROUP BY c.id, c.character_name
       ORDER BY total_value DESC
       LIMIT 20
     `);
