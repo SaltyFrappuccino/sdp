@@ -1722,14 +1722,21 @@ router.get('/market/portfolio/:character_id', async (req: Request, res: Response
     const db = await initDB();
     
     let portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
+    const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+    
     if (!portfolio) {
       // Создаем портфолио, если его нет
-      const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
-      if (!character) {
-        return res.status(404).json({ error: 'Персонаж не найден' });
-      }
       const result = await db.run('INSERT INTO Portfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, character.currency || 0]);
       portfolio = { id: result.lastID, character_id, cash_balance: character.currency || 0 };
+    } else {
+      // Синхронизируем валюту с персонажем
+      if (portfolio.cash_balance !== character.currency) {
+        await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [character.currency || 0, portfolio.id]);
+        portfolio.cash_balance = character.currency || 0;
+      }
     }
 
     const assets = await db.all(`
@@ -1762,23 +1769,36 @@ router.post('/market/trade', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Акция не найдена' });
     }
 
-    const portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
-    if (!portfolio) {
+    let portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
+    const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
       await db.run('ROLLBACK');
-      return res.status(404).json({ error: 'Портфолио не найдено' });
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+    
+    if (!portfolio) {
+      // Создаем портфолио, если его нет
+      const result = await db.run('INSERT INTO Portfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, character.currency || 0]);
+      portfolio = { id: result.lastID, character_id, cash_balance: character.currency || 0 };
+    } else {
+      // Синхронизируем валюту с персонажем
+      if (portfolio.cash_balance !== character.currency) {
+        await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [character.currency || 0, portfolio.id]);
+        portfolio.cash_balance = character.currency || 0;
+      }
     }
 
     const total_cost = stock.current_price * quantity;
 
     if (trade_type === 'buy') {
-      if (portfolio.cash_balance < total_cost) {
+      if (character.currency < total_cost) {
         await db.run('ROLLBACK');
         return res.status(400).json({ error: 'Недостаточно средств' });
       }
 
-      const new_balance = portfolio.cash_balance - total_cost;
-      await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [new_balance, portfolio.id]);
+      const new_balance = character.currency - total_cost;
       await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [new_balance, character_id]);
+      await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [new_balance, portfolio.id]);
 
       const existing_asset = await db.get('SELECT * FROM PortfolioAssets WHERE portfolio_id = ? AND stock_id = ?', [portfolio.id, stock.id]);
       if (existing_asset) {
@@ -1796,9 +1816,9 @@ router.post('/market/trade', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Недостаточно акций для продажи' });
       }
 
-      const new_balance = portfolio.cash_balance + total_cost;
-      await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [new_balance, portfolio.id]);
+      const new_balance = character.currency + total_cost;
       await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [new_balance, character_id]);
+      await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [new_balance, portfolio.id]);
 
       const new_quantity = existing_asset.quantity - quantity;
       if (new_quantity > 0) {
