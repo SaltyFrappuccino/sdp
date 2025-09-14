@@ -282,6 +282,48 @@ export async function initDB() {
       );
     `);
 
+    // Миграция для CasinoGames - добавляем недостающие колонки
+    try {
+      await db.exec('ALTER TABLE CasinoGames ADD COLUMN game_type TEXT');
+    } catch (error) {
+      // Игнорируем ошибку, если колонка уже существует
+      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
+        console.log('CasinoGames game_type column already exists or error:', error);
+      }
+    }
+
+    try {
+      await db.exec('ALTER TABLE CasinoGames ADD COLUMN bet_amount REAL');
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
+        console.log('CasinoGames bet_amount column already exists or error:', error);
+      }
+    }
+
+    try {
+      await db.exec('ALTER TABLE CasinoGames ADD COLUMN win_amount REAL DEFAULT 0');
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
+        console.log('CasinoGames win_amount column already exists or error:', error);
+      }
+    }
+
+    try {
+      await db.exec('ALTER TABLE CasinoGames ADD COLUMN game_data TEXT DEFAULT "{}"');
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
+        console.log('CasinoGames game_data column already exists or error:', error);
+      }
+    }
+
+    try {
+      await db.exec('ALTER TABLE CasinoGames ADD COLUMN result TEXT');
+    } catch (error) {
+      if (!(error instanceof Error && error.message.includes('duplicate column name'))) {
+        console.log('CasinoGames result column already exists or error:', error);
+      }
+    }
+
     await seedStocks(db);
 
     return db;
