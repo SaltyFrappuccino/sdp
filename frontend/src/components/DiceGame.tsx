@@ -5,6 +5,7 @@ import { Icon28Dice1Outline } from '@vkontakte/icons';
 interface DiceGameProps {
   characterId: number;
   betAmount: number;
+  onGameStart: () => void;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -23,7 +24,7 @@ const DICE_FACES = [
   ['🎲', '🎲', '🎲', '🎲', '🎲', '🎲']  // Альтернативные символы
 ];
 
-export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameEnd, onClose }) => {
+export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameStart, onGameEnd, onClose }) => {
   const [prediction, setPrediction] = useState<number>(1);
   const [isRolling, setIsRolling] = useState(false);
   const [diceValues, setDiceValues] = useState<{ dice1: number; dice2: number }>({ dice1: 1, dice2: 1 });
@@ -33,6 +34,9 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameEnd, onClose }) =
 
   const rollDice = async () => {
     if (isRolling) return;
+    
+    // Списываем ставку в начале игры
+    onGameStart();
     
     setIsRolling(true);
     setResult(null);
@@ -87,14 +91,14 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameEnd, onClose }) =
   };
 
   const getMultiplier = (pred: number): number => {
-    // Чем меньше число, тем больше множитель
+    // Чем меньше число, тем больше множитель (но сделали менее выгодным)
     switch (pred) {
-      case 1: return 12; // 2 - очень редко
-      case 2: return 8;  // 4
-      case 3: return 6;  // 6
-      case 4: return 4;  // 8
-      case 5: return 3;  // 10
-      case 6: return 2;  // 12 - часто
+      case 1: return 8;  // уменьшили с 12 до 8 (сумма 2 - очень редко)
+      case 2: return 6;  // уменьшили с 8 до 6 (сумма 4)
+      case 3: return 4;  // уменьшили с 6 до 4 (сумма 6)
+      case 4: return 3;  // уменьшили с 4 до 3 (сумма 8)
+      case 5: return 2;  // уменьшили с 3 до 2 (сумма 10)
+      case 6: return 1.5; // уменьшили с 2 до 1.5 (сумма 12 - часто)
       default: return 1;
     }
   };
@@ -276,7 +280,7 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameEnd, onClose }) =
           <Text style={{ fontSize: 12, lineHeight: 1.4, color: '#ccc' }}>
             Угадайте сумму двух костей (2-12)<br/>
             Чем меньше число, тем больше множитель:<br/>
-            2 = x12 | 4 = x8 | 6 = x6 | 8 = x4 | 10 = x3 | 12 = x2
+            2 = x8 | 4 = x6 | 6 = x4 | 8 = x3 | 10 = x2 | 12 = x1.5
           </Text>
         </div>
       </Div>

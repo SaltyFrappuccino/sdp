@@ -5,6 +5,7 @@ import { Icon28GameOutline } from '@vkontakte/icons';
 interface SlotsGameProps {
   characterId: number;
   betAmount: number;
+  onGameStart: () => void;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -15,9 +16,9 @@ interface SlotReel {
 }
 
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '⭐', '💎'];
-const SYMBOL_WEIGHTS = [30, 25, 20, 15, 8, 1.5, 0.5]; // Веса для символов (чем меньше, тем реже)
+const SYMBOL_WEIGHTS = [40, 30, 20, 10, 5, 1, 0.2]; // Веса для символов (сделали менее выгодными)
 
-export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose }) => {
+export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameStart, onGameEnd, onClose }) => {
   const [reels, setReels] = useState<SlotReel[]>([]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<{ type: 'win' | 'lose' | 'jackpot'; winAmount: number; message: string } | null>(null);
@@ -57,6 +58,9 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose })
 
   const spin = async () => {
     if (isSpinning) return;
+    
+    // Списываем ставку в начале игры
+    onGameStart();
     
     setIsSpinning(true);
     setResult(null);
@@ -105,7 +109,7 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose })
     if (reel1 === '💎' && reel2 === '💎' && reel3 === '💎') {
       return {
         type: 'jackpot',
-        winAmount: betAmount * 100,
+        winAmount: betAmount * 50, // уменьшили с 100 до 50
         message: '🎰 ДЖЕКПОТ! Три алмаза! 🎰'
       };
     }
@@ -123,7 +127,7 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose })
     // Два одинаковых символа
     if (reel1 === reel2 || reel2 === reel3 || reel1 === reel3) {
       const symbol = reel1 === reel2 ? reel1 : reel2;
-      const multiplier = getSymbolMultiplier(symbol) * 0.3;
+      const multiplier = getSymbolMultiplier(symbol) * 0.2; // уменьшили с 0.3 до 0.2
       return {
         type: 'win',
         winAmount: Math.floor(betAmount * multiplier),
@@ -140,13 +144,13 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose })
 
   const getSymbolMultiplier = (symbol: string): number => {
     switch (symbol) {
-      case '💎': return 50;
-      case '⭐': return 20;
-      case '🔔': return 10;
-      case '🍇': return 5;
-      case '🍊': return 3;
-      case '🍋': return 2;
-      case '🍒': return 1.5;
+      case '💎': return 25; // уменьшили с 50 до 25
+      case '⭐': return 10; // уменьшили с 20 до 10
+      case '🔔': return 5;  // уменьшили с 10 до 5
+      case '🍇': return 3;  // уменьшили с 5 до 3
+      case '🍊': return 2;  // уменьшили с 3 до 2
+      case '🍋': return 1.5; // уменьшили с 2 до 1.5
+      case '🍒': return 1.2; // уменьшили с 1.5 до 1.2
       default: return 1;
     }
   };
@@ -299,10 +303,10 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameEnd, onClose })
         <div style={{ marginTop: 20, padding: 12, backgroundColor: '#2a2a2a', borderRadius: 8, border: '1px solid #444' }}>
           <Text weight="2" style={{ marginBottom: 8, fontSize: 14, color: '#fff' }}>Правила:</Text>
           <Text style={{ fontSize: 12, lineHeight: 1.4, color: '#ccc' }}>
-            💎💎💎 = x100 (Джекпот)<br/>
-            ⭐⭐⭐ = x20 | 🔔🔔🔔 = x10 | 🍇🍇🍇 = x5<br/>
-            🍊🍊🍊 = x3 | 🍋🍋🍋 = x2 | 🍒🍒🍒 = x1.5<br/>
-            Два одинаковых = x0.3 от полного множителя
+            💎💎💎 = x50 (Джекпот)<br/>
+            ⭐⭐⭐ = x10 | 🔔🔔🔔 = x5 | 🍇🍇🍇 = x3<br/>
+            🍊🍊🍊 = x2 | 🍋🍋🍋 = x1.5 | 🍒🍒🍒 = x1.2<br/>
+            Два одинаковых = x0.2 от полного множителя
           </Text>
         </div>
       </Div>

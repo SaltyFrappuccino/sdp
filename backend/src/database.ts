@@ -168,39 +168,63 @@ export async function initDB() {
       );
     `);
 
+    // Пересоздаем таблицы для новой системы ивентов
+    await db.exec(`DROP TABLE IF EXISTS EventParticipants`);
+    await db.exec(`DROP TABLE IF EXISTS Events`);
+    
     await db.exec(`
-      CREATE TABLE IF NOT EXISTS Events (
+      CREATE TABLE Events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        registration_instructions TEXT NOT NULL,
-        status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'closed', 'completed', 'cancelled')),
+        estimated_start_date DATETIME NOT NULL,
+        registration_end_date DATETIME,
         min_rank TEXT,
         max_rank TEXT,
-        max_participants INTEGER,
-        start_date DATETIME,
-        end_date DATETIME,
-        registration_deadline DATETIME,
-        organizer_vk_id INTEGER NOT NULL,
-        organizer_name TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     await db.exec(`
-      CREATE TABLE IF NOT EXISTS EventParticipants (
+      CREATE TABLE EventParticipants (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_id INTEGER NOT NULL,
         character_id INTEGER NOT NULL,
         vk_id INTEGER NOT NULL,
-        character_name TEXT NOT NULL,
-        character_rank TEXT NOT NULL,
-        faction TEXT NOT NULL,
-        registration_text TEXT NOT NULL,
-        status TEXT DEFAULT 'registered' CHECK (status IN ('registered', 'withdrawn')),
-        registered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(event_id) REFERENCES Events(id) ON DELETE CASCADE,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS EventBets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        bet_text TEXT NOT NULL,
+        status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed', 'settled')),
+        result TEXT CHECK (result IN ('believers_win', 'unbelievers_win')),
+        believers_total_pool REAL DEFAULT 0,
+        unbelievers_total_pool REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        closed_at DATETIME,
+        settled_at DATETIME,
+        FOREIGN KEY(event_id) REFERENCES Events(id) ON DELETE CASCADE
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS EventBetPlacements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bet_id INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        vk_id INTEGER NOT NULL,
+        bet_type TEXT NOT NULL CHECK (bet_type IN ('believer', 'unbeliever')),
+        amount REAL NOT NULL,
+        odds_at_placement REAL NOT NULL,
+        potential_payout REAL NOT NULL,
+        actual_payout REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(bet_id) REFERENCES EventBets(id) ON DELETE CASCADE,
         FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
       );
     `);

@@ -96,7 +96,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     const playerValue = calculateHandValue(playerCards);
     const dealerValue = calculateHandValue(dealerCards);
     
-    // Проверяем на блэкджек
+    // Проверяем на блэкджек (менее выгодно для игрока)
     let gameStatus: 'playing' | 'playerBust' | 'dealerTurn' | 'finished' = 'playing';
     let result: 'win' | 'lose' | 'push' | undefined;
     let winAmount = 0;
@@ -104,11 +104,11 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     if (playerValue === 21 && dealerValue === 21) {
       gameStatus = 'finished';
       result = 'push';
-      winAmount = betAmount;
+      winAmount = betAmount; // возврат ставки
     } else if (playerValue === 21) {
       gameStatus = 'finished';
       result = 'win';
-      winAmount = Math.floor(betAmount * 2.5);
+      winAmount = Math.floor(betAmount * 2.2); // уменьшили с 2.5 до 2.2
     }
     
     setGameState({
@@ -124,6 +124,13 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     setTimeout(() => {
       setAnimating(false);
       setLoading(false);
+      
+      // Если игра сразу закончилась (блэкджек), завершаем ее
+      if (gameStatus === 'finished') {
+        setTimeout(() => {
+          onGameEnd({ result, winAmount, gameData: { playerCards, dealerCards, playerValue, dealerValue } });
+        }, 1500);
+      }
     }, 1000);
   };
 
@@ -148,7 +155,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     } else if (newPlayerValue === 21) {
       newGameStatus = 'finished';
       result = 'win';
-      winAmount = Math.floor(betAmount * 2);
+      winAmount = Math.floor(betAmount * 1.8); // уменьшили с 2 до 1.8
     }
     
     setGameState({
@@ -202,15 +209,15 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     
     if (dealerValue > 21) {
       result = 'win';
-      winAmount = Math.floor(betAmount * 2);
+      winAmount = Math.floor(betAmount * 1.8); // уменьшили с 2 до 1.8
     } else if (dealerValue > gameState.playerValue) {
       result = 'lose';
     } else if (dealerValue === gameState.playerValue) {
       result = 'push';
-      winAmount = betAmount;
+      winAmount = betAmount; // возврат ставки
     } else {
       result = 'win';
-      winAmount = Math.floor(betAmount * 2);
+      winAmount = Math.floor(betAmount * 1.8); // уменьшили с 2 до 1.8
     }
     
     setGameState(prev => prev ? {

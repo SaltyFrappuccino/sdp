@@ -344,6 +344,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
             <SlotsGame
               characterId={selectedCharacter}
               betAmount={parseInt(betAmount)}
+              onGameStart={() => handleGameStart('slots')}
               onGameEnd={(result) => handleGameEnd('slots', result)}
               onClose={() => setActiveModal(null)}
             />
@@ -371,6 +372,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
             <DiceGame
               characterId={selectedCharacter}
               betAmount={parseInt(betAmount)}
+              onGameStart={() => handleGameStart('dice')}
               onGameEnd={(result) => handleGameEnd('dice', result)}
               onClose={() => setActiveModal(null)}
             />

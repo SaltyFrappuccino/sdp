@@ -1425,31 +1425,22 @@ router.get('/characters/accepted', async (req: Request, res: Response) => {
   }
 });
 
-// ==================== EVENTS API ====================
+// ==================== НОВАЯ СИСТЕМА СОБЫТИЙ ====================
 
 // GET /api/events - Получить список ивентов
 router.get('/events', async (req: Request, res: Response) => {
   try {
-    const { status } = req.query;
     const db = await initDB();
     
-    let query = `
+    const events = await db.all(`
       SELECT e.*, 
              COUNT(ep.id) as participant_count
       FROM Events e
-      LEFT JOIN EventParticipants ep ON e.id = ep.event_id AND ep.status = 'registered'
-      WHERE 1=1
-    `;
-    const params: any[] = [];
+      LEFT JOIN EventParticipants ep ON e.id = ep.event_id
+      GROUP BY e.id 
+      ORDER BY e.created_at DESC
+    `);
 
-    if (status) {
-      query += ' AND e.status = ?';
-      params.push(status);
-    }
-
-    query += ' GROUP BY e.id ORDER BY e.created_at DESC';
-
-    const events = await db.all(query, params);
     res.json(events);
   } catch (error) {
     console.error('Failed to fetch events:', error);
@@ -1467,7 +1458,7 @@ router.get('/events/:id', async (req: Request, res: Response) => {
       SELECT e.*, 
              COUNT(ep.id) as participant_count
       FROM Events e
-      LEFT JOIN EventParticipants ep ON e.id = ep.event_id AND ep.status = 'registered'
+      LEFT JOIN EventParticipants ep ON e.id = ep.event_id
       WHERE e.id = ?
       GROUP BY e.id
     `, [id]);
@@ -1477,11 +1468,11 @@ router.get('/events/:id', async (req: Request, res: Response) => {
     }
 
     const participants = await db.all(`
-      SELECT ep.*, c.character_name, c.nickname, c.rank, c.faction
+      SELECT ep.*, c.character_name, c.rank, c.faction
       FROM EventParticipants ep
       JOIN Characters c ON ep.character_id = c.id
       WHERE ep.event_id = ?
-      ORDER BY ep.registered_at DESC
+      ORDER BY ep.joined_at DESC
     `, [id]);
 
     res.json({ ...event, participants });
@@ -1493,33 +1484,30 @@ router.get('/events/:id', async (req: Request, res: Response) => {
 
 // POST /api/events - Создать новый ивент
 router.post('/events', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   try {
     const {
       title,
-      description,
-      registration_instructions,
+      estimated_start_date,
+      registration_end_date,
       min_rank,
-      max_rank,
-      max_participants,
-      start_date,
-      end_date,
-      registration_deadline,
-      organizer_vk_id,
-      organizer_name
+      max_rank
     } = req.body;
+
+    if (!title || !estimated_start_date) {
+      return res.status(400).json({ error: 'Название и ориентировочная дата начала обязательны' });
+    }
 
     const db = await initDB();
     const result = await db.run(`
       INSERT INTO Events (
-        title, description, registration_instructions, min_rank, max_rank,
-        max_participants, start_date, end_date, registration_deadline,
-        organizer_vk_id, organizer_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      title, description, registration_instructions, min_rank, max_rank,
-      max_participants, start_date, end_date, registration_deadline,
-      organizer_vk_id, organizer_name
-    ]);
+        title, estimated_start_date, registration_end_date, min_rank, max_rank
+      ) VALUES (?, ?, ?, ?, ?)
+    `, [title, estimated_start_date, registration_end_date, min_rank || null, max_rank || null]);
 
     res.status(201).json({ id: result.lastID });
   } catch (error) {
@@ -1528,37 +1516,26 @@ router.post('/events', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/events/:id/register - Зарегистрироваться на событие
-router.post('/events/:id/register', async (req: Request, res: Response) => {
+// POST /api/events/:id/join - Присоединиться к ивенту
+router.post('/events/:id/join', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { character_id, vk_id, registration_text } = req.body;
+    const { character_id, vk_id } = req.body;
     const db = await initDB();
 
-    if (!character_id || !vk_id || !registration_text) {
+    if (!character_id || !vk_id) {
       return res.status(400).json({ error: 'Неверные параметры' });
     }
 
-    // Проверяем, что событие существует и открыто для регистрации
-    const event = await db.get('SELECT * FROM Events WHERE id = ? AND status = "open"', [id]);
+    // Получаем данные события
+    const event = await db.get('SELECT * FROM Events WHERE id = ?', [id]);
     if (!event) {
-      return res.status(404).json({ error: 'Событие не найдено или закрыто для регистрации' });
+      return res.status(404).json({ error: 'Событие не найдено' });
     }
 
-    // Проверяем, что не истек срок регистрации
-    if (event.registration_deadline && new Date() > new Date(event.registration_deadline)) {
+    // Проверяем дату окончания регистрации
+    if (event.registration_end_date && new Date() > new Date(event.registration_end_date)) {
       return res.status(400).json({ error: 'Срок регистрации истек' });
-    }
-
-    // Проверяем, что не превышено максимальное количество участников
-    if (event.max_participants) {
-      const participantCount = await db.get(
-        'SELECT COUNT(*) as count FROM EventParticipants WHERE event_id = ? AND status = "registered"',
-        [id]
-      );
-      if (participantCount.count >= event.max_participants) {
-        return res.status(400).json({ error: 'Достигнуто максимальное количество участников' });
-      }
     }
 
     // Получаем данные персонажа
@@ -1568,16 +1545,26 @@ router.post('/events/:id/register', async (req: Request, res: Response) => {
     }
 
     // Проверяем ранг персонажа
-    if (event.min_rank && character.rank < event.min_rank) {
-      return res.status(400).json({ error: 'Ранг персонажа слишком низкий для этого события' });
+    const ranks = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    const characterRankIndex = ranks.indexOf(character.rank);
+    
+    if (event.min_rank) {
+      const minRankIndex = ranks.indexOf(event.min_rank);
+      if (characterRankIndex < minRankIndex) {
+        return res.status(400).json({ error: 'Ранг персонажа слишком низкий для этого события' });
+      }
     }
-    if (event.max_rank && character.rank > event.max_rank) {
-      return res.status(400).json({ error: 'Ранг персонажа слишком высокий для этого события' });
+    
+    if (event.max_rank) {
+      const maxRankIndex = ranks.indexOf(event.max_rank);
+      if (characterRankIndex > maxRankIndex) {
+        return res.status(400).json({ error: 'Ранг персонажа слишком высокий для этого события' });
+      }
     }
 
     // Проверяем, что персонаж еще не зарегистрирован
     const existingRegistration = await db.get(
-      'SELECT * FROM EventParticipants WHERE event_id = ? AND character_id = ? AND status = "registered"',
+      'SELECT * FROM EventParticipants WHERE event_id = ? AND character_id = ?',
       [id, character_id]
     );
     if (existingRegistration) {
@@ -1587,21 +1574,19 @@ router.post('/events/:id/register', async (req: Request, res: Response) => {
     // Регистрируем персонажа
     await db.run(`
       INSERT INTO EventParticipants (
-        event_id, character_id, vk_id, character_name, character_rank, faction, registration_text
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [
-      id, character_id, vk_id, character.character_name, character.rank, character.faction, registration_text
-    ]);
+        event_id, character_id, vk_id
+      ) VALUES (?, ?, ?)
+    `, [id, character_id, vk_id]);
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Failed to register for event:', error);
-    res.status(500).json({ error: 'Не удалось зарегистрироваться на событие' });
+    console.error('Failed to join event:', error);
+    res.status(500).json({ error: 'Не удалось присоединиться к событию' });
   }
 });
 
-// DELETE /api/events/:id/register - Отменить регистрацию на событие
-router.delete('/events/:id/register', async (req: Request, res: Response) => {
+// DELETE /api/events/:id/leave - Покинуть ивент
+router.delete('/events/:id/leave', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { character_id } = req.body;
@@ -1611,9 +1596,9 @@ router.delete('/events/:id/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Неверные параметры' });
     }
 
-    // Отменяем регистрацию
+    // Удаляем регистрацию
     const result = await db.run(
-      'UPDATE EventParticipants SET status = "withdrawn" WHERE event_id = ? AND character_id = ? AND status = "registered"',
+      'DELETE FROM EventParticipants WHERE event_id = ? AND character_id = ?',
       [id, character_id]
     );
 
@@ -1623,87 +1608,22 @@ router.delete('/events/:id/register', async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Failed to withdraw from event:', error);
-    res.status(500).json({ error: 'Не удалось отменить регистрацию' });
+    console.error('Failed to leave event:', error);
+    res.status(500).json({ error: 'Не удалось покинуть событие' });
   }
 });
 
-// PUT /api/events/:id - Обновить ивент
-router.put('/events/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const {
-      title,
-      description,
-      event_type,
-      difficulty,
-      recommended_rank,
-      max_participants,
-      min_participants,
-      is_deadly,
-      is_open_world,
-      rewards,
-      requirements,
-      location,
-      location_description,
-      start_date,
-      end_date,
-      application_deadline,
-      additional_info,
-      event_data,
-      status
-    } = req.body;
-
-    const db = await initDB();
-    
-    const updateFields = [];
-    const params: any[] = [];
-
-    if (title !== undefined) { updateFields.push('title = ?'); params.push(title); }
-    if (description !== undefined) { updateFields.push('description = ?'); params.push(description); }
-    if (event_type !== undefined) { updateFields.push('event_type = ?'); params.push(event_type); }
-    if (difficulty !== undefined) { updateFields.push('difficulty = ?'); params.push(difficulty); }
-    if (recommended_rank !== undefined) { updateFields.push('recommended_rank = ?'); params.push(recommended_rank); }
-    if (max_participants !== undefined) { updateFields.push('max_participants = ?'); params.push(max_participants); }
-    if (min_participants !== undefined) { updateFields.push('min_participants = ?'); params.push(min_participants); }
-    if (is_deadly !== undefined) { updateFields.push('is_deadly = ?'); params.push(is_deadly ? 1 : 0); }
-    if (is_open_world !== undefined) { updateFields.push('is_open_world = ?'); params.push(is_open_world ? 1 : 0); }
-    if (rewards !== undefined) { updateFields.push('rewards = ?'); params.push(JSON.stringify(rewards)); }
-    if (requirements !== undefined) { updateFields.push('requirements = ?'); params.push(JSON.stringify(requirements)); }
-    if (location !== undefined) { updateFields.push('location = ?'); params.push(location); }
-    if (location_description !== undefined) { updateFields.push('location_description = ?'); params.push(location_description); }
-    if (start_date !== undefined) { updateFields.push('start_date = ?'); params.push(start_date); }
-    if (end_date !== undefined) { updateFields.push('end_date = ?'); params.push(end_date); }
-    if (application_deadline !== undefined) { updateFields.push('application_deadline = ?'); params.push(application_deadline); }
-    if (additional_info !== undefined) { updateFields.push('additional_info = ?'); params.push(additional_info); }
-    if (event_data !== undefined) { updateFields.push('event_data = ?'); params.push(JSON.stringify(event_data)); }
-    if (status !== undefined) { updateFields.push('status = ?'); params.push(status); }
-
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'Нет полей для обновления' });
-    }
-
-    updateFields.push('updated_at = CURRENT_TIMESTAMP');
-    params.push(id);
-
-    await db.run(`
-      UPDATE Events 
-      SET ${updateFields.join(', ')}
-      WHERE id = ?
-    `, params);
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Failed to update event:', error);
-    res.status(500).json({ error: 'Не удалось обновить ивент' });
-  }
-});
-
-// DELETE /api/events/:id - Удалить ивент
+// DELETE /api/events/:id - Удалить ивент (только админы)
 router.delete('/events/:id', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   try {
     const { id } = req.params;
     const db = await initDB();
+    await db.run('DELETE FROM EventParticipants WHERE event_id = ?', [id]);
     await db.run('DELETE FROM Events WHERE id = ?', [id]);
     res.json({ success: true });
   } catch (error) {
@@ -1712,72 +1632,359 @@ router.delete('/events/:id', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/events/:id/participants - Подать заявку на участие в ивенте
-router.post('/events/:id/participants', async (req: Request, res: Response) => {
+// ==================== EVENT BETTING API ====================
+
+// Функция расчета коэффициентов
+const calculateOdds = (believersPool: number, unbelieversPool: number, margin = 0.07) => {
+  const totalPool = believersPool + unbelieversPool;
+  if (totalPool === 0) {
+    return { believerOdds: 2.0, unbelieverOdds: 2.0 };
+  }
+  
+  const availablePool = totalPool * (1 - margin);
+  
+  let believerOdds = believersPool > 0 ? availablePool / believersPool : 10.0;
+  let unbelieverOdds = unbelieversPool > 0 ? availablePool / unbelieversPool : 10.0;
+  
+  // Минимальные и максимальные коэффициенты
+  believerOdds = Math.max(1.01, Math.min(15.0, believerOdds));
+  unbelieverOdds = Math.max(1.01, Math.min(15.0, unbelieverOdds));
+  
+  return {
+    believerOdds: Math.round(believerOdds * 100) / 100,
+    unbelieverOdds: Math.round(unbelieverOdds * 100) / 100
+  };
+};
+
+// POST /api/events/:id/bets - Создать ставку для ивента (админы)
+router.post('/events/:id/bets', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   try {
     const { id } = req.params;
-    const { character_id, vk_id, character_name, character_rank, faction, application_data = {} } = req.body;
-
+    const { bet_text } = req.body;
     const db = await initDB();
-    
-    // Check if already applied
-    const existing = await db.get(`
-      SELECT id FROM EventParticipants 
-      WHERE event_id = ? AND character_id = ?
-    `, [id, character_id]);
 
-    if (existing) {
-      return res.status(400).json({ error: 'Уже подана заявка на этот ивент' });
+    if (!bet_text || bet_text.trim().length === 0) {
+      return res.status(400).json({ error: 'Текст ставки обязателен' });
+    }
+
+    // Проверяем что ивент существует
+    const event = await db.get('SELECT * FROM Events WHERE id = ?', [id]);
+    if (!event) {
+      return res.status(404).json({ error: 'Ивент не найден' });
     }
 
     const result = await db.run(`
-      INSERT INTO EventParticipants (
-        event_id, character_id, vk_id, character_name, 
-        character_rank, faction, application_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [id, character_id, vk_id, character_name, character_rank, faction, JSON.stringify(application_data)]);
+      INSERT INTO EventBets (event_id, bet_text)
+      VALUES (?, ?)
+    `, [id, bet_text.trim()]);
 
     res.status(201).json({ id: result.lastID });
   } catch (error) {
-    console.error('Failed to apply to event:', error);
-    res.status(500).json({ error: 'Не удалось подать заявку на ивент' });
+    console.error('Failed to create event bet:', error);
+    res.status(500).json({ error: 'Не удалось создать ставку' });
   }
 });
 
-// PUT /api/events/:id/participants/:participant_id - Обновить статус участника
-router.put('/events/:id/participants/:participant_id', async (req: Request, res: Response) => {
+// GET /api/events/:id/bets - Получить все ставки для ивента
+router.get('/events/:id/bets', async (req: Request, res: Response) => {
   try {
-    const { id, participant_id } = req.params;
-    const { status } = req.body;
-
+    const { id } = req.params;
     const db = await initDB();
-    await db.run(`
-      UPDATE EventParticipants 
-      SET status = ?
-      WHERE id = ? AND event_id = ?
-    `, [status, participant_id, id]);
+    
+    const bets = await db.all(`
+      SELECT 
+        eb.*,
+        (SELECT COUNT(*) FROM EventBetPlacements WHERE bet_id = eb.id AND bet_type = 'believer') as believer_count,
+        (SELECT COUNT(*) FROM EventBetPlacements WHERE bet_id = eb.id AND bet_type = 'unbeliever') as unbeliever_count
+      FROM EventBets eb
+      WHERE eb.event_id = ?
+      ORDER BY eb.created_at DESC
+    `, [id]);
 
-    res.json({ success: true });
+    // Рассчитываем коэффициенты для каждой ставки
+    const betsWithOdds = bets.map(bet => {
+      const odds = calculateOdds(bet.believers_total_pool, bet.unbelievers_total_pool);
+      return {
+        ...bet,
+        ...odds
+      };
+    });
+
+    res.json(betsWithOdds);
   } catch (error) {
-    console.error('Failed to update participant status:', error);
-    res.status(500).json({ error: 'Не удалось обновить статус участника' });
+    console.error('Failed to fetch event bets:', error);
+    res.status(500).json({ error: 'Не удалось получить ставки' });
   }
 });
 
-// DELETE /api/events/:id/participants/:participant_id - Удалить участника
-router.delete('/events/:id/participants/:participant_id', async (req: Request, res: Response) => {
+// GET /api/bets/:bet_id/details - Получить детали конкретной ставки с размещенными ставками
+router.get('/bets/:bet_id/details', async (req: Request, res: Response) => {
   try {
-    const { id, participant_id } = req.params;
+    const { bet_id } = req.params;
     const db = await initDB();
-    await db.run(`
-      DELETE FROM EventParticipants 
-      WHERE id = ? AND event_id = ?
-    `, [participant_id, id]);
+    
+    const bet = await db.get('SELECT * FROM EventBets WHERE id = ?', [bet_id]);
+    if (!bet) {
+      return res.status(404).json({ error: 'Ставка не найдена' });
+    }
+
+    const placements = await db.all(`
+      SELECT 
+        ebp.*,
+        c.character_name,
+        c.rank,
+        c.faction
+      FROM EventBetPlacements ebp
+      JOIN Characters c ON ebp.character_id = c.id
+      WHERE ebp.bet_id = ?
+      ORDER BY ebp.created_at DESC
+    `, [bet_id]);
+
+    const odds = calculateOdds(bet.believers_total_pool, bet.unbelievers_total_pool);
+
+    res.json({
+      ...bet,
+      ...odds,
+      placements
+    });
+  } catch (error) {
+    console.error('Failed to fetch bet details:', error);
+    res.status(500).json({ error: 'Не удалось получить детали ставки' });
+  }
+});
+
+// POST /api/bets/:bet_id/place - Разместить ставку
+router.post('/bets/:bet_id/place', async (req: Request, res: Response) => {
+  try {
+    const { bet_id } = req.params;
+    const { character_id, vk_id, bet_type, amount } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !vk_id || !bet_type || !amount || amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    if (!['believer', 'unbeliever'].includes(bet_type)) {
+      return res.status(400).json({ error: 'Неверный тип ставки' });
+    }
+
+    // Проверяем что ставка существует и открыта
+    const bet = await db.get('SELECT * FROM EventBets WHERE id = ? AND status = ?', [bet_id, 'open']);
+    if (!bet) {
+      return res.status(404).json({ error: 'Ставка не найдена или закрыта' });
+    }
+
+    // Проверяем персонажа и его валюту
+    const character = await db.get('SELECT * FROM Characters WHERE id = ? AND vk_id = ?', [character_id, vk_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Проверяем что персонаж еще не делал ставку на этот исход
+    const existingBet = await db.get(`
+      SELECT * FROM EventBetPlacements 
+      WHERE bet_id = ? AND character_id = ? AND bet_type = ?
+    `, [bet_id, character_id, bet_type]);
+
+    if (existingBet) {
+      return res.status(400).json({ error: 'Вы уже делали ставку на этот исход' });
+    }
+
+    await db.run('BEGIN TRANSACTION');
+
+    try {
+      // Обновляем пулы и рассчитываем коэффициенты
+      const newBelieversPool = bet_type === 'believer' 
+        ? bet.believers_total_pool + amount 
+        : bet.believers_total_pool;
+      const newUnbelieversPool = bet_type === 'unbeliever' 
+        ? bet.unbelievers_total_pool + amount 
+        : bet.unbelievers_total_pool;
+
+      const odds = calculateOdds(newBelieversPool, newUnbelieversPool);
+      const currentOdds = bet_type === 'believer' ? odds.believerOdds : odds.unbelieverOdds;
+      const potentialPayout = amount * currentOdds;
+
+      // Списываем валюту с персонажа
+      await db.run(
+        'UPDATE Characters SET currency = currency - ? WHERE id = ?',
+        [amount, character_id]
+      );
+
+      // Размещаем ставку
+      await db.run(`
+        INSERT INTO EventBetPlacements 
+        (bet_id, character_id, vk_id, bet_type, amount, odds_at_placement, potential_payout)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [bet_id, character_id, vk_id, bet_type, amount, currentOdds, potentialPayout]);
+
+      // Обновляем пулы в ставке
+      await db.run(`
+        UPDATE EventBets 
+        SET believers_total_pool = ?, unbelievers_total_pool = ?
+        WHERE id = ?
+      `, [newBelieversPool, newUnbelieversPool, bet_id]);
+
+      await db.run('COMMIT');
+
+      res.json({ 
+        success: true, 
+        odds: currentOdds,
+        potential_payout: potentialPayout,
+        new_currency: character.currency - amount
+      });
+
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Failed to place bet:', error);
+    res.status(500).json({ error: 'Не удалось разместить ставку' });
+  }
+});
+
+// PUT /api/bets/:bet_id/settle - Завершить ставку (админы)
+router.put('/bets/:bet_id/settle', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { bet_id } = req.params;
+    const { result } = req.body; // 'believers_win' или 'unbelievers_win'
+    const db = await initDB();
+
+    if (!['believers_win', 'unbelievers_win'].includes(result)) {
+      return res.status(400).json({ error: 'Неверный результат ставки' });
+    }
+
+    const bet = await db.get('SELECT * FROM EventBets WHERE id = ? AND status = ?', [bet_id, 'open']);
+    if (!bet) {
+      return res.status(404).json({ error: 'Ставка не найдена или уже завершена' });
+    }
+
+    await db.run('BEGIN TRANSACTION');
+
+    try {
+      // Получаем все размещенные ставки
+      const placements = await db.all(`
+        SELECT ebp.*, c.currency as current_currency
+        FROM EventBetPlacements ebp
+        JOIN Characters c ON ebp.character_id = c.id
+        WHERE ebp.bet_id = ?
+      `, [bet_id]);
+
+      // Рассчитываем и выплачиваем выигрыши
+      const winningBetType = result === 'believers_win' ? 'believer' : 'unbeliever';
+      
+      for (const placement of placements) {
+        let payout = 0;
+        
+        if (placement.bet_type === winningBetType) {
+          // Выигравшие получают выплату согласно коэффициентам
+          payout = placement.potential_payout;
+          
+          await db.run(
+            'UPDATE Characters SET currency = currency + ? WHERE id = ?',
+            [payout, placement.character_id]
+          );
+        }
+        // Проигравшие не получают ничего (деньги уже списаны)
+
+        // Обновляем размещенную ставку
+        await db.run(
+          'UPDATE EventBetPlacements SET actual_payout = ? WHERE id = ?',
+          [payout, placement.id]
+        );
+      }
+
+      // Обновляем статус ставки
+      await db.run(`
+        UPDATE EventBets 
+        SET status = 'settled', result = ?, settled_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [result, bet_id]);
+
+      await db.run('COMMIT');
+
+      res.json({ success: true });
+
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Failed to settle bet:', error);
+    res.status(500).json({ error: 'Не удалось завершить ставку' });
+  }
+});
+
+// PUT /api/bets/:bet_id/close - Закрыть ставку для новых размещений (админы)
+router.put('/bets/:bet_id/close', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { bet_id } = req.params;
+    const db = await initDB();
+
+    const result = await db.run(`
+      UPDATE EventBets 
+      SET status = 'closed', closed_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND status = 'open'
+    `, [bet_id]);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Ставка не найдена или уже закрыта' });
+    }
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Failed to remove participant:', error);
-    res.status(500).json({ error: 'Не удалось удалить участника' });
+    console.error('Failed to close bet:', error);
+    res.status(500).json({ error: 'Не удалось закрыть ставку' });
+  }
+});
+
+// GET /api/characters/:character_id/bet-history - История ставок персонажа
+router.get('/characters/:character_id/bet-history', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+
+    const history = await db.all(`
+      SELECT 
+        ebp.*,
+        eb.bet_text,
+        eb.status as bet_status,
+        eb.result,
+        e.title as event_title
+      FROM EventBetPlacements ebp
+      JOIN EventBets eb ON ebp.bet_id = eb.id
+      JOIN Events e ON eb.event_id = e.id
+      WHERE ebp.character_id = ?
+      ORDER BY ebp.created_at DESC
+      LIMIT 50
+    `, [character_id]);
+
+    res.json(history);
+  } catch (error) {
+    console.error('Failed to fetch bet history:', error);
+    res.status(500).json({ error: 'Не удалось получить историю ставок' });
   }
 });
 
@@ -2165,6 +2372,78 @@ router.post('/casino/blackjack/start', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/casino/slots/start - Начать игру в слоты (списать ставку)
+router.post('/casino/slots/start', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < bet_amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Списываем ставку
+    await db.run(
+      'UPDATE Characters SET currency = currency - ? WHERE id = ?',
+      [bet_amount, character_id]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Ставка списана, игра началась',
+      new_currency: character.currency - bet_amount
+    });
+  } catch (error) {
+    console.error('Slots start error:', error);
+    res.status(500).json({ error: 'Не удалось начать игру' });
+  }
+});
+
+// POST /api/casino/dice/start - Начать игру в кости (списать ставку)
+router.post('/casino/dice/start', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < bet_amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Списываем ставку
+    await db.run(
+      'UPDATE Characters SET currency = currency - ? WHERE id = ?',
+      [bet_amount, character_id]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Ставка списана, игра началась',
+      new_currency: character.currency - bet_amount
+    });
+  } catch (error) {
+    console.error('Dice start error:', error);
+    res.status(500).json({ error: 'Не удалось начать игру' });
+  }
+});
+
 // POST /api/casino/blackjack - Сохранить результат игры в блэкджек
 router.post('/casino/blackjack', async (req: Request, res: Response) => {
   try {
@@ -2217,11 +2496,8 @@ router.post('/casino/slots', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Персонаж не найден' });
     }
 
-    if (character.currency < bet_amount) {
-      return res.status(400).json({ error: 'Недостаточно средств' });
-    }
-
-    const newCurrency = character.currency - bet_amount + winAmount;
+    // Ставка уже была списана при начале игры, только начисляем выигрыш
+    const newCurrency = character.currency + winAmount;
     
     await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
 
@@ -2257,11 +2533,8 @@ router.post('/casino/dice', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Персонаж не найден' });
     }
 
-    if (character.currency < bet_amount) {
-      return res.status(400).json({ error: 'Недостаточно средств' });
-    }
-
-    const newCurrency = character.currency - bet_amount + winAmount;
+    // Ставка уже была списана при начале игры, только начисляем выигрыш
+    const newCurrency = character.currency + winAmount;
     
     await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
 
