@@ -274,7 +274,6 @@ export async function initDB() {
         stock_id INTEGER NOT NULL,
         price REAL NOT NULL,
         timestamp TEXT, -- ISO 8601 format with milliseconds (YYYY-MM-DDTHH:mm:ss.sssZ)
-        legacy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, -- Keep for backward compatibility
         FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
       );
 
@@ -293,7 +292,6 @@ export async function initDB() {
         stock_id INTEGER NOT NULL,
         quantity INTEGER NOT NULL,
         average_purchase_price REAL NOT NULL,
-        position_type TEXT DEFAULT 'long' CHECK (position_type IN ('long', 'short')),
         FOREIGN KEY(portfolio_id) REFERENCES Portfolios(id) ON DELETE CASCADE,
         FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
       );
@@ -446,41 +444,60 @@ export async function initDB() {
 
     // Безопасная миграция для StockPriceHistory
     try {
-      // Добавляем legacy_timestamp колонку если её нет
-      await db.run('ALTER TABLE StockPriceHistory ADD COLUMN legacy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP');
-      console.log('Added legacy_timestamp column to StockPriceHistory');
-    } catch (error: any) {
-      // Колонка уже существует, это нормально
-      if (!error.message.includes('duplicate column name') && !error.message.includes('already exists')) {
-        console.warn('Warning adding legacy_timestamp column:', error.message);
+      // Проверяем существует ли колонка legacy_timestamp
+      const stockHistoryColumns = await db.all("PRAGMA table_info(StockPriceHistory)");
+      const hasLegacyTimestamp = stockHistoryColumns.some((col: any) => col.name === 'legacy_timestamp');
+      
+      if (!hasLegacyTimestamp) {
+        // Добавляем legacy_timestamp колонку без DEFAULT CURRENT_TIMESTAMP (SQLite ограничение)
+        await db.run('ALTER TABLE StockPriceHistory ADD COLUMN legacy_timestamp DATETIME');
+        console.log('Added legacy_timestamp column to StockPriceHistory');
+        
+        // Заполняем legacy_timestamp текущим временем для всех записей
+        await db.run(`
+          UPDATE StockPriceHistory 
+          SET legacy_timestamp = CURRENT_TIMESTAMP 
+          WHERE legacy_timestamp IS NULL
+        `);
+        console.log('Updated legacy_timestamp for existing records');
       }
-    }
-
-    try {
-      // Обновляем legacy_timestamp для записей где она NULL
-      await db.run(`
-        UPDATE StockPriceHistory 
-        SET legacy_timestamp = CURRENT_TIMESTAMP 
-        WHERE legacy_timestamp IS NULL
-      `);
     } catch (error: any) {
-      console.warn('Warning updating legacy_timestamp:', error.message);
+      console.warn('Warning in StockPriceHistory migration:', error.message);
     }
 
     try {
       // Миграция существующих записей на новый формат timestamp
       await db.run(`
         UPDATE StockPriceHistory 
-        SET timestamp = CASE 
-          WHEN timestamp IS NULL OR timestamp = '' 
-          THEN datetime(IFNULL(legacy_timestamp, CURRENT_TIMESTAMP) || 'Z') 
-          ELSE timestamp 
-        END 
+        SET timestamp = datetime(IFNULL(legacy_timestamp, CURRENT_TIMESTAMP) || 'Z')
         WHERE timestamp IS NULL OR timestamp = ''
       `);
       console.log('Migrated StockPriceHistory timestamp format');
     } catch (error: any) {
       console.warn('Warning migrating timestamp format:', error.message);
+    }
+
+    // Безопасная миграция для PortfolioAssets
+    try {
+      // Проверяем существует ли колонка position_type
+      const portfolioColumns = await db.all("PRAGMA table_info(PortfolioAssets)");
+      const hasPositionType = portfolioColumns.some((col: any) => col.name === 'position_type');
+      
+      if (!hasPositionType) {
+        // Добавляем position_type колонку
+        await db.run("ALTER TABLE PortfolioAssets ADD COLUMN position_type TEXT DEFAULT 'long'");
+        console.log('Added position_type column to PortfolioAssets');
+        
+        // Обновляем все существующие записи как 'long'
+        await db.run(`
+          UPDATE PortfolioAssets 
+          SET position_type = 'long' 
+          WHERE position_type IS NULL
+        `);
+        console.log('Updated position_type for existing assets');
+      }
+    } catch (error: any) {
+      console.warn('Warning in PortfolioAssets migration:', error.message);
     }
 
     await seedStocks(db);
