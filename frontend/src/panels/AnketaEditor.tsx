@@ -560,7 +560,10 @@ export const AnketaEditor: FC<NavIdProps & {
               </Button>
             </div>
             <Button size="l" stretched onClick={onSave}>
-              {isAdminEditor ? 'Сохранить изменения' : (character.status === 'Принято' ? 'Отправить на проверку' : 'Сохранить изменения')}
+              {(() => {
+                console.log('AnketaEditor button logic:', { isAdminEditor, characterStatus: character.status });
+                return isAdminEditor ? 'Сохранить изменения' : (character.status === 'Принято' ? 'Отправить на проверку' : 'Сохранить изменения');
+              })()}
             </Button>
           </Div>
           {snackbar}

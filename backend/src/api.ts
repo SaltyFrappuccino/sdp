@@ -491,7 +491,9 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
   const userVkId = req.headers['x-user-vk-id'];
   
-  console.log(`PUT /characters/:id - adminId: ${adminId}, userVkId: ${userVkId}, ADMIN_VK_ID: ${ADMIN_VK_ID}`);
+  console.log(`PUT /characters/:id - adminId: ${adminId} (type: ${typeof adminId}), userVkId: ${userVkId}, ADMIN_VK_ID: ${ADMIN_VK_ID} (type: ${typeof ADMIN_VK_ID})`);
+  console.log(`adminId === ADMIN_VK_ID: ${adminId === ADMIN_VK_ID}`);
+  console.log(`adminId == ADMIN_VK_ID: ${adminId == ADMIN_VK_ID}`);
   
   // Если запрос идет от администратора - сразу обновляем анкету
   if (adminId === ADMIN_VK_ID) {
