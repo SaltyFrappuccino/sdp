@@ -23,7 +23,9 @@ import {
   FormItem,
   Select,
   Search,
-  Cell
+  Cell,
+  Tabs,
+  TabsItem
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect, ReactNode } from 'react';
@@ -76,6 +78,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const [editingItem, setEditingItem] = useState<Partial<MarketItem> | null>(null);
   const [characterSearch, setCharacterSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'characters' | 'market' | 'updates' | 'bulk'>('characters');
 
   const fetchCharacters = async () => {
     try {
@@ -348,7 +351,35 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         Админ-панель
       </PanelHeader>
       
-      <Group>
+      <Tabs>
+        <TabsItem 
+          selected={activeTab === 'characters'} 
+          onClick={() => setActiveTab('characters')}
+        >
+          👥 Анкеты
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'market'} 
+          onClick={() => setActiveTab('market')}
+        >
+          🛒 Маркет
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'updates'} 
+          onClick={() => setActiveTab('updates')}
+        >
+          📝 Изменения
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'bulk'} 
+          onClick={() => setActiveTab('bulk')}
+        >
+          ⚡ Массовые
+        </TabsItem>
+      </Tabs>
+
+      {activeTab === 'characters' && (
+        <Group>
         <Header>Реестр анкет</Header>
         <Search value={characterSearch} onChange={(e) => setCharacterSearch(e.target.value)} />
         {loading.characters ? <Spinner /> : (
@@ -392,8 +423,10 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           </CardGrid>
         )}
       </Group>
+      )}
 
-      <Group>
+      {activeTab === 'updates' && (
+        <Group>
        <Header>Ожидающие проверки изменения</Header>
        {loading.updates ? <Spinner /> : (
          updates.filter(u => u.status === 'pending').map(update => (
@@ -403,8 +436,10 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
          ))
        )}
       </Group>
+      )}
 
-      <Group>
+      {activeTab === 'market' && (
+        <Group>
         <Div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Header>Товары на рынке</Header>
           <Button before={<Icon24Add />} onClick={() => openMarketItemModal(null)}>Добавить товар</Button>
@@ -429,8 +464,10 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           </CardGrid>
         )}
       </Group>
+      )}
 
-      <Group>
+      {activeTab === 'bulk' && (
+        <Group>
         <Div>
           <Button 
             size="l" 
@@ -472,6 +509,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           </Button>
         </Div>
       </Group>
+      )}
       
       {snackbar}
       {popout}

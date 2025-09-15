@@ -376,19 +376,19 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                       <Text style={{ color: short.unrealized_pnl >= 0 ? 'var(--vkui--color_text_positive)' : 'var(--vkui--color_text_negative)' }}>
                         P&L: {short.unrealized_pnl >= 0 ? '+' : ''}{short.unrealized_pnl.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭
                       </Text>
-                      <Button size="s" mode="destructive" onClick={() => {
+                      <Button size="s" mode="secondary" onClick={() => {
                         // Закрыть короткую позицию
                         fetch(`${API_URL}/market/cover`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
-                            character_id: selectedCharacter,
+                            character_id: selectedCharacter!.id,
                             short_position_id: short.id,
                             quantity: short.quantity
                           })
                         }).then(() => {
                           setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24CheckCircleOutline />Короткая позиция закрыта</Snackbar>);
-                          fetchPortfolio(selectedCharacter);
+                          fetchPortfolio(selectedCharacter!.id);
                         });
                       }}>
                         Закрыть позицию
@@ -435,7 +435,9 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
               key={entry.character_id}
               shown={hoveredCharacterId === entry.character_id}
               placement="right"
-              content={hoveredCharacter ? `Портфолио: ${hoveredCharacter.character_name}` : ""}
+              content={hoveredCharacter ? 
+                `${hoveredCharacter.character_name}\n💰 ${hoveredCharacter.cash_balance?.toLocaleString('ru-RU')} ₭\n📊 Общая стоимость: ${hoveredCharacter.total_value?.toLocaleString('ru-RU')} ₭\n📈 Активов: ${hoveredCharacter.assets?.length || 0}` 
+                : ""}
             >
               <div
                 onMouseEnter={() => setHoveredCharacterId(entry.character_id)}
@@ -520,21 +522,21 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                           <Button size="m" mode="secondary" onClick={() => openTradeModal(stock, 'sell')}>Продать</Button>
                         </ButtonGroup>
                         <ButtonGroup stretched style={{ marginTop: '8px' }}>
-                          <Button size="m" mode="destructive" onClick={() => {
+                          <Button size="m" mode="secondary" onClick={() => {
                             // Открыть короткую позицию
                             if (!selectedCharacter) return;
                             fetch(`${API_URL}/market/short`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
-                                character_id: selectedCharacter,
+                                character_id: selectedCharacter!.id,
                                 ticker_symbol: stock.ticker_symbol,
                                 quantity: 1 // По умолчанию 1, можно сделать настраиваемым
                               })
                             }).then(async (res) => {
                               if (res.ok) {
                                 setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24CheckCircleOutline />Короткая позиция открыта</Snackbar>);
-                                fetchPortfolio(selectedCharacter);
+                                fetchPortfolio(selectedCharacter!.id);
                                 fetchCharacters();
                               } else {
                                 const error = await res.json();
@@ -552,7 +554,7 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
-                                  character_id: selectedCharacter,
+                                  character_id: selectedCharacter!.id,
                                   ticker_symbol: stock.ticker_symbol,
                                   order_type: 'limit',
                                   side: 'buy',
@@ -562,7 +564,7 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                               }).then(async (res) => {
                                 if (res.ok) {
                                   setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24CheckCircleOutline />Лимитный ордер создан</Snackbar>);
-                                  fetchPortfolio(selectedCharacter);
+                                  fetchPortfolio(selectedCharacter!.id);
                                 } else {
                                   const error = await res.json();
                                   setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24ErrorCircle />{error.error}</Snackbar>);
