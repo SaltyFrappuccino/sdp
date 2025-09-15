@@ -5,6 +5,8 @@ export { AnketaDetail } from './AnketaDetail';
 export { AdminLogin } from './AdminLogin';
 export { AdminPanel } from './AdminPanel';
 export { AnketaEditor } from './AnketaEditor';
+export { UserAnketaEditor } from './UserAnketaEditor';
+export { AdminAnketaEditor } from './AdminAnketaEditor';
 export { Calculator } from './Calculator';
 export { MarketPanel } from './MarketPanel';
 export { MyAnketasPanel } from './MyAnketasPanel';

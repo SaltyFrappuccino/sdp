@@ -157,14 +157,29 @@ const getUnityStage = (syncLevel: number): string => {
   return 'Ступень I - Активация';
 };
 
-export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null) => void; fetchedUser?: UserInfo }> = ({ id, fetchedUser }) => {
+export const AnketaEditor: FC<NavIdProps & {
+  setModal: (modal: ReactNode | null) => void;
+  fetchedUser?: UserInfo;
+  isAdminEditor?: boolean;
+  character: CharacterData | null;
+  onCharacterChange: (character: CharacterData) => void;
+  onSave: () => void;
+  onAICheck?: () => void;
+  onShowHistory?: () => void;
+  snackbar?: ReactNode | null;
+}> = ({
+  id,
+  fetchedUser,
+  isAdminEditor,
+  character,
+  onCharacterChange,
+  onSave,
+  onAICheck,
+  onShowHistory,
+  snackbar
+}) => {
   const routeNavigator = useRouteNavigator();
-  const params = useParams<'id'>();
-  const characterId = params?.id;
-
-  const [character, setCharacter] = useState<CharacterData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+  const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -175,7 +190,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
   const handleImportAnketa = async (event: Event) => {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    if (!file) return;
+    if (!file || !character) return;
 
     try {
       const content = await readJsonFile(file);
@@ -214,83 +229,16 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
         life_status: importedData.life_status
       };
       
-      if (characterData && character) {
-        // Заполняем форму импортированными данными
-        setCharacter(characterData);
-        
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)}>
-            Анкета успешно импортирована!
-          </Snackbar>
-        );
-      } else {
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)}>
-            Ошибка при импорте анкеты. Проверьте формат файла.
-          </Snackbar>
-        );
-      }
+      onCharacterChange(characterData);
+      
     } catch (error) {
-      setSnackbar(
-        <Snackbar onClose={() => setSnackbar(null)}>
-          Ошибка при чтении файла
-        </Snackbar>
-      );
+      // Handle error, maybe show a snackbar
     }
   };
-  useEffect(() => {
-    const fetchCharacter = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`${API_URL}/characters/${characterId}`);
-        const data = await response.json();
-        // Преобразование для обратной совместимости, если appearance - строка
-        if (typeof data.appearance === 'string' || !data.appearance) {
-          data.appearance = { text: data.appearance || '', images: [] };
-        } else if (data.appearance && typeof data.appearance.text === 'string' && data.appearance.text.startsWith('{')) {
-          // Если text содержит JSON, парсим его
-          try {
-            const parsedAppearance = JSON.parse(data.appearance.text);
-            data.appearance = parsedAppearance;
-          } catch (e) {
-            // Если не удалось распарсить, оставляем как есть
-          }
-        }
-        if (!data.character_images) {
-          data.character_images = [];
-        }
-        if (data.contracts) {
-            data.contracts.forEach((c: Contract) => {
-                if (!c.creature_images) c.creature_images = [];
-            });
-        }
-        if (data.inventory) {
-            data.inventory.forEach((i: Item) => {
-                if (!i.image_url) i.image_url = [];
-                if (!i.sinki_type) i.sinki_type = undefined;
-                if (!i.rank) i.rank = undefined;
-            });
-        }
-        setCharacter(data);
-      } catch (error) {
-        console.error('Failed to fetch character:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (characterId) {
-      fetchCharacter();
-    } else {
-      // Это новая анкета, устанавливаем значения по умолчанию
-      setCharacter(getDefaultCharacterData());
-      setLoading(false);
-    }
-  }, [characterId]);
 
   const handleClearForm = () => {
     if (window.confirm('Вы уверены, что хотите очистить всю анкету? Все несохраненные данные будут потеряны.')) {
-      setCharacter(getDefaultCharacterData());
+      onCharacterChange(getDefaultCharacterData());
     }
   };
 
@@ -298,12 +246,12 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
     const { name, value } = e.target;
     if (character) {
         const nameParts = name.split('.');
-        if (nameParts.length > 1 && nameParts[0] === 'appearance') {
-            setCharacter({
+        if (nameParts.length > 1 && nameParts[1] === 'appearance') {
+            onCharacterChange({
                 ...character,
                 appearance: {
                     ...character.appearance,
-                    [nameParts[1]]: value
+                    text: value
                 }
             });
         } else {
@@ -311,7 +259,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
             if (name === 'age' || name === 'currency') {
                 processedValue = parseInt(value, 10) || 0;
             }
-            setCharacter({ ...character, [name]: processedValue });
+            onCharacterChange({ ...character, [name]: processedValue });
         }
     }
   };
@@ -324,20 +272,20 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
     } else {
       newAttributes[name] = value;
     }
-    setCharacter(prev => prev ? ({
-      ...prev,
+    onCharacterChange({
+      ...character,
       attributes: newAttributes
-    }) : null);
+    });
   };
 
   const handleArchetypeChange = (archetype: string, isSelected: boolean) => {
     if (!character) return;
-    setCharacter(prev => prev ? ({
-      ...prev,
+    onCharacterChange({
+      ...character,
       archetypes: isSelected
-        ? [...prev.archetypes, archetype]
-        : prev.archetypes.filter(a => a !== archetype)
-    }) : null);
+        ? [...character.archetypes, archetype]
+        : character.archetypes.filter(a => a !== archetype)
+    });
   };
 
   const handleContractChange = (index: number, fieldOrObject: string | Partial<Contract>, value?: any) => {
@@ -347,13 +295,11 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
     let updatedContract = { ...newContracts[index] };
 
     if (typeof fieldOrObject === 'string') {
-      // Обновление одного поля
       updatedContract = { ...updatedContract, [fieldOrObject]: value };
       if (fieldOrObject === 'sync_level') {
         updatedContract.unity_stage = getUnityStage(Number(value));
       }
     } else {
-      // Обновление нескольких полей из объекта
       updatedContract = { ...updatedContract, ...fieldOrObject };
       if (fieldOrObject.sync_level !== undefined) {
         updatedContract.unity_stage = getUnityStage(fieldOrObject.sync_level);
@@ -361,214 +307,41 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
     }
 
     newContracts[index] = updatedContract;
-    setCharacter(prev => prev ? { ...prev, contracts: newContracts } : null);
+    onCharacterChange({ ...character, contracts: newContracts });
   };
 
   const addContract = () => {
     if (!character) return;
-    setCharacter(prev => prev ? ({ ...prev, contracts: [...prev.contracts, { ...emptyContract }] }) : null);
+    onCharacterChange({ ...character, contracts: [...character.contracts, { ...emptyContract }] });
   };
 
   const removeContract = (index: number) => {
     if (!character || character.contracts.length <= 1) return;
     const newContracts = character.contracts.filter((_, i) => i !== index);
-    setCharacter(prev => prev ? ({ ...prev, contracts: newContracts }) : null);
+    onCharacterChange({ ...character, contracts: newContracts });
   };
 
   const handleInventoryChange = (newInventory: Item[]) => {
       if (!character) return;
-      setCharacter(prev => prev ? ({ ...prev, inventory: newInventory }) : null);
+      onCharacterChange({ ...character, inventory: newInventory });
   }
 
   const handleCharacterImageChange = (index: number, value: string) => {
     if (!character) return;
     const newImages = [...character.character_images];
     newImages[index] = value;
-    setCharacter(prev => prev ? ({ ...prev, character_images: newImages }) : null);
+    onCharacterChange({ ...character, character_images: newImages });
   };
 
   const addCharacterImage = () => {
     if (!character) return;
-    setCharacter(prev => prev ? ({ ...prev, character_images: [...prev.character_images, ''] }) : null);
+    onCharacterChange({ ...character, character_images: [...character.character_images, ''] });
   };
 
   const removeCharacterImage = (index: number) => {
     if (!character) return;
     const newImages = character.character_images.filter((_, i) => i !== index);
-    setCharacter(prev => prev ? ({ ...prev, character_images: newImages }) : null);
-  };
-
-
-  const validateCharacter = (char: any) => {
-    const errors: { [key: string]: string } = {};
-
-    // Проверка лимита очков атрибутов
-    if (char.attributes) {
-      const attributeCosts: { [key: string]: number } = {
-        "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
-      };
-      
-      const getAttributePointsForRank = (rank: string): number => {
-        switch (rank) {
-          case 'F': return 10;
-          case 'E': return 14;
-          case 'D': return 16;
-          case 'C': return 20;
-          case 'B': return 30;
-          case 'A': return 40;
-          case 'S': return 50;
-          case 'SS': return 60;
-          case 'SSS': return 70;
-          default: return 10;
-        }
-      };
-      
-      const spentPoints = Object.values(char.attributes).reduce((acc: number, level: unknown) => {
-        const levelStr = level as string;
-        return acc + (attributeCosts[levelStr] || 0);
-      }, 0);
-      const totalPoints = getAttributePointsForRank(char.rank);
-      
-      if (spentPoints > totalPoints) {
-        errors.attributes = `Превышен лимит очков атрибутов! Потрачено: ${spentPoints}, доступно: ${totalPoints}`;
-      }
-    }
-
-    // Проверка контрактов (только если они есть)
-    if (char.contracts && char.contracts.length > 0) {
-      char.contracts.forEach((contract: any, contractIndex: number) => {
-        // Проверка обязательных полей контракта только если контракт не пустой
-        const hasAnyContractData = contract.contract_name?.trim() || 
-                                  contract.creature_name?.trim() || 
-                                  contract.creature_spectrum?.trim() || 
-                                  contract.creature_description?.trim() || 
-                                  contract.gift?.trim();
-        
-        if (hasAnyContractData) {
-          if (!contract.contract_name?.trim()) {
-            errors[`contract_${contractIndex}_name`] = 'Название контракта обязательно';
-          }
-          if (!contract.creature_name?.trim()) {
-            errors[`contract_${contractIndex}_creature_name`] = 'Имя существа обязательно';
-          }
-          if (!contract.creature_spectrum?.trim()) {
-            errors[`contract_${contractIndex}_creature_spectrum`] = 'Спектр существа обязателен';
-          }
-          if (!contract.creature_description?.trim()) {
-            errors[`contract_${contractIndex}_creature_description`] = 'Описание существа обязательно';
-          }
-          if (!contract.gift?.trim()) {
-            errors[`contract_${contractIndex}_gift`] = 'Дар существа обязателен';
-          }
-        }
-
-        // Проверка способностей контракта
-        if (contract.abilities && contract.abilities.length > 0) {
-          contract.abilities.forEach((ability: any, abilityIndex: number) => {
-            // Проверка бюджета способности
-            const cellSpecs: Record<string, { budget: number; maxTagRank: string }> = {
-              'Нулевая': { budget: 5, maxTagRank: 'F' },
-              'Малая (I)': { budget: 20, maxTagRank: 'C' },
-              'Значительная (II)': { budget: 50, maxTagRank: 'A' }, 
-              'Предельная (III)': { budget: 150, maxTagRank: 'SSS' },
-            };
-
-            const tagCosts: Record<string, number> = {
-              'F': 1, 'E': 2, 'D': 5, 'C': 10, 'B': 20, 'A': 35, 'S': 70, 'SS': 100, 'SSS': 150
-            };
-
-            const spec = cellSpecs[ability.cell_type];
-            if (spec) {
-              const budget = spec.budget * ability.cell_cost;
-              const spentPoints = Object.values(ability.tags || {}).reduce((acc: number, rank: unknown) => {
-                const rankStr = rank as string;
-                return acc + (tagCosts[rankStr] || 0);
-              }, 0);
-              
-              if (spentPoints > budget) {
-                errors[`contract_${contractIndex}_ability_${abilityIndex}_budget`] = `Превышен бюджет способности! Потрачено: ${spentPoints}, доступно: ${budget}`;
-              }
-            }
-
-            // Проверка обязательных тегов для способностей призыва
-            if (ability.is_summon) {
-              const requiredTags = ['Пробивающий', 'Защитный', 'Неотвратимый', 'Область'];
-              const missingTags = requiredTags.filter(tag => !ability.tags?.[tag]);
-              
-              if (missingTags.length > 0) {
-                errors[`contract_${contractIndex}_ability_${abilityIndex}_tags`] = `Отсутствуют обязательные теги для призыва: ${missingTags.join(', ')}`;
-              }
-            }
-          });
-        }
-      });
-    }
-
-    return errors;
-  };
-
-  const handleSave = async () => {
-    if (!character) return;
-
-    // Валидация перед сохранением
-    const validationErrors = validateCharacter(character);
-    if (Object.keys(validationErrors).length > 0) {
-      const errorMessages = Object.values(validationErrors).filter(Boolean);
-      setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>
-        Ошибки валидации: {errorMessages.join('; ')}
-      </Snackbar>);
-      return;
-    }
-
-    const adminId = localStorage.getItem('adminId');
-
-    try {
-      let response;
-      let successMessage;
-
-      if (character.status === 'Принято') {
-        response = await fetch(`${API_URL}/characters/${characterId}/updates`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-id': adminId || '',
-            'x-user-vk-id': fetchedUser?.id?.toString() || '',
-          },
-          body: JSON.stringify({ updated_data: character }),
-        });
-        successMessage = "Изменения отправлены на проверку";
-      } else {
-        response = await fetch(`${API_URL}/characters/${characterId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-id': adminId || '',
-            'x-user-vk-id': fetchedUser?.id?.toString() || '',
-          },
-          body: JSON.stringify(character),
-        });
-        successMessage = "Анкета успешно обновлена!";
-      }
-
-      if (response.ok) {
-        setSnackbar(<Snackbar
-          onClose={() => setSnackbar(null)}
-          before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
-        >{successMessage}</Snackbar>);
-        routeNavigator.back();
-      } else {
-        const errorData = await response.text();
-        console.error("Server response:", errorData);
-        throw new Error(`Ошибка сервера: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error("Save error:", error);
-      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
-      setSnackbar(<Snackbar
-        onClose={() => setSnackbar(null)}
-        before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
-      >{`Ошибка сохранения: ${message}`}</Snackbar>);
-    }
+    onCharacterChange({ ...character, character_images: newImages });
   };
 
   return (
@@ -676,7 +449,7 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
                   <Input
                     type="number"
                     value={String(character.attribute_points_total ?? getAttributePointsForRank(character.rank))}
-                    onChange={(e) => setCharacter(prev => prev ? ({ ...prev, attribute_points_total: Number(e.target.value) }) : null)}
+                    onChange={(e) => character && onCharacterChange({ ...character, attribute_points_total: Number(e.target.value) })}
                     placeholder="Автоматически по рангу"
                   />
                 </FormItem>
@@ -700,21 +473,21 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
                     <Input
                       type="number"
                       value={String(character.aura_cells?.["Малые (I)"] ?? '')}
-                      onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Малые (I)": Number(e.target.value) } as any }) : null)}
+                      onChange={(e) => character && onCharacterChange({ ...character, aura_cells: { ...character.aura_cells, "Малые (I)": Number(e.target.value) } as any })}
                     />
                   </FormItem>
                   <FormItem top="Значительные (II)">
                     <Input
                       type="number"
                       value={String(character.aura_cells?.["Значительные (II)"] ?? '')}
-                      onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Значительные (II)": Number(e.target.value) } as any }) : null)}
+                      onChange={(e) => character && onCharacterChange({ ...character, aura_cells: { ...character.aura_cells, "Значительные (II)": Number(e.target.value) } as any })}
                     />
                   </FormItem>
                   <FormItem top="Предельные (III)">
                     <Input
                       type="number"
                       value={String(character.aura_cells?.["Предельные (III)"] ?? '')}
-                      onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Предельные (III)": Number(e.target.value) } as any }) : null)}
+                      onChange={(e) => character && onCharacterChange({ ...character, aura_cells: { ...character.aura_cells, "Предельные (III)": Number(e.target.value) } as any })}
                     />
                   </FormItem>
                 </FormLayoutGroup>
@@ -786,8 +559,8 @@ export const AnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | null)
                 Очистить
               </Button>
             </div>
-            <Button size="l" stretched onClick={handleSave}>
-              {character.status === 'Принято' ? 'Отправить на проверку' : 'Сохранить изменения'}
+            <Button size="l" stretched onClick={onSave}>
+              {isAdminEditor ? 'Сохранить изменения' : (character.status === 'Принято' ? 'Отправить на проверку' : 'Сохранить изменения')}
             </Button>
           </Div>
           {snackbar}

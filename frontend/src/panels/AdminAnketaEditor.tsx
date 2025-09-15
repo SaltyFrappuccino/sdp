@@ -2,54 +2,27 @@ import {
   Panel,
   PanelHeader,
   NavIdProps,
-  Group,
-  FormItem,
-  Input,
-  Button,
-  Select,
   PanelHeaderBack,
   Snackbar,
   ScreenSpinner,
-  Textarea,
   Separator,
-  Header,
   Div,
   ModalRoot,
   ModalPage,
   ModalPageHeader,
-  IconButton,
-  FormLayoutGroup,
 } from '@vkontakte/vkui';
-import { Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, ReactNode, useEffect } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
-import { Icon24ErrorCircle, Icon24CheckCircleOutline, Icon24Add } from '@vkontakte/icons';
+import { Icon24ErrorCircle, Icon24CheckCircleOutline } from '@vkontakte/icons';
 import ReactMarkdown from 'react-markdown';
+import { AnketaEditor } from './AnketaEditor';
 import { AI_API_URL } from '../api';
-import { ContractForm } from '../components/ContractForm';
-import { AttributeManager } from '../components/AttributeManager';
-import { ArchetypeSelector } from '../components/ArchetypeSelector';
-import { InventoryManager } from '../components/InventoryManager';
 import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 import { readJsonFile } from '../utils/anketaExport';
 import { ManifestationData } from '../components/ManifestationForm';
 
-const getAttributePointsForRank = (rank: Rank): number => {
-  switch (rank) {
-    case 'F': return 10;
-    case 'E': return 14;
-    case 'D': return 16;
-    case 'C': return 20;
-    case 'B': return 30;
-    case 'A': return 40;
-    case 'S': return 50;
-    case 'SS': return 60;
-    case 'SSS': return 70;
-    default: return 10;
-  }
-};
 
 interface Item {
     name: string;
@@ -108,6 +81,7 @@ interface CharacterData {
     currency: number;
     admin_note: string;
     life_status: 'Жив' | 'Мёртв';
+    status: string;
 }
 
 const emptyContract: Contract = {
@@ -151,62 +125,6 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
 
-  const handleImportAnketa = async (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    const file = target.files?.[0];
-    if (!file) return;
-
-    try {
-      const content = await readJsonFile(file);
-      const importedData = JSON.parse(content as string);
-
-      if (importedData.contracts && Array.isArray(importedData.contracts)) {
-        importedData.contracts.forEach((contract: any) => {
-          if (contract.manifestation && typeof contract.manifestation.modus === 'undefined') {
-            contract.manifestation.modus = '';
-          }
-        });
-      }
-
-      const characterData = {
-        ...character,
-          character_name: importedData.character_name,
-          nickname: importedData.nickname,
-          age: importedData.age,
-          rank: importedData.rank as Rank,
-          faction: importedData.faction,
-          faction_position: importedData.faction_position,
-          home_island: importedData.home_island,
-          appearance: importedData.appearance,
-          character_images: importedData.character_images,
-          personality: importedData.personality,
-          biography: importedData.biography,
-          archetypes: importedData.archetypes,
-          attributes: importedData.attributes,
-          attribute_points_total: importedData.attribute_points_total,
-          aura_cells: importedData.aura_cells,
-          contracts: importedData.contracts,
-          inventory: importedData.inventory,
-          currency: importedData.currency,
-          admin_note: importedData.admin_note,
-          life_status: importedData.life_status
-        };
-        
-        setCharacter(characterData);
-        
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)}>
-            Анкета успешно импортирована!
-          </Snackbar>
-        );
-    } catch (error) {
-      setSnackbar(
-        <Snackbar onClose={() => setSnackbar(null)}>
-          Ошибка при чтении файла
-        </Snackbar>
-      );
-    }
-  };
 
   useEffect(() => {
     const fetchCharacter = async () => {
@@ -533,216 +451,18 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
       {loading ? (
         <ScreenSpinner />
       ) : character ? (
-        <>
-          <Group header={<Header>I. ОБЩАЯ ИНФОРМАЦИЯ</Header>}>
-            <FormItem top="Имя и Фамилия">
-              <Input name="character_name" value={character.character_name} onChange={handleChange} />
-            </FormItem>
-            <FormItem top="Ранг Проводника">
-              <Select
-                name="rank"
-                value={character.rank}
-                onChange={handleChange}
-                options={[
-                  { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
-                  { label: 'C', value: 'C' }, { label: 'B', value: 'B' }, { label: 'A', value: 'A' },
-                  { label: 'S', value: 'S' }, { label: 'SS', value: 'SS' }, { label: 'SSS', value: 'SSS' },
-                ]}
-              />
-            </FormItem>
-            <FormItem top="Прозвище/Позывной">
-              <Input name="nickname" value={character.nickname} onChange={handleChange} />
-            </FormItem>
-            <FormItem top="Возраст">
-              <Input name="age" type="number" value={String(character.age)} onChange={handleChange} />
-            </FormItem>
-            <FormItem top="Фракция">
-              <Select
-                name="faction"
-                placeholder="Выберите фракцию"
-                value={character.faction}
-                onChange={handleChange}
-                options={[
-                  { label: 'Отражённый Свет Солнца', value: 'Отражённый Свет Солнца' },
-                  { label: 'Чёрная Лилия', value: 'Чёрная Лилия' },
-                  { label: 'Порядок', value: 'Порядок' },
-                  { label: 'Нейтрал', value: 'Нейтрал' },
-                ]}
-              />
-            </FormItem>
-            <FormItem top="Позиция во фракции">
-              <Input name="faction_position" value={character.faction_position} onChange={handleChange} />
-            </FormItem>
-            <FormItem top="Родной остров">
-              <Select
-                name="home_island"
-                placeholder="Выберите родной остров"
-                value={character.home_island}
-                onChange={handleChange}
-                options={[
-                  { label: 'Кага', value: 'Кага' }, { label: 'Хоши', value: 'Хоши' },
-                  { label: 'Ичи', value: 'Ичи' }, { label: 'Куро', value: 'Куро' },
-                  { label: 'Мидзу', value: 'Мидзу' }, { label: 'Сора', value: 'Сора' },
-                ]}
-              />
-            </FormItem>
-            <FormItem top="Статус жизни">
-              <Select
-                name="life_status"
-                value={character.life_status}
-                onChange={handleChange}
-                options={[
-                  { label: 'Жив', value: 'Жив' },
-                  { label: 'Мёртв', value: 'Мёртв' },
-                ]}
-              />
-            </FormItem>
-          </Group>
-
-          <Group header={<Header>II. ЛИЧНОСТЬ И ВНЕШНОСТЬ</Header>}>
-            <FormItem top="Внешность (описание)">
-              <Textarea name="appearance.text" value={character.appearance.text} onChange={handleChange} />
-            </FormItem>
-            <FormItem top="Ссылки на внешность">
-              {character.character_images.map((img, index) => (
-                <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <Input
-                    value={img}
-                    onChange={(e) => handleCharacterImageChange(index, e.target.value)}
-                    style={{ marginRight: '8px' }}
-                    placeholder="https://example.com/image.png"
-                  />
-                  <IconButton onClick={() => removeCharacterImage(index)} aria-label="Удалить ссылку">
-                    <Icon24Cancel />
-                  </IconButton>
-                </div>
-              ))}
-              <Button onClick={addCharacterImage} before={<Icon24Add />}>
-                Добавить ссылку на внешность
-              </Button>
-            </FormItem>
-            <FormItem top="Характер">
-              <Textarea name="personality" value={character.personality} onChange={handleChange} />
-            </FormItem>
-            <FormItem top="Биография">
-              <Textarea name="biography" value={character.biography} onChange={handleChange} />
-            </FormItem>
-          </Group>
-
-          <Group header={<Header>III. БОЕВЫЕ ХАРАКТЕРИСТИКИ</Header>}>
-            <ArchetypeSelector
-              selectedArchetypes={character.archetypes}
-              onArchetypeChange={handleArchetypeChange}
-            />
-            <Header>Атрибуты (ручная настройка)</Header>
-            <FormItem top="Всего очков атрибутов">
-              <Input
-                type="number"
-                value={String(character.attribute_points_total ?? getAttributePointsForRank(character.rank))}
-                onChange={(e) => setCharacter(prev => prev ? ({ ...prev, attribute_points_total: Number(e.target.value) }) : null)}
-                placeholder="Автоматически по рангу"
-              />
-            </FormItem>
-            <AttributeManager
-              attributes={character.attributes}
-              onAttributeChange={handleAttributeChange}
-              totalPoints={character.attribute_points_total ?? getAttributePointsForRank(character.rank)}
-            />
-            <Header>Ячейки Ауры (ручная настройка)</Header>
-            <FormLayoutGroup mode="horizontal">
-              <FormItem top="Малые (I)">
-                <Input
-                  type="number"
-                  value={String(character.aura_cells?.["Малые (I)"] ?? '')}
-                  onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Малые (I)": Number(e.target.value) } as any }) : null)}
-                />
-              </FormItem>
-              <FormItem top="Значительные (II)">
-                <Input
-                  type="number"
-                  value={String(character.aura_cells?.["Значительные (II)"] ?? '')}
-                  onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Значительные (II)": Number(e.target.value) } as any }) : null)}
-                />
-              </FormItem>
-              <FormItem top="Предельные (III)">
-                <Input
-                  type="number"
-                  value={String(character.aura_cells?.["Предельные (III)"] ?? '')}
-                  onChange={(e) => setCharacter(prev => prev ? ({ ...prev, aura_cells: { ...prev.aura_cells, "Предельные (III)": Number(e.target.value) } as any }) : null)}
-                />
-              </FormItem>
-            </FormLayoutGroup>
-          </Group>
-
-          <Group header={<Header>IV. КОНТРАКТ(Ы)</Header>}>
-            {character.contracts.map((contract, index) => (
-              <Div key={index}>
-                {index > 0 && <Separator style={{ marginBottom: '12px' }} />}
-                <ContractForm
-                  contract={contract}
-                  index={index}
-                  onChange={handleContractChange as any}
-                  onRemove={removeContract}
-                  characterRank={character.rank}
-                  fullCharacterData={character}
-                />
-              </Div>
-            ))}
-            <FormItem>
-              <Button onClick={addContract} before={<Icon24Add />}>
-                Добавить контракт
-              </Button>
-            </FormItem>
-          </Group>
-
-          <InventoryManager
-            inventory={character.inventory}
-            onInventoryChange={handleInventoryChange}
-            characterRank={character.rank}
-          />
-          <Group>
-             <FormItem top="Валюта (Кредиты ₭)">
-              <Input name="currency" type="number" value={String(character.currency)} onChange={handleChange} />
-            </FormItem>
-          </Group>
-
-          <Group header={<Header>VI. ПРИМЕЧАНИЕ ДЛЯ АДМИНИСТРАЦИИ</Header>}>
-            <FormItem>
-              <Textarea name="admin_note" value={character.admin_note} onChange={handleChange} />
-            </FormItem>
-          </Group>
-
-          <Div>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <Button 
-                size="l" 
-                mode="outline" 
-                style={{ width: '100%' }}
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = '.json';
-                  input.onchange = handleImportAnketa;
-                  input.click();
-                }}
-              >
-                📥 Импорт анкеты
-              </Button>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Button size="l" stretched onClick={handleSave}>
-                Сохранить
-              </Button>
-            <Button size="l" stretched mode="secondary" onClick={handleAICheck}>
-              Проверить ИИ
-            </Button>
-            <Button size="l" stretched mode="secondary" onClick={handleShowHistory}>
-              История проверок ИИ
-            </Button>
-            </div>
-          </Div>
-          {snackbar}
-        </>
+        <AnketaEditor
+          id={id}
+          setModal={setModal}
+          fetchedUser={fetchedUser}
+          isAdminEditor={true}
+          character={character}
+          onCharacterChange={setCharacter}
+          onSave={handleSave}
+          onAICheck={handleAICheck}
+          onShowHistory={handleShowHistory}
+          snackbar={snackbar}
+        />
       ) : (
         <Div>Не удалось загрузить данные анкеты.</Div>
       )}

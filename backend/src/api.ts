@@ -491,8 +491,14 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
   const userVkId = req.headers['x-user-vk-id'];
   
-  // Проверяем, является ли пользователь админом или владельцем анкеты
-  if (adminId !== ADMIN_VK_ID) {
+  console.log(`PUT /characters/:id - adminId: ${adminId}, userVkId: ${userVkId}, ADMIN_VK_ID: ${ADMIN_VK_ID}`);
+  
+  // Если запрос идет от администратора - сразу обновляем анкету
+  if (adminId === ADMIN_VK_ID) {
+    console.log('Admin update - updating character directly');
+    // Продолжаем к обновлению анкеты
+  } else {
+    // Если запрос идет от пользователя - проверяем владельца и создаем запрос на изменение
     if (!userVkId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
@@ -504,6 +510,24 @@ router.put('/characters/:id', async (req: Request, res: Response) => {
       if (!character || character.vk_id !== parseInt(userVkId as string)) {
         return res.status(403).json({ error: 'Forbidden' });
       }
+      
+      // Создаем запрос на изменение вместо прямого обновления
+      const { contracts, ...characterFields } = req.body;
+      const updateData = {
+        character_id: req.params.id,
+        updated_data: JSON.stringify({ ...characterFields, contracts }),
+        status: 'pending'
+      };
+      
+      await db.run(`
+        INSERT INTO CharacterUpdates (character_id, updated_data, status) 
+        VALUES (?, ?, ?)
+      `, [updateData.character_id, updateData.updated_data, updateData.status]);
+      
+      return res.json({ 
+        success: true, 
+        message: 'Запрос на изменение отправлен на рассмотрение администратору' 
+      });
     } catch (error) {
       return res.status(500).json({ error: 'Database error' });
     }
