@@ -25,6 +25,7 @@ import {
   Snackbar,
   Tabs,
   TabsItem,
+  FormLayoutGroup,
 } from '@vkontakte/vkui';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
@@ -50,6 +51,8 @@ interface Stock {
   description: string;
   current_price: number;
   exchange: string;
+  total_shares?: number;
+  available_shares?: number;
   history?: { price: number, timestamp: string }[];
 }
 
@@ -148,6 +151,61 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
   const portfolioValue = portfolio?.assets.reduce((acc, asset) => acc + (asset.current_price * asset.quantity), 0) || 0;
   const totalPortfolioValue = (portfolio?.cash_balance || 0) + portfolioValue;
 
+  const showSnackbar = (message: string, success: boolean) => {
+    setSnackbar(
+      <Snackbar onClose={() => setSnackbar(null)}>
+        {success ? <Icon24CheckCircleOutline /> : <Icon24ErrorCircle />}
+        {message}
+      </Snackbar>
+    );
+  };
+
+  const openTradeModal = (stock: Stock, action: 'buy' | 'sell') => {
+    setSelectedStock(stock);
+    setTradeType(action);
+    setTradeQuantity(1);
+    setActiveModal('trade');
+  };
+
+  const executeTrade = async () => {
+    if (!selectedCharacter || !selectedStock || !tradeQuantity || tradeQuantity <= 0) {
+      showSnackbar('Заполните все поля корректно', false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/market/trade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_id: selectedCharacter.id,
+          stock_id: selectedStock.id,
+          action: tradeType,
+          quantity: tradeQuantity,
+          vk_id: fetchedUser?.id
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showSnackbar(result.message, true);
+        setActiveModal(null);
+        await fetchStocks();
+        await fetchPortfolio(selectedCharacter.id);
+        await fetchCharacters();
+      } else {
+        const errorData = await response.json();
+        showSnackbar(errorData.error || 'Ошибка выполнения операции', false);
+      }
+    } catch (error) {
+      console.error('Failed to execute trade:', error);
+      showSnackbar('Ошибка соединения', false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (fetchedUser) {
       setLoading(true);
@@ -221,12 +279,6 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
     }
   };
 
-  const openTradeModal = (stock: Stock, type: 'buy' | 'sell') => {
-    setSelectedStock(stock);
-    setTradeType(type);
-    setTradeQuantity(1);
-    setActiveModal('trade');
-  };
 
   const handleTrade = async () => {
     if (!selectedCharacter || !selectedStock || tradeQuantity <= 0) return;
@@ -506,7 +558,14 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                                     }
                                     return [value, "Цена"];
                                   }}
-                                  labelFormatter={(label: string | number) => new Date(label).toLocaleDateString('ru-RU')}
+                                  labelFormatter={(label: string | number) => new Date(label).toLocaleString('ru-RU', { 
+                                    year: 'numeric', 
+                                    month: 'short', 
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                  })}
                                 />
                                  <Area type="monotone" dataKey="price" stroke="#8884d8" fill="#8884d8" strokeWidth={2} dot={false} />
                               </AreaChart>
@@ -517,8 +576,21 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                       <Div>
                         <Text>{stock.description}</Text>
                         <Text>Цена: {stock.current_price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>
+                        <Text>📊 Общий выпуск: {stock.total_shares?.toLocaleString('ru-RU')} акций</Text>
+                        <Text style={{ 
+                          color: (stock.available_shares || 0) < (stock.total_shares || 0) * 0.1 ? '#f44336' : '#4caf50'
+                        }}>
+                          🔓 Доступно: {stock.available_shares?.toLocaleString('ru-RU')} акций
+                        </Text>
                         <ButtonGroup stretched>
-                          <Button size="m" mode="primary" onClick={() => openTradeModal(stock, 'buy')}>Купить</Button>
+                          <Button 
+                            size="m" 
+                            mode="primary" 
+                            onClick={() => openTradeModal(stock, 'buy')}
+                            disabled={(stock.available_shares || 0) <= 0}
+                          >
+                            Купить
+                          </Button>
                           <Button size="m" mode="secondary" onClick={() => openTradeModal(stock, 'sell')}>Продать</Button>
                         </ButtonGroup>
                         <ButtonGroup stretched style={{ marginTop: '8px' }}>
@@ -621,6 +693,56 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
           </Div>
         </ModalPage>
       </ModalRoot>
+      {activeModal === 'trade' && selectedStock && (
+        <ModalRoot activeModal="trade">
+          <ModalPage id="trade">
+            <ModalPageHeader>
+              {tradeType === 'buy' ? 'Покупка' : 'Продажа'} {selectedStock.ticker_symbol}
+            </ModalPageHeader>
+            <FormLayoutGroup>
+              <FormItem top={`Цена за акцию: ${selectedStock.current_price.toLocaleString('ru-RU')} ₭`}>
+                <Input
+                  type="number"
+                  placeholder="Количество"
+                  value={tradeQuantity}
+                  onChange={(e) => setTradeQuantity(parseInt(e.target.value) || 0)}
+                  min="1"
+                  max={tradeType === 'buy' ? selectedStock.available_shares : undefined}
+                />
+              </FormItem>
+              {tradeType === 'buy' && (
+                <FormItem top="Доступно для покупки">
+                  <span style={{ 
+                    color: (selectedStock.available_shares || 0) < (selectedStock.total_shares || 0) * 0.1 ? '#f44336' : '#4caf50'
+                  }}>
+                    {selectedStock.available_shares?.toLocaleString('ru-RU')} акций
+                  </span>
+                </FormItem>
+              )}
+              <FormItem top="Общая стоимость">
+                <span>{(selectedStock.current_price * tradeQuantity).toLocaleString('ru-RU')} ₭</span>
+              </FormItem>
+              <FormItem>
+                <ButtonGroup stretched>
+                  <Button 
+                    size="l" 
+                    mode={tradeType === 'buy' ? 'primary' : 'secondary'}
+                    onClick={executeTrade}
+                    loading={loading}
+                    disabled={(tradeType === 'buy' && tradeQuantity > (selectedStock.available_shares || 0)) || tradeQuantity <= 0}
+                  >
+                    {tradeType === 'buy' ? 'Купить' : 'Продать'}
+                  </Button>
+                  <Button size="l" mode="tertiary" onClick={() => setActiveModal(null)}>
+                    Отмена
+                  </Button>
+                </ButtonGroup>
+              </FormItem>
+            </FormLayoutGroup>
+          </ModalPage>
+        </ModalRoot>
+      )}
+
       {snackbar}
     </Panel>
   );

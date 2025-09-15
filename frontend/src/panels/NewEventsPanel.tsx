@@ -21,6 +21,7 @@ interface Event {
   registration_end_date: string | null;
   min_rank: string | null;
   max_rank: string | null;
+  status?: string;
   created_at: string;
   participant_count: number;
   participants?: EventParticipant[];
@@ -249,6 +250,13 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
     return event.participants.some(p => p.character_id === characterId);
   };
 
+
+  const canLeaveEvent = (event: Event) => {
+    if (!selectedCharacter) return false;
+    if (!isCharacterRegistered(event, selectedCharacter)) return false;
+    return event.status === 'active' || event.status === 'upcoming';
+  };
+
   const canJoinEvent = (event: Event) => {
     if (event.registration_end_date && new Date() > new Date(event.registration_end_date)) {
       return false;
@@ -403,6 +411,17 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
                           onClick={() => openJoinModal(event)}
                         >
                           Присоединиться
+                        </Button>
+                      )}
+                      
+                      {canLeaveEvent(event) && (
+                        <Button
+                          size="s"
+                          mode="secondary"
+                          onClick={() => leaveEvent(event.id, selectedCharacter!)}
+                          style={{ backgroundColor: '#ffebee', color: '#d32f2f' }}
+                        >
+                          Покинуть
                         </Button>
                       )}
                     </div>

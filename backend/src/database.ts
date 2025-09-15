@@ -265,6 +265,7 @@ export async function initDB() {
         volume INTEGER,
         exchange TEXT NOT NULL CHECK (exchange IN ('IGX', 'KSM', 'MCM', 'OSB')),
         base_trend REAL DEFAULT 0.0,
+        total_shares INTEGER DEFAULT 1000000,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -500,6 +501,40 @@ export async function initDB() {
       console.warn('Warning in PortfolioAssets migration:', error.message);
     }
 
+    // Безопасная миграция для Stocks - добавляем total_shares
+    try {
+      // Проверяем существует ли колонка total_shares
+      const stocksColumns = await db.all("PRAGMA table_info(Stocks)");
+      const hasTotalShares = stocksColumns.some((col: any) => col.name === 'total_shares');
+      
+      if (!hasTotalShares) {
+        // Добавляем total_shares колонку
+        await db.run("ALTER TABLE Stocks ADD COLUMN total_shares INTEGER DEFAULT 1000000");
+        console.log('Added total_shares column to Stocks');
+        
+        // Обновляем существующие акции с разными значениями для реализма
+        const stockUpdates = [
+          { ticker: 'ARSK', shares: 2500000000 }, // Крупная корпорация
+          { ticker: 'SBER', shares: 1800000000 }, // Банк 
+          { ticker: 'OSS', shares: 500000000 },   // Религиозная организация
+          { ticker: 'ORD-B', shares: 10000000000 }, // Государственные облигации
+          { ticker: 'BLK-L', shares: 100000000 },  // Криминальный индекс
+          { ticker: 'MDZ-H', shares: 50000000 }    // Редкие товары
+        ];
+        
+        for (const update of stockUpdates) {
+          await db.run(`
+            UPDATE Stocks 
+            SET total_shares = ? 
+            WHERE ticker_symbol = ?
+          `, [update.shares, update.ticker]);
+        }
+        console.log('Updated total_shares for existing stocks');
+      }
+    } catch (error: any) {
+      console.warn('Warning in Stocks migration:', error.message);
+    }
+
     await seedStocks(db);
 
     return db;
@@ -511,17 +546,17 @@ export async function initDB() {
 
 export async function seedStocks(db: any) {
   const stocks = [
-    { name: 'Arasaka', ticker_symbol: 'ARSK', description: 'Промышленный и военный гигант, производитель оружия, роботов и имплантов.', current_price: 150.75, exchange: 'IGX' },
-    { name: 'Sber', ticker_symbol: 'SBER', description: 'Цифровой гигант, контролирующий информацию, финансы и логистику.', current_price: 280.50, exchange: 'IGX' },
-    { name: 'Отражённый Свет Солнца', ticker_symbol: 'OSS', description: 'Религиозная и бизнес-сеть с огромным влиянием.', current_price: 120.00, exchange: 'IGX' },
-    { name: 'Стабилизационные Облигации Порядка', ticker_symbol: 'ORD-B', description: 'Надежные государственные облигации, поддерживаемые Порядком.', current_price: 100.00, exchange: 'OSB' },
-    { name: 'Индекс Влияния "Чёрной Лилии"', ticker_symbol: 'BLK-L', description: 'Высокорисковый индекс, отражающий успех теневых операций.', current_price: 50.25, exchange: 'KSM' },
-    { name: 'Редкие травы с Мидзу', ticker_symbol: 'MDZ-H', description: 'Товарный фьючерс на поставку уникальных лекарственных растений.', current_price: 3500.00, exchange: 'MCM' }
+    { name: 'Arasaka', ticker_symbol: 'ARSK', description: 'Промышленный и военный гигант, производитель оружия, роботов и имплантов.', current_price: 150.75, exchange: 'IGX', total_shares: 2500000000 },
+    { name: 'Sber', ticker_symbol: 'SBER', description: 'Цифровой гигант, контролирующий информацию, финансы и логистику.', current_price: 280.50, exchange: 'IGX', total_shares: 1800000000 },
+    { name: 'Отражённый Свет Солнца', ticker_symbol: 'OSS', description: 'Религиозная и бизнес-сеть с огромным влиянием.', current_price: 120.00, exchange: 'IGX', total_shares: 500000000 },
+    { name: 'Стабилизационные Облигации Порядка', ticker_symbol: 'ORD-B', description: 'Надежные государственные облигации, поддерживаемые Порядком.', current_price: 100.00, exchange: 'OSB', total_shares: 10000000000 },
+    { name: 'Индекс Влияния "Чёрной Лилии"', ticker_symbol: 'BLK-L', description: 'Высокорисковый индекс, отражающий успех теневых операций.', current_price: 50.25, exchange: 'KSM', total_shares: 100000000 },
+    { name: 'Редкие травы с Мидзу', ticker_symbol: 'MDZ-H', description: 'Товарный фьючерс на поставку уникальных лекарственных растений.', current_price: 3500.00, exchange: 'MCM', total_shares: 50000000 }
   ];
 
-  const stmt = await db.prepare('INSERT OR IGNORE INTO Stocks (name, ticker_symbol, description, current_price, exchange) VALUES (?, ?, ?, ?, ?)');
+  const stmt = await db.prepare('INSERT OR IGNORE INTO Stocks (name, ticker_symbol, description, current_price, exchange, total_shares) VALUES (?, ?, ?, ?, ?, ?)');
   for (const stock of stocks) {
-    await stmt.run(stock.name, stock.ticker_symbol, stock.description, stock.current_price, stock.exchange);
+    await stmt.run(stock.name, stock.ticker_symbol, stock.description, stock.current_price, stock.exchange, stock.total_shares);
   }
   await stmt.finalize();
 }

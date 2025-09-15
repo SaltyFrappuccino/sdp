@@ -3371,4 +3371,162 @@ router.get('/casino/history/:character_id', async (req: Request, res: Response) 
   }
 });
 
+// Market/Stock Trading API
+router.get('/market/stocks', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const stocks = await db.all(`
+      SELECT s.*, 
+             COUNT(pa.id) as holders,
+             COALESCE(SUM(pa.quantity), 0) as shares_owned
+      FROM Stocks s 
+      LEFT JOIN PortfolioAssets pa ON s.id = pa.stock_id AND pa.position_type = 'long'
+      GROUP BY s.id
+      ORDER BY s.exchange, s.name
+    `);
+    
+    // Добавляем доступные акции
+    const enrichedStocks = stocks.map((stock: any) => ({
+      ...stock,
+      available_shares: stock.total_shares - (stock.shares_owned || 0)
+    }));
+    
+    res.json(enrichedStocks);
+  } catch (error) {
+    console.error('Failed to fetch stocks:', error);
+    res.status(500).json({ error: 'Не удалось получить список акций' });
+  }
+});
+
+router.post('/market/trade', async (req: Request, res: Response) => {
+  try {
+    const { character_id, stock_id, action, quantity, vk_id } = req.body;
+    
+    if (!character_id || !stock_id || !action || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+    
+    const db = await initDB();
+    await db.run('BEGIN TRANSACTION');
+    
+    try {
+      // Получаем информацию об акции
+      const stock = await db.get('SELECT * FROM Stocks WHERE id = ?', [stock_id]);
+      if (!stock) {
+        await db.run('ROLLBACK');
+        return res.status(404).json({ error: 'Акция не найдена' });
+      }
+      
+      // Получаем персонажа
+      const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+      if (!character) {
+        await db.run('ROLLBACK');
+        return res.status(404).json({ error: 'Персонаж не найден' });
+      }
+      
+      // Создаем портфель если его нет
+      let portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
+      if (!portfolio) {
+        await db.run('INSERT INTO Portfolios (character_id, vk_id) VALUES (?, ?)', [character_id, vk_id]);
+        portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
+      }
+      
+      if (action === 'buy') {
+        // Проверяем доступность акций
+        const ownedShares = await db.get(`
+          SELECT COALESCE(SUM(quantity), 0) as total 
+          FROM PortfolioAssets 
+          WHERE stock_id = ? AND position_type = 'long'
+        `, [stock_id]);
+        
+        const availableShares = stock.total_shares - (ownedShares?.total || 0);
+        
+        if (quantity > availableShares) {
+          await db.run('ROLLBACK');
+          return res.status(400).json({ 
+            error: `Недостаточно доступных акций. Доступно: ${availableShares.toLocaleString('ru-RU')}` 
+          });
+        }
+        
+        const cost = stock.current_price * quantity;
+        
+        if (character.currency < cost) {
+          await db.run('ROLLBACK');
+          return res.status(400).json({ error: 'Недостаточно средств' });
+        }
+        
+        // Списываем деньги
+        await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [cost, character_id]);
+        
+        // Добавляем/обновляем позицию в портфеле
+        const existingAsset = await db.get(`
+          SELECT * FROM PortfolioAssets 
+          WHERE portfolio_id = ? AND stock_id = ? AND position_type = 'long'
+        `, [portfolio.id, stock_id]);
+        
+        if (existingAsset) {
+          const newQuantity = existingAsset.quantity + quantity;
+          const newAvgPrice = ((existingAsset.average_purchase_price * existingAsset.quantity) + (stock.current_price * quantity)) / newQuantity;
+          
+          await db.run(`
+            UPDATE PortfolioAssets 
+            SET quantity = ?, average_purchase_price = ?
+            WHERE id = ?
+          `, [newQuantity, newAvgPrice, existingAsset.id]);
+        } else {
+          await db.run(`
+            INSERT INTO PortfolioAssets (portfolio_id, stock_id, quantity, average_purchase_price, position_type)
+            VALUES (?, ?, ?, ?, 'long')
+          `, [portfolio.id, stock_id, quantity, stock.current_price]);
+        }
+        
+        await db.run('COMMIT');
+        res.json({ 
+          message: `Успешно куплено ${quantity} акций ${stock.ticker_symbol} за ${cost.toLocaleString('ru-RU')} ₭`,
+          cost,
+          available_shares: availableShares - quantity
+        });
+        
+      } else if (action === 'sell') {
+        // Проверяем наличие акций у персонажа
+        const asset = await db.get(`
+          SELECT * FROM PortfolioAssets 
+          WHERE portfolio_id = ? AND stock_id = ? AND position_type = 'long'
+        `, [portfolio.id, stock_id]);
+        
+        if (!asset || asset.quantity < quantity) {
+          await db.run('ROLLBACK');
+          return res.status(400).json({ error: 'Недостаточно акций для продажи' });
+        }
+        
+        const revenue = stock.current_price * quantity;
+        
+        // Зачисляем деньги
+        await db.run('UPDATE Characters SET currency = currency + ? WHERE id = ?', [revenue, character_id]);
+        
+        // Обновляем/удаляем позицию
+        if (asset.quantity === quantity) {
+          await db.run('DELETE FROM PortfolioAssets WHERE id = ?', [asset.id]);
+        } else {
+          await db.run('UPDATE PortfolioAssets SET quantity = quantity - ? WHERE id = ?', [quantity, asset.id]);
+        }
+        
+        await db.run('COMMIT');
+        res.json({ 
+          message: `Успешно продано ${quantity} акций ${stock.ticker_symbol} за ${revenue.toLocaleString('ru-RU')} ₭`,
+          revenue
+        });
+      }
+      
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+    
+  } catch (error) {
+    console.error('Failed to execute trade:', error);
+    res.status(500).json({ error: 'Не удалось выполнить операцию' });
+  }
+});
+
 export default router;
