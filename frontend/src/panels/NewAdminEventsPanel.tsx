@@ -1,7 +1,7 @@
 import React, { FC, useState, useEffect } from 'react';
 import {
   Panel, PanelHeader, Div, Card, Text, Button, Input, Snackbar,
-  ModalRoot, ModalPage, ModalPageHeader, FormItem, Textarea
+  ModalRoot, ModalPage, ModalPageHeader, FormItem, Textarea, Select
 } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon28CalendarOutline, Icon28UsersOutline } from '@vkontakte/icons';
 import { API_URL } from '../api';
@@ -36,6 +36,19 @@ interface EventBet {
   created_at: string;
 }
 
+interface EventBranch {
+  id: number;
+  event_id: number;
+  branch_name: string;
+  description: string | null;
+  min_rank: string | null;
+  max_rank: string | null;
+  max_participants: number | null;
+  rewards: any;
+  participant_count: number;
+  created_at: string;
+}
+
 const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
 
 export const NewAdminEventsPanel: FC<NavIdProps> = ({ id }) => {
@@ -45,9 +58,19 @@ export const NewAdminEventsPanel: FC<NavIdProps> = ({ id }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBetsModal, setShowBetsModal] = useState(false);
   const [showCreateBetModal, setShowCreateBetModal] = useState(false);
+  const [showBranchesModal, setShowBranchesModal] = useState(false);
+  const [showCreateBranchModal, setShowCreateBranchModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [eventBets, setEventBets] = useState<EventBet[]>([]);
+  const [eventBranches, setEventBranches] = useState<EventBranch[]>([]);
   const [newBetText, setNewBetText] = useState('');
+  const [newBranch, setNewBranch] = useState({
+    branch_name: '',
+    description: '',
+    min_rank: '',
+    max_rank: '',
+    max_participants: ''
+  });
   const [newEvent, setNewEvent] = useState({
     title: '',
     estimated_start_date: '',
@@ -176,6 +199,107 @@ export const NewAdminEventsPanel: FC<NavIdProps> = ({ id }) => {
     setSelectedEvent(event);
     await fetchEventBets(event.id);
     setShowBetsModal(true);
+  };
+
+  const fetchEventBranches = async (eventId: number) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/events/${eventId}/branches`);
+      const data = await response.json();
+      setEventBranches(data);
+    } catch (error) {
+      console.error('Failed to fetch event branches:', error);
+      showSnackbar('Ошибка загрузки веток', false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openBranchesModal = async (event: Event) => {
+    setSelectedEvent(event);
+    await fetchEventBranches(event.id);
+    setShowBranchesModal(true);
+  };
+
+  const openCreateBranchModal = (event: Event) => {
+    setSelectedEvent(event);
+    setNewBranch({
+      branch_name: '',
+      description: '',
+      min_rank: '',
+      max_rank: '',
+      max_participants: ''
+    });
+    setShowCreateBranchModal(true);
+  };
+
+  const createBranch = async () => {
+    if (!selectedEvent || !newBranch.branch_name.trim()) {
+      showSnackbar('Заполните название ветки', false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const branchData: any = {
+        branch_name: newBranch.branch_name.trim(),
+        description: newBranch.description.trim() || null,
+        min_rank: newBranch.min_rank || null,
+        max_rank: newBranch.max_rank || null,
+        max_participants: newBranch.max_participants ? parseInt(newBranch.max_participants) : null
+      };
+
+      const response = await fetch(`${API_URL}/events/${selectedEvent.id}/branches`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-id': '1'
+        },
+        body: JSON.stringify(branchData)
+      });
+
+      if (response.ok) {
+        showSnackbar('Ветка создана успешно', true);
+        setShowCreateBranchModal(false);
+        if (showBranchesModal) {
+          await fetchEventBranches(selectedEvent.id);
+        }
+      } else {
+        const errorData = await response.json();
+        showSnackbar(errorData.error || 'Ошибка создания ветки', false);
+      }
+    } catch (error) {
+      console.error('Failed to create branch:', error);
+      showSnackbar('Ошибка соединения', false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteBranch = async (branchId: number) => {
+    if (!confirm('Вы уверены, что хотите удалить эту ветку? Это действие нельзя отменить.')) return;
+
+    try {
+      const response = await fetch(`${API_URL}/events/branches/${branchId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-id': '1'
+        }
+      });
+
+      if (response.ok) {
+        showSnackbar('Ветка удалена', true);
+        if (selectedEvent) {
+          await fetchEventBranches(selectedEvent.id);
+        }
+      } else {
+        const errorData = await response.json();
+        showSnackbar(errorData.error || 'Ошибка удаления ветки', false);
+      }
+    } catch (error) {
+      console.error('Failed to delete branch:', error);
+      showSnackbar('Ошибка соединения', false);
+    }
   };
 
   const openCreateBetModal = (event: Event) => {
@@ -340,7 +464,21 @@ export const NewAdminEventsPanel: FC<NavIdProps> = ({ id }) => {
                     </Text>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 8 }}>
+                      <Button
+                        size="s"
+                        mode="secondary"
+                        onClick={() => openBranchesModal(event)}
+                        style={{ backgroundColor: '#e3f2fd', color: '#1976d2' }}
+                      >
+                        Ветки
+                      </Button>
+                      <Button
+                        size="s"
+                        onClick={() => openCreateBranchModal(event)}
+                      >
+                        + Ветка
+                      </Button>
                       <Button
                         size="s"
                         mode="secondary"
@@ -399,6 +537,8 @@ export const NewAdminEventsPanel: FC<NavIdProps> = ({ id }) => {
 
       <ModalRoot activeModal={
         showCreateModal ? 'create-event' : 
+        showCreateBranchModal ? 'create-branch' :
+        showBranchesModal ? 'manage-branches' :
         showCreateBetModal ? 'create-bet' :
         showBetsModal ? 'manage-bets' : null
       }>
@@ -474,6 +614,191 @@ export const NewAdminEventsPanel: FC<NavIdProps> = ({ id }) => {
                 </Button>
               </FormItem>
             </div>
+          </Div>
+        </ModalPage>
+
+        {/* Модальное окно создания ветки */}
+        <ModalPage
+          id="create-branch"
+          onClose={() => setShowCreateBranchModal(false)}
+          header={
+            <ModalPageHeader>
+              Создать ветку ивента
+            </ModalPageHeader>
+          }
+        >
+          <Div>
+            {selectedEvent && (
+              <div>
+                <Text weight="2" style={{ fontSize: 18, marginBottom: 16 }}>
+                  {selectedEvent.title}
+                </Text>
+                
+                <FormItem top="Название ветки *">
+                  <Input
+                    value={newBranch.branch_name}
+                    onChange={(e) => setNewBranch(prev => ({
+                      ...prev,
+                      branch_name: e.target.value
+                    }))}
+                    placeholder="Например: Главный вход, Крыша, Черный ход"
+                  />
+                </FormItem>
+                
+                <FormItem top="Описание">
+                  <Textarea
+                    value={newBranch.description}
+                    onChange={(e) => setNewBranch(prev => ({
+                      ...prev,
+                      description: e.target.value
+                    }))}
+                    placeholder="Описание ветки ивента (необязательно)"
+                    rows={3}
+                  />
+                </FormItem>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <FormItem top="Минимальный ранг">
+                    <Select
+                      value={newBranch.min_rank}
+                      onChange={(e) => setNewBranch(prev => ({
+                        ...prev,
+                        min_rank: e.target.value
+                      }))}
+                      options={[
+                        { label: 'Без ограничений', value: '' },
+                        ...RANKS.map(rank => ({ label: rank, value: rank }))
+                      ]}
+                    />
+                  </FormItem>
+
+                  <FormItem top="Максимальный ранг">
+                    <Select
+                      value={newBranch.max_rank}
+                      onChange={(e) => setNewBranch(prev => ({
+                        ...prev,
+                        max_rank: e.target.value
+                      }))}
+                      options={[
+                        { label: 'Без ограничений', value: '' },
+                        ...RANKS.map(rank => ({ label: rank, value: rank }))
+                      ]}
+                    />
+                  </FormItem>
+                </div>
+
+                <FormItem top="Максимальное количество участников">
+                  <Input
+                    type="number"
+                    value={newBranch.max_participants}
+                    onChange={(e) => setNewBranch(prev => ({
+                      ...prev,
+                      max_participants: e.target.value
+                    }))}
+                    placeholder="Оставьте пустым для неограниченного количества"
+                  />
+                </FormItem>
+
+                <FormItem>
+                  <Button
+                    size="l"
+                    onClick={createBranch}
+                    disabled={loading || !newBranch.branch_name.trim()}
+                    style={{ width: '100%' }}
+                  >
+                    {loading ? 'Создание...' : 'Создать ветку'}
+                  </Button>
+                </FormItem>
+              </div>
+            )}
+          </Div>
+        </ModalPage>
+
+        {/* Модальное окно управления ветками */}
+        <ModalPage
+          id="manage-branches"
+          onClose={() => setShowBranchesModal(false)}
+          header={
+            <ModalPageHeader>
+              Управление ветками ивента
+            </ModalPageHeader>
+          }
+        >
+          <Div>
+            {selectedEvent && (
+              <div>
+                <Text weight="2" style={{ fontSize: 18, marginBottom: 16 }}>
+                  {selectedEvent.title}
+                </Text>
+                
+                <div style={{ marginBottom: 16 }}>
+                  <Button
+                    onClick={() => openCreateBranchModal(selectedEvent)}
+                    before={<Icon28AddOutline />}
+                  >
+                    Создать ветку
+                  </Button>
+                </div>
+
+                {eventBranches.length === 0 ? (
+                  <Text style={{ color: '#666' }}>Веток пока нет. Участники могут присоединяться к основному ивенту.</Text>
+                ) : (
+                  eventBranches.map(branch => (
+                    <Card key={branch.id} style={{ marginBottom: 16 }}>
+                      <Div>
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                            <Text weight="2" style={{ fontSize: 16 }}>
+                              🌿 {branch.branch_name}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: '#666' }}>
+                              ID: {branch.id}
+                            </Text>
+                          </div>
+                          
+                          {branch.description && (
+                            <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
+                              {branch.description}
+                            </Text>
+                          )}
+                          
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 12, fontSize: 14 }}>
+                            <Text>👥 Участников: {branch.participant_count}</Text>
+                            
+                            {(branch.min_rank || branch.max_rank) && (
+                              <Text>
+                                🏆 Ранг: {getRankText(branch.min_rank, branch.max_rank)}
+                              </Text>
+                            )}
+                            
+                            {branch.max_participants && (
+                              <Text>
+                                📊 Лимит: {branch.max_participants}
+                              </Text>
+                            )}
+                          </div>
+                          
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12, color: '#999' }}>
+                              Создано: {formatDate(branch.created_at)}
+                            </Text>
+                            
+                            <Button
+                              size="s"
+                              mode="secondary"
+                              onClick={() => deleteBranch(branch.id)}
+                              style={{ color: '#f44336' }}
+                            >
+                              Удалить
+                            </Button>
+                          </div>
+                        </div>
+                      </Div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            )}
           </Div>
         </ModalPage>
 

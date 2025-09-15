@@ -185,14 +185,31 @@ export async function initDB() {
     `);
 
     await db.exec(`
+      CREATE TABLE IF NOT EXISTS EventBranches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        branch_name TEXT NOT NULL,
+        description TEXT,
+        min_rank TEXT,
+        max_rank TEXT,
+        max_participants INTEGER,
+        rewards TEXT, -- JSON строка с наградами
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(event_id) REFERENCES Events(id) ON DELETE CASCADE
+      );
+    `);
+
+    await db.exec(`
       CREATE TABLE EventParticipants (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_id INTEGER NOT NULL,
         character_id INTEGER NOT NULL,
         vk_id INTEGER NOT NULL,
+        branch_id INTEGER, -- может быть NULL для старых записей
         joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(event_id) REFERENCES Events(id) ON DELETE CASCADE,
-        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY(branch_id) REFERENCES EventBranches(id) ON DELETE SET NULL
       );
     `);
 

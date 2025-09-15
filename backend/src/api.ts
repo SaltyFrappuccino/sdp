@@ -1467,15 +1467,32 @@ router.get('/events/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Ивент не найден' });
     }
 
+    // Получаем участников с информацией о ветках
     const participants = await db.all(`
-      SELECT ep.*, c.character_name, c.rank, c.faction
+      SELECT ep.*, c.character_name, c.rank, c.faction, eb.branch_name
       FROM EventParticipants ep
       JOIN Characters c ON ep.character_id = c.id
+      LEFT JOIN EventBranches eb ON ep.branch_id = eb.id
       WHERE ep.event_id = ?
       ORDER BY ep.joined_at DESC
     `, [id]);
 
-    res.json({ ...event, participants });
+    // Получаем ветки ивента с количеством участников
+    const branches = await db.all(`
+      SELECT eb.*, 
+             COUNT(ep.id) as participant_count
+      FROM EventBranches eb
+      LEFT JOIN EventParticipants ep ON eb.id = ep.branch_id
+      WHERE eb.event_id = ?
+      GROUP BY eb.id
+      ORDER BY eb.created_at ASC
+    `, [id]);
+
+    res.json({ 
+      ...event, 
+      participants,
+      branches
+    });
   } catch (error) {
     console.error('Failed to fetch event:', error);
     res.status(500).json({ error: 'Не удалось получить ивент' });
@@ -1513,6 +1530,213 @@ router.post('/events', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to create event:', error);
     res.status(500).json({ error: 'Не удалось создать ивент' });
+  }
+});
+
+// POST /api/events/:id/branches - Создать ветку ивента (админы)
+router.post('/events/:id/branches', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { id } = req.params;
+    const { branch_name, description, min_rank, max_rank, max_participants, rewards } = req.body;
+    const db = await initDB();
+
+    if (!branch_name || branch_name.trim().length === 0) {
+      return res.status(400).json({ error: 'Название ветки обязательно' });
+    }
+
+    // Проверяем что ивент существует
+    const event = await db.get('SELECT * FROM Events WHERE id = ?', [id]);
+    if (!event) {
+      return res.status(404).json({ error: 'Ивент не найден' });
+    }
+
+    const result = await db.run(`
+      INSERT INTO EventBranches (event_id, branch_name, description, min_rank, max_rank, max_participants, rewards)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+      id, 
+      branch_name.trim(), 
+      description || null, 
+      min_rank || null, 
+      max_rank || null, 
+      max_participants || null,
+      rewards ? JSON.stringify(rewards) : null
+    ]);
+
+    res.status(201).json({ id: result.lastID });
+  } catch (error) {
+    console.error('Failed to create event branch:', error);
+    res.status(500).json({ error: 'Не удалось создать ветку ивента' });
+  }
+});
+
+// GET /api/events/:id/branches - Получить все ветки ивента
+router.get('/events/:id/branches', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const db = await initDB();
+    
+    const branches = await db.all(`
+      SELECT eb.*, 
+             COUNT(ep.id) as participant_count
+      FROM EventBranches eb
+      LEFT JOIN EventParticipants ep ON eb.id = ep.branch_id
+      WHERE eb.event_id = ?
+      GROUP BY eb.id
+      ORDER BY eb.created_at ASC
+    `, [id]);
+
+    // Парсим rewards из JSON
+    const branchesWithRewards = branches.map(branch => ({
+      ...branch,
+      rewards: branch.rewards ? JSON.parse(branch.rewards) : null
+    }));
+
+    res.json(branchesWithRewards);
+  } catch (error) {
+    console.error('Failed to fetch event branches:', error);
+    res.status(500).json({ error: 'Не удалось получить ветки ивента' });
+  }
+});
+
+// DELETE /api/events/branches/:branch_id - Удалить ветку ивента (админы)
+router.delete('/events/branches/:branch_id', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { branch_id } = req.params;
+    const db = await initDB();
+
+    // Проверяем что ветка существует
+    const branch = await db.get('SELECT * FROM EventBranches WHERE id = ?', [branch_id]);
+    if (!branch) {
+      return res.status(404).json({ error: 'Ветка не найдена' });
+    }
+
+    // Проверяем есть ли участники в этой ветке
+    const participantCount = await db.get(
+      'SELECT COUNT(*) as count FROM EventParticipants WHERE branch_id = ?',
+      [branch_id]
+    );
+
+    if (participantCount.count > 0) {
+      return res.status(400).json({ 
+        error: `Нельзя удалить ветку с участниками (${participantCount.count} участников)` 
+      });
+    }
+
+    await db.run('DELETE FROM EventBranches WHERE id = ?', [branch_id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete event branch:', error);
+    res.status(500).json({ error: 'Не удалось удалить ветку ивента' });
+  }
+});
+
+// POST /api/events/:id/join-branch - Присоединиться к ветке ивента
+router.post('/events/:id/join-branch', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { character_id, vk_id, branch_id } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !vk_id) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    // Проверяем что ивент существует
+    const event = await db.get('SELECT * FROM Events WHERE id = ?', [id]);
+    if (!event) {
+      return res.status(404).json({ error: 'Ивент не найден' });
+    }
+
+    // Проверяем персонажа
+    const character = await db.get('SELECT * FROM Characters WHERE id = ? AND vk_id = ?', [character_id, vk_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    // Если указана ветка, проверяем её
+    let branch = null;
+    if (branch_id) {
+      branch = await db.get('SELECT * FROM EventBranches WHERE id = ? AND event_id = ?', [branch_id, id]);
+      if (!branch) {
+        return res.status(404).json({ error: 'Ветка не найдена' });
+      }
+
+      // Проверяем ограничения ветки
+      if (branch.min_rank || branch.max_rank) {
+        const ranks = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+        const characterRankIndex = ranks.indexOf(character.rank);
+        const minRankIndex = branch.min_rank ? ranks.indexOf(branch.min_rank) : -1;
+        const maxRankIndex = branch.max_rank ? ranks.indexOf(branch.max_rank) : ranks.length;
+
+        if (minRankIndex !== -1 && characterRankIndex < minRankIndex) {
+          return res.status(400).json({ error: `Минимальный ранг для этой ветки: ${branch.min_rank}` });
+        }
+        
+        if (maxRankIndex !== ranks.length && characterRankIndex > maxRankIndex) {
+          return res.status(400).json({ error: `Максимальный ранг для этой ветки: ${branch.max_rank}` });
+        }
+      }
+
+      // Проверяем лимит участников ветки
+      if (branch.max_participants) {
+        const branchParticipantCount = await db.get(
+          'SELECT COUNT(*) as count FROM EventParticipants WHERE branch_id = ?',
+          [branch_id]
+        );
+        
+        if (branchParticipantCount.count >= branch.max_participants) {
+          return res.status(400).json({ error: 'Достигнут лимит участников для этой ветки' });
+        }
+      }
+    } else {
+      // Проверяем ограничения основного ивента, если не указана ветка
+      if (event.min_rank || event.max_rank) {
+        const ranks = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+        const characterRankIndex = ranks.indexOf(character.rank);
+        const minRankIndex = event.min_rank ? ranks.indexOf(event.min_rank) : -1;
+        const maxRankIndex = event.max_rank ? ranks.indexOf(event.max_rank) : ranks.length;
+
+        if (minRankIndex !== -1 && characterRankIndex < minRankIndex) {
+          return res.status(400).json({ error: `Минимальный ранг: ${event.min_rank}` });
+        }
+        
+        if (maxRankIndex !== ranks.length && characterRankIndex > maxRankIndex) {
+          return res.status(400).json({ error: `Максимальный ранг: ${event.max_rank}` });
+        }
+      }
+    }
+
+    // Проверяем что персонаж еще не зарегистрирован в ивенте
+    const existingParticipant = await db.get(`
+      SELECT * FROM EventParticipants 
+      WHERE event_id = ? AND character_id = ?
+    `, [id, character_id]);
+
+    if (existingParticipant) {
+      return res.status(400).json({ error: 'Персонаж уже зарегистрирован в этом ивенте' });
+    }
+
+    // Регистрируем участника
+    await db.run(`
+      INSERT INTO EventParticipants (event_id, character_id, vk_id, branch_id)
+      VALUES (?, ?, ?, ?)
+    `, [id, character_id, vk_id, branch_id || null]);
+
+    res.status(201).json({ success: true });
+  } catch (error) {
+    console.error('Failed to join event branch:', error);
+    res.status(500).json({ error: 'Не удалось присоединиться к ивенту' });
   }
 });
 
@@ -1629,6 +1853,266 @@ router.delete('/events/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to delete event:', error);
     res.status(500).json({ error: 'Не удалось удалить ивент' });
+  }
+});
+
+// ==================== BULK CHARACTERS MANAGEMENT API ====================
+
+// GET /api/admin/characters - Получить список всех персонажей с поиском (админы)
+router.get('/admin/characters', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { search, limit = 100, offset = 0 } = req.query;
+    const db = await initDB();
+
+    let query = `
+      SELECT c.*, u.first_name, u.last_name
+      FROM Characters c
+      LEFT JOIN Users u ON c.vk_id = u.vk_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (search && typeof search === 'string') {
+      query += ` AND (
+        c.character_name LIKE ? OR 
+        c.rank LIKE ? OR 
+        c.faction LIKE ? OR
+        u.first_name LIKE ? OR
+        u.last_name LIKE ?
+      )`;
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    query += ` ORDER BY c.character_name ASC LIMIT ? OFFSET ?`;
+    params.push(parseInt(limit as string), parseInt(offset as string));
+
+    const characters = await db.all(query, params);
+
+    // Получаем общее количество для пагинации
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM Characters c
+      LEFT JOIN Users u ON c.vk_id = u.vk_id
+      WHERE 1=1
+    `;
+    const countParams: any[] = [];
+
+    if (search && typeof search === 'string') {
+      countQuery += ` AND (
+        c.character_name LIKE ? OR 
+        c.rank LIKE ? OR 
+        c.faction LIKE ? OR
+        u.first_name LIKE ? OR
+        u.last_name LIKE ?
+      )`;
+      const searchTerm = `%${search}%`;
+      countParams.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    const totalResult = await db.get(countQuery, countParams);
+
+    res.json({
+      characters,
+      total: totalResult.total,
+      limit: parseInt(limit as string),
+      offset: parseInt(offset as string)
+    });
+  } catch (error) {
+    console.error('Failed to fetch characters:', error);
+    res.status(500).json({ error: 'Не удалось получить список персонажей' });
+  }
+});
+
+// POST /api/admin/characters/bulk-update-attributes - Массовое изменение атрибутов (админы)
+router.post('/admin/characters/bulk-update-attributes', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { character_ids, attribute_changes } = req.body;
+    const db = await initDB();
+
+    if (!Array.isArray(character_ids) || character_ids.length === 0) {
+      return res.status(400).json({ error: 'Необходимо выбрать персонажей' });
+    }
+
+    if (!attribute_changes || Object.keys(attribute_changes).length === 0) {
+      return res.status(400).json({ error: 'Необходимо указать изменения атрибутов' });
+    }
+
+    await db.run('BEGIN TRANSACTION');
+
+    try {
+      for (const characterId of character_ids) {
+        // Проверяем что персонаж существует
+        const character = await db.get('SELECT * FROM Characters WHERE id = ?', [characterId]);
+        if (!character) continue;
+
+        // Формируем запрос на обновление
+        const updates: string[] = [];
+        const params: any[] = [];
+
+        for (const [attribute, change] of Object.entries(attribute_changes)) {
+          if (typeof change === 'number' && change !== 0) {
+            if (['strength', 'agility', 'intellect', 'endurance', 'luck'].includes(attribute)) {
+              if (change > 0) {
+                updates.push(`${attribute} = ${attribute} + ?`);
+              } else {
+                updates.push(`${attribute} = MAX(0, ${attribute} + ?)`);
+              }
+              params.push(Math.abs(change));
+            }
+          }
+        }
+
+        if (updates.length > 0) {
+          await db.run(
+            `UPDATE Characters SET ${updates.join(', ')} WHERE id = ?`,
+            [...params, characterId]
+          );
+        }
+      }
+
+      await db.run('COMMIT');
+      res.json({ success: true, updated_count: character_ids.length });
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to bulk update attributes:', error);
+    res.status(500).json({ error: 'Не удалось обновить атрибуты' });
+  }
+});
+
+// POST /api/admin/characters/bulk-update-currency - Массовое изменение валюты (админы)
+router.post('/admin/characters/bulk-update-currency', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { character_ids, currency_change } = req.body;
+    const db = await initDB();
+
+    if (!Array.isArray(character_ids) || character_ids.length === 0) {
+      return res.status(400).json({ error: 'Необходимо выбрать персонажей' });
+    }
+
+    if (typeof currency_change !== 'number' || currency_change === 0) {
+      return res.status(400).json({ error: 'Необходимо указать изменение валюты' });
+    }
+
+    await db.run('BEGIN TRANSACTION');
+
+    try {
+      for (const characterId of character_ids) {
+        if (currency_change > 0) {
+          // Добавляем валюту
+          await db.run(
+            'UPDATE Characters SET currency = currency + ? WHERE id = ?',
+            [currency_change, characterId]
+          );
+        } else {
+          // Отнимаем валюту (но не меньше 0)
+          await db.run(
+            'UPDATE Characters SET currency = MAX(0, currency + ?) WHERE id = ?',
+            [currency_change, characterId]
+          );
+        }
+      }
+
+      await db.run('COMMIT');
+      res.json({ success: true, updated_count: character_ids.length });
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to bulk update currency:', error);
+    res.status(500).json({ error: 'Не удалось обновить валюту' });
+  }
+});
+
+// POST /api/admin/characters/bulk-add-inventory - Массовое добавление предметов в инвентарь (админы)
+router.post('/admin/characters/bulk-add-inventory', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const { character_ids, item_name, item_description, quantity = 1 } = req.body;
+    const db = await initDB();
+
+    if (!Array.isArray(character_ids) || character_ids.length === 0) {
+      return res.status(400).json({ error: 'Необходимо выбрать персонажей' });
+    }
+
+    if (!item_name || item_name.trim().length === 0) {
+      return res.status(400).json({ error: 'Необходимо указать название предмета' });
+    }
+
+    if (typeof quantity !== 'number' || quantity <= 0) {
+      return res.status(400).json({ error: 'Количество должно быть положительным числом' });
+    }
+
+    await db.run('BEGIN TRANSACTION');
+
+    try {
+      for (const characterId of character_ids) {
+        // Проверяем что персонаж существует
+        const character = await db.get('SELECT * FROM Characters WHERE id = ?', [characterId]);
+        if (!character) continue;
+
+        // Получаем текущий инвентарь
+        let inventory = [];
+        try {
+          inventory = character.inventory ? JSON.parse(character.inventory) : [];
+        } catch (e) {
+          inventory = [];
+        }
+
+        // Проверяем есть ли уже такой предмет
+        const existingItemIndex = inventory.findIndex((item: any) => item.name === item_name.trim());
+
+        if (existingItemIndex !== -1) {
+          // Увеличиваем количество существующего предмета
+          inventory[existingItemIndex].quantity = (inventory[existingItemIndex].quantity || 1) + quantity;
+        } else {
+          // Добавляем новый предмет
+          inventory.push({
+            name: item_name.trim(),
+            description: item_description || '',
+            quantity: quantity
+          });
+        }
+
+        // Обновляем инвентарь
+        await db.run(
+          'UPDATE Characters SET inventory = ? WHERE id = ?',
+          [JSON.stringify(inventory), characterId]
+        );
+      }
+
+      await db.run('COMMIT');
+      res.json({ success: true, updated_count: character_ids.length });
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to bulk add inventory:', error);
+    res.status(500).json({ error: 'Не удалось добавить предметы' });
   }
 });
 

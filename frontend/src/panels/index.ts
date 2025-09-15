@@ -18,3 +18,4 @@ export { AdminMarketPanel } from './AdminMarketPanel';
 export { CasinoPanel } from './CasinoPanel';
 export { NewEventsPanel } from './NewEventsPanel';
 export { NewAdminEventsPanel } from './NewAdminEventsPanel';
+export { BulkCharacterManagement } from './BulkCharacterManagement';

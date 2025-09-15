@@ -57,6 +57,19 @@ interface EventBet {
   created_at: string;
 }
 
+interface EventBranch {
+  id: number;
+  event_id: number;
+  branch_name: string;
+  description: string | null;
+  min_rank: string | null;
+  max_rank: string | null;
+  max_participants: number | null;
+  rewards: any;
+  participant_count: number;
+  created_at: string;
+}
+
 export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => {
   const [events, setEvents] = useState<Event[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -72,6 +85,8 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
   const [selectedBet, setSelectedBet] = useState<EventBet | null>(null);
   const [betType, setBetType] = useState<'believer' | 'unbeliever'>('believer');
   const [betAmount, setBetAmount] = useState<string>('');
+  const [eventBranches, setEventBranches] = useState<EventBranch[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState<number | null>(null);
 
   useEffect(() => {
     fetchEvents();
@@ -125,13 +140,26 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
     );
   };
 
-  const openJoinModal = (event: Event) => {
+  const fetchEventBranches = async (eventId: number) => {
+    try {
+      const response = await fetch(`${API_URL}/events/${eventId}/branches`);
+      const data = await response.json();
+      setEventBranches(data || []);
+    } catch (error) {
+      console.error('Failed to fetch event branches:', error);
+      setEventBranches([]);
+    }
+  };
+
+  const openJoinModal = async (event: Event) => {
     if (!characters.length) {
       showSnackbar('У вас нет персонажей для регистрации', false);
       return;
     }
     setSelectedEvent(event);
     setSelectedCharacter(null);
+    setSelectedBranch(null);
+    await fetchEventBranches(event.id);
     setShowJoinModal(true);
   };
 
@@ -148,13 +176,26 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/events/${selectedEvent.id}/join`, {
+      
+      // Выбираем правильный эндпоинт в зависимости от того, выбрана ли ветка
+      const endpoint = selectedBranch 
+        ? `${API_URL}/events/${selectedEvent.id}/join-branch`
+        : `${API_URL}/events/${selectedEvent.id}/join`;
+
+      const body: any = {
+        character_id: selectedCharacter,
+        vk_id: fetchedUser?.id
+      };
+
+      // Добавляем ID ветки если она выбрана
+      if (selectedBranch) {
+        body.branch_id = selectedBranch;
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          character_id: selectedCharacter,
-          vk_id: fetchedUser?.id
-        })
+        body: JSON.stringify(body)
       });
 
       if (response.ok) {
@@ -453,15 +494,64 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
                   {selectedEvent.title}
                 </Text>
                 
-                <Text style={{ marginBottom: 8 }}>Выберите персонажа:</Text>
-                <Select
-                  value={selectedCharacter?.toString() || ''}
-                  onChange={(e) => setSelectedCharacter(parseInt(e.target.value))}
-                  options={characters.map(char => ({
-                    label: `${char.character_name} (${char.rank}) - ${char.faction}`,
-                    value: char.id.toString()
-                  }))}
-                />
+                <FormItem top="Выберите персонажа:">
+                  <Select
+                    value={selectedCharacter?.toString() || ''}
+                    onChange={(e) => setSelectedCharacter(parseInt(e.target.value))}
+                    options={characters.map(char => ({
+                      label: `${char.character_name} (${char.rank}) - ${char.faction}`,
+                      value: char.id.toString()
+                    }))}
+                  />
+                </FormItem>
+
+                {eventBranches.length > 0 && (
+                  <FormItem top="Выберите путь (ветку):">
+                    <Select
+                      value={selectedBranch?.toString() || ''}
+                      onChange={(e) => setSelectedBranch(e.target.value ? parseInt(e.target.value) : null)}
+                      options={[
+                        { label: '🏰 Основной путь (без веток)', value: '' },
+                        ...eventBranches.map(branch => ({
+                          label: `🌿 ${branch.branch_name} (${branch.participant_count}/${branch.max_participants || '∞'} участников)`,
+                          value: branch.id.toString()
+                        }))
+                      ]}
+                    />
+                  </FormItem>
+                )}
+
+                {selectedBranch && (
+                  <div style={{ 
+                    padding: 12, 
+                    backgroundColor: '#f5f5f5', 
+                    borderRadius: 8, 
+                    marginBottom: 16 
+                  }}>
+                    {(() => {
+                      const branch = eventBranches.find(b => b.id === selectedBranch);
+                      if (!branch) return null;
+                      return (
+                        <div>
+                          <Text weight="2" style={{ fontSize: 16, marginBottom: 8 }}>
+                            🌿 {branch.branch_name}
+                          </Text>
+                          {branch.description && (
+                            <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
+                              {branch.description}
+                            </Text>
+                          )}
+                          <div style={{ fontSize: 14, color: '#666' }}>
+                            {branch.min_rank || branch.max_rank ? (
+                              <div>🏆 Требования: {getRankText(branch.min_rank, branch.max_rank)}</div>
+                            ) : null}
+                            <div>👥 Участников: {branch.participant_count}{branch.max_participants ? `/${branch.max_participants}` : ''}</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 <div style={{ marginTop: 20 }}>
                   <Button

@@ -461,6 +461,16 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
             Управление Ивентами
           </Button>
         </Div>
+        <Div>
+          <Button
+            size="l"
+            stretched
+            mode="secondary"
+            onClick={() => routeNavigator.push('/bulk_characters')}
+          >
+            👑 Массовое управление персонажами
+          </Button>
+        </Div>
       </Group>
       
       {snackbar}

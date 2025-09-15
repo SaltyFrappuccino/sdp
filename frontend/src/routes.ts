@@ -31,6 +31,7 @@ export const DEFAULT_VIEW_PANELS = {
   CASINO: 'casino',
   EVENTS: 'events',
   ADMIN_EVENTS: 'admin_events',
+  BULK_CHARACTERS: 'bulk_characters',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -56,6 +57,7 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.CASINO, `/${DEFAULT_VIEW_PANELS.CASINO}`, []),
       createPanel(DEFAULT_VIEW_PANELS.EVENTS, `/${DEFAULT_VIEW_PANELS.EVENTS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_EVENTS, `/${DEFAULT_VIEW_PANELS.ADMIN_EVENTS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.BULK_CHARACTERS, `/${DEFAULT_VIEW_PANELS.BULK_CHARACTERS}`, []),
     ]),
   ]),
 ]);
