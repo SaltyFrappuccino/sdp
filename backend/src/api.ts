@@ -1994,6 +1994,66 @@ router.get('/market/events', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/market/admin/reset-economy - Сбросить экономику
+router.post('/market/admin/reset-economy', async (req: Request, res: Response) => {
+  const adminId = req.headers['x-admin-id'];
+  if (adminId !== ADMIN_VK_ID) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const db = await initDB();
+  try {
+    await db.run('BEGIN TRANSACTION');
+
+    // 1. Обнуление валюты у всех персонажей
+    await db.run('UPDATE Characters SET currency = 0');
+
+    // 2. Очистка всех портфелей
+    await db.run('DELETE FROM PortfolioAssets');
+    await db.run('DELETE FROM Portfolios');
+
+    // 3. Очистка истории цен
+    await db.run('DELETE FROM StockPriceHistory');
+    
+    // 4. Сброс цен на акции к первоначальным значениям
+    // Для этого нам нужно пересоздать акции с помощью seedStocks
+    await db.run('DELETE FROM Stocks');
+    // seedStocks находится в database.ts и вызывается в initDB,
+    // но для идемпотентности вызовем его здесь явно.
+    // Для этого нужно импортировать seedStocks.
+    // Однако, чтобы не усложнять, просто пересоздадим базу.
+    // Простой вариант - это просто пересоздать таблицы.
+    // Но самый простой и надежный способ - это просто удалить и заново создать.
+    // Но так как у нас есть seedStocks, мы можем его использовать.
+    // Для этого нужно экспортировать seedStocks из database.ts
+    // и импортировать в api.ts.
+    // Но для простоты, я просто скопирую логику сюда.
+    const stocks = [
+      { name: 'Arasaka', ticker_symbol: 'ARSK', description: 'Промышленный и военный гигант, производитель оружия, роботов и имплантов.', current_price: 150.75, exchange: 'IGX' },
+      { name: 'Sber', ticker_symbol: 'SBER', description: 'Цифровой гигант, контролирующий информацию, финансы и логистику.', current_price: 280.50, exchange: 'IGX' },
+      { name: 'Отражённый Свет Солнца', ticker_symbol: 'OSS', description: 'Религиозная и бизнес-сеть с огромным влиянием.', current_price: 120.00, exchange: 'IGX' },
+      { name: 'Стабилизационные Облигации Порядка', ticker_symbol: 'ORD-B', description: 'Надежные государственные облигации, поддерживаемые Порядком.', current_price: 100.00, exchange: 'OSB' },
+      { name: 'Индекс Влияния "Чёрной Лилии"', ticker_symbol: 'BLK-L', description: 'Высокорисковый индекс, отражающий успех теневых операций.', current_price: 50.25, exchange: 'KSM' },
+      { name: 'Редкие травы с Мидзу', ticker_symbol: 'MDZ-H', description: 'Товарный фьючерс на поставку уникальных лекарственных растений.', current_price: 3500.00, exchange: 'MCM' }
+    ];
+  
+    const stmt = await db.prepare('INSERT OR IGNORE INTO Stocks (name, ticker_symbol, description, current_price, exchange) VALUES (?, ?, ?, ?, ?)');
+    for (const stock of stocks) {
+      await stmt.run(stock.name, stock.ticker_symbol, stock.description, stock.current_price, stock.exchange);
+    }
+    await stmt.finalize();
+
+
+    await db.run('COMMIT');
+    res.json({ message: 'Экономика успешно сброшена' });
+
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Failed to reset economy:', error);
+    res.status(500).json({ error: 'Не удалось сбросить экономику' });
+  }
+});
+
 // GET /api/market/leaderboard - Получить рейтинг трейдеров
 router.get('/market/leaderboard', async (req: Request, res: Response) => {
   try {

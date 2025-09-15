@@ -1,5 +1,5 @@
 import { FC, useState, useEffect, ReactNode } from 'react';
-import { Panel, PanelHeader, Header, Group, Div, CardGrid, Card, Text, Button, Spinner, Select, Input, FormItem, Snackbar, PanelHeaderBack } from '@vkontakte/vkui';
+import { Panel, PanelHeader, Header, Group, Div, CardGrid, Card, Text, Button, Spinner, Select, Input, FormItem, Snackbar, PanelHeaderBack, Alert } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
 import { Icon24CheckCircleOutline, Icon24ErrorCircle } from '@vkontakte/icons';
@@ -29,6 +29,7 @@ export const AdminMarketPanel: FC<AdminMarketPanelProps> = ({ id }) => {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+  const [popout, setPopout] = useState<ReactNode | null>(null);
   const [newEvent, setNewEvent] = useState<Partial<MarketEvent>>({ impact_strength: 0.01, duration_hours: 24 });
   
   useEffect(() => {
@@ -81,6 +82,46 @@ export const AdminMarketPanel: FC<AdminMarketPanelProps> = ({ id }) => {
       if (response.ok) {
         setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24CheckCircleOutline />}>{result.message}</Snackbar>);
         setNewEvent({ impact_strength: 0.01, duration_hours: 24 });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Ошибка';
+      setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24ErrorCircle />}>{message}</Snackbar>);
+    }
+  };
+
+  const showResetConfirmation = () => {
+    setPopout(
+      <Alert
+        actions={[
+          { title: 'Отмена', mode: 'cancel' },
+          {
+            title: 'Сбросить',
+            mode: 'destructive',
+            action: handleResetEconomy,
+          },
+        ]}
+        actionsLayout="vertical"
+        onClose={() => setPopout(null)}
+      >
+        <h2>Подтверждение сброса</h2>
+        <p>Вы уверены, что хотите сбросить всю экономику? Это действие обнулит валюту и акции всех игроков. Действие необратимо.</p>
+      </Alert>
+    );
+  };
+
+  const handleResetEconomy = async () => {
+    const adminId = localStorage.getItem('adminId');
+    try {
+      const response = await fetch(`${API_URL}/market/admin/reset-economy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-id': adminId || '' },
+      });
+      const result = await response.json();
+      if (response.ok) {
+        setSnackbar(<Snackbar onClose={() => setSnackbar(null)} before={<Icon24CheckCircleOutline />}>{result.message}</Snackbar>);
+        fetchStocks(); // Обновить список акций
       } else {
         throw new Error(result.error);
       }
@@ -143,9 +184,23 @@ export const AdminMarketPanel: FC<AdminMarketPanelProps> = ({ id }) => {
               <Button size="l" stretched onClick={handleCreateEvent}>Создать событие</Button>
             </Div>
           </Group>
+
+          <Group header={<Header>Опасная зона</Header>}>
+            <Div>
+              <Button
+                size="l"
+                stretched
+                appearance="negative"
+                onClick={showResetConfirmation}
+              >
+                Сбросить экономику
+              </Button>
+            </Div>
+          </Group>
         </>
       )}
       {snackbar}
+      {popout}
     </Panel>
   );
 };
