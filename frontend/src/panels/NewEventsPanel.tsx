@@ -34,6 +34,7 @@ interface EventParticipant {
   rank: string;
   faction: string;
   joined_at: string;
+  branch_name?: string;
 }
 
 interface Character {
@@ -84,6 +85,7 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [showBetsModal, setShowBetsModal] = useState(false);
   const [showPlaceBetModal, setShowPlaceBetModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [eventBets, setEventBets] = useState<EventBet[]>([]);
   const [selectedBet, setSelectedBet] = useState<EventBet | null>(null);
   const [betType, setBetType] = useState<'believer' | 'unbeliever'>('believer');
@@ -257,6 +259,41 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
     return event.status === 'active' || event.status === 'upcoming';
   };
 
+  const openLeaveModal = (event: Event) => {
+    setSelectedEvent(event);
+    setShowLeaveModal(true);
+  };
+
+  const leaveEventWithCharacter = async () => {
+    if (!selectedEvent || !selectedCharacter) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/events/${selectedEvent.id}/leave`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ character_id: selectedCharacter })
+      });
+
+      if (response.ok) {
+        showSnackbar('Покинули событие', true);
+        setShowLeaveModal(false);
+        fetchEvents();
+        if (selectedEvent) {
+          await fetchEventDetails(selectedEvent.id);
+        }
+      } else {
+        const errorData = await response.json();
+        showSnackbar(errorData.error || 'Ошибка выхода из события', false);
+      }
+    } catch (error) {
+      console.error('Failed to leave event:', error);
+      showSnackbar('Ошибка соединения', false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const canJoinEvent = (event: Event) => {
     if (event.registration_end_date && new Date() > new Date(event.registration_end_date)) {
       return false;
@@ -361,6 +398,21 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
       </PanelHeader>
       
       <Div>
+        {characters.length > 0 && (
+          <Select
+            placeholder="Выберите персонажа"
+            value={selectedCharacter}
+            onChange={(e) => setSelectedCharacter(Number(e.target.value))}
+            options={characters.map(char => ({
+              label: `${char.character_name || 'Неизвестно'} (${char.rank || 'Нет ранга'}) - ${char.faction || 'Нет фракции'}`,
+              value: char.id
+            }))}
+            style={{ marginBottom: '16px' }}
+          />
+        )}
+      </Div>
+      
+      <Div>
         {loading ? (
           <Card>
             <Div>
@@ -418,7 +470,7 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
                         <Button
                           size="s"
                           mode="secondary"
-                          onClick={() => leaveEvent(event.id, selectedCharacter!)}
+                          onClick={() => openLeaveModal(event)}
                           style={{ backgroundColor: '#ffebee', color: '#d32f2f' }}
                         >
                           Покинуть
@@ -622,6 +674,11 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
                             <Text style={{ fontSize: 14, color: '#666' }}>
                               {participant.rank} - {participant.faction}
                             </Text>
+                            {participant.branch_name && (
+                              <Text style={{ fontSize: 14, color: '#2196F3' }}>
+                                🌿 {participant.branch_name}
+                              </Text>
+                            )}
                           </div>
                           <Text style={{ fontSize: 12, color: '#666' }}>
                             {formatDate(participant.joined_at)}
@@ -840,6 +897,44 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
               </div>
             )}
           </Div>
+        </ModalPage>
+      </ModalRoot>
+
+      {/* Модальное окно покидания события */}
+      <ModalRoot activeModal={showLeaveModal ? 'leave' : null}>
+        <ModalPage id="leave">
+          <ModalPageHeader>Покинуть событие</ModalPageHeader>
+          <div style={{ padding: '16px' }}>
+            {selectedEvent && (
+              <>
+                <Text style={{ marginBottom: '16px' }}>
+                  Вы уверены, что хотите покинуть событие "{selectedEvent.title}"?
+                </Text>
+                {selectedCharacter && (
+                  <Text style={{ marginBottom: '16px', color: '#666' }}>
+                    Персонаж: {characters.find(c => c.id === selectedCharacter)?.character_name}
+                  </Text>
+                )}
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <Button
+                    size="m"
+                    mode="tertiary"
+                    onClick={() => setShowLeaveModal(false)}
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    size="m"
+                    onClick={leaveEventWithCharacter}
+                    loading={loading}
+                    style={{ backgroundColor: '#d32f2f', color: 'white' }}
+                  >
+                    Покинуть
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         </ModalPage>
       </ModalRoot>
 

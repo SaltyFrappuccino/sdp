@@ -3380,18 +3380,35 @@ router.get('/market/stocks', async (req: Request, res: Response) => {
              COUNT(pa.id) as holders,
              COALESCE(SUM(pa.quantity), 0) as shares_owned
       FROM Stocks s 
-      LEFT JOIN PortfolioAssets pa ON s.id = pa.stock_id AND pa.position_type = 'long'
+      LEFT JOIN PortfolioAssets pa ON s.id = pa.stock_id AND (pa.position_type = 'long' OR pa.position_type IS NULL)
       GROUP BY s.id
       ORDER BY s.exchange, s.name
     `);
     
-    // Добавляем доступные акции
-    const enrichedStocks = stocks.map((stock: any) => ({
-      ...stock,
-      available_shares: stock.total_shares - (stock.shares_owned || 0)
-    }));
+    // Добавляем историю цен и доступные акции
+    for (const stock of stocks) {
+      // Получаем историю цен
+      const priceHistory = await db.all(`
+        SELECT price, 
+               CASE 
+                 WHEN timestamp IS NOT NULL AND timestamp != '' THEN timestamp 
+                 ELSE legacy_timestamp 
+               END as timestamp
+        FROM StockPriceHistory 
+        WHERE stock_id = ? 
+        ORDER BY 
+          CASE 
+            WHEN timestamp IS NOT NULL AND timestamp != '' THEN timestamp 
+            ELSE legacy_timestamp 
+          END DESC 
+        LIMIT 30
+      `, [stock.id]);
+      
+      stock.history = priceHistory.reverse();
+      stock.available_shares = (stock.total_shares || 0) - (stock.shares_owned || 0);
+    }
     
-    res.json(enrichedStocks);
+    res.json(stocks);
   } catch (error) {
     console.error('Failed to fetch stocks:', error);
     res.status(500).json({ error: 'Не удалось получить список акций' });

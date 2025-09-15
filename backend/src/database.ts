@@ -485,15 +485,15 @@ export async function initDB() {
       const hasPositionType = portfolioColumns.some((col: any) => col.name === 'position_type');
       
       if (!hasPositionType) {
-        // Добавляем position_type колонку
-        await db.run("ALTER TABLE PortfolioAssets ADD COLUMN position_type TEXT DEFAULT 'long'");
+        // Добавляем position_type колонку без DEFAULT (SQLite ограничение)
+        await db.run("ALTER TABLE PortfolioAssets ADD COLUMN position_type TEXT");
         console.log('Added position_type column to PortfolioAssets');
         
         // Обновляем все существующие записи как 'long'
         await db.run(`
           UPDATE PortfolioAssets 
           SET position_type = 'long' 
-          WHERE position_type IS NULL
+          WHERE position_type IS NULL OR position_type = ''
         `);
         console.log('Updated position_type for existing assets');
       }
