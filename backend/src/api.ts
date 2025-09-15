@@ -1622,7 +1622,7 @@ router.delete('/events/branches/:branch_id', async (req: Request, res: Response)
     }
 
     // Проверяем есть ли участники в этой ветке
-    const participantCount = await db.get(
+      const participantCount = await db.get(
       'SELECT COUNT(*) as count FROM EventParticipants WHERE branch_id = ?',
       [branch_id]
     );
@@ -1775,14 +1775,14 @@ router.post('/events/:id/join', async (req: Request, res: Response) => {
     if (event.min_rank) {
       const minRankIndex = ranks.indexOf(event.min_rank);
       if (characterRankIndex < minRankIndex) {
-        return res.status(400).json({ error: 'Ранг персонажа слишком низкий для этого события' });
-      }
+      return res.status(400).json({ error: 'Ранг персонажа слишком низкий для этого события' });
+    }
     }
     
     if (event.max_rank) {
       const maxRankIndex = ranks.indexOf(event.max_rank);
       if (characterRankIndex > maxRankIndex) {
-        return res.status(400).json({ error: 'Ранг персонажа слишком высокий для этого события' });
+      return res.status(400).json({ error: 'Ранг персонажа слишком высокий для этого события' });
       }
     }
 
@@ -1868,7 +1868,7 @@ router.get('/admin/characters', async (req: Request, res: Response) => {
   try {
     const { search, limit = 100, offset = 0 } = req.query;
     const db = await initDB();
-
+    
     let query = `
       SELECT c.*, u.first_name, u.last_name
       FROM Characters c
@@ -1929,23 +1929,23 @@ router.get('/admin/characters', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/characters/bulk-update-attributes - Массовое изменение атрибутов (админы)
-router.post('/admin/characters/bulk-update-attributes', async (req: Request, res: Response) => {
+// POST /api/admin/characters/bulk-update-attribute-points - Массовое изменение очков атрибутов (админы)
+router.post('/admin/characters/bulk-update-attribute-points', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
   if (adminId !== ADMIN_VK_ID) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
   try {
-    const { character_ids, attribute_changes } = req.body;
+    const { character_ids, attribute_points_change } = req.body;
     const db = await initDB();
 
     if (!Array.isArray(character_ids) || character_ids.length === 0) {
       return res.status(400).json({ error: 'Необходимо выбрать персонажей' });
     }
 
-    if (!attribute_changes || Object.keys(attribute_changes).length === 0) {
-      return res.status(400).json({ error: 'Необходимо указать изменения атрибутов' });
+    if (typeof attribute_points_change !== 'number' || attribute_points_change === 0) {
+      return res.status(400).json({ error: 'Необходимо указать изменение очков атрибутов' });
     }
 
     await db.run('BEGIN TRANSACTION');
@@ -1953,43 +1953,27 @@ router.post('/admin/characters/bulk-update-attributes', async (req: Request, res
     try {
       for (const characterId of character_ids) {
         // Проверяем что персонаж существует
-        const character = await db.get('SELECT * FROM Characters WHERE id = ?', [characterId]);
+        const character = await db.get('SELECT attribute_points_total FROM Characters WHERE id = ?', [characterId]);
         if (!character) continue;
 
-        // Формируем запрос на обновление
-        const updates: string[] = [];
-        const params: any[] = [];
+        const currentPoints = character.attribute_points_total || 0;
+        const newPoints = Math.max(0, currentPoints + attribute_points_change); // Не позволяем быть отрицательными
 
-        for (const [attribute, change] of Object.entries(attribute_changes)) {
-          if (typeof change === 'number' && change !== 0) {
-            if (['strength', 'agility', 'intellect', 'endurance', 'luck'].includes(attribute)) {
-              if (change > 0) {
-                updates.push(`${attribute} = ${attribute} + ?`);
-              } else {
-                updates.push(`${attribute} = MAX(0, ${attribute} + ?)`);
-              }
-              params.push(Math.abs(change));
-            }
-          }
-        }
-
-        if (updates.length > 0) {
-          await db.run(
-            `UPDATE Characters SET ${updates.join(', ')} WHERE id = ?`,
-            [...params, characterId]
-          );
-        }
+        await db.run(
+          'UPDATE Characters SET attribute_points_total = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [newPoints, characterId]
+        );
       }
 
       await db.run('COMMIT');
-      res.json({ success: true, updated_count: character_ids.length });
-    } catch (error) {
+      res.json({ message: `Очки атрибутов обновлены для ${character_ids.length} персонажей` });
+  } catch (error) {
       await db.run('ROLLBACK');
       throw error;
     }
   } catch (error) {
-    console.error('Failed to bulk update attributes:', error);
-    res.status(500).json({ error: 'Не удалось обновить атрибуты' });
+    console.error('Failed to bulk update attribute points:', error);
+    res.status(500).json({ error: 'Не удалось обновить очки атрибутов' });
   }
 });
 
@@ -2033,7 +2017,7 @@ router.post('/admin/characters/bulk-update-currency', async (req: Request, res: 
 
       await db.run('COMMIT');
       res.json({ success: true, updated_count: character_ids.length });
-    } catch (error) {
+  } catch (error) {
       await db.run('ROLLBACK');
       throw error;
     }
@@ -2151,7 +2135,7 @@ router.post('/events/:id/bets', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { bet_text } = req.body;
     const db = await initDB();
-
+    
     if (!bet_text || bet_text.trim().length === 0) {
       return res.status(400).json({ error: 'Текст ставки обязателен' });
     }
@@ -2305,7 +2289,7 @@ router.post('/bets/:bet_id/place', async (req: Request, res: Response) => {
       );
 
       // Размещаем ставку
-      await db.run(`
+    await db.run(`
         INSERT INTO EventBetPlacements 
         (bet_id, character_id, vk_id, bet_type, amount, odds_at_placement, potential_payout)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -2327,7 +2311,7 @@ router.post('/bets/:bet_id/place', async (req: Request, res: Response) => {
         new_currency: character.currency - amount
       });
 
-    } catch (error) {
+  } catch (error) {
       await db.run('ROLLBACK');
       throw error;
     }
@@ -2395,7 +2379,7 @@ router.put('/bets/:bet_id/settle', async (req: Request, res: Response) => {
       }
 
       // Обновляем статус ставки
-      await db.run(`
+    await db.run(`
         UPDATE EventBets 
         SET status = 'settled', result = ?, settled_at = CURRENT_TIMESTAMP
         WHERE id = ?
@@ -2403,9 +2387,9 @@ router.put('/bets/:bet_id/settle', async (req: Request, res: Response) => {
 
       await db.run('COMMIT');
 
-      res.json({ success: true });
+    res.json({ success: true });
 
-    } catch (error) {
+  } catch (error) {
       await db.run('ROLLBACK');
       throw error;
     }
@@ -2481,7 +2465,21 @@ router.get('/market/stocks', async (req: Request, res: Response) => {
     const stocks = await db.all('SELECT id, name, ticker_symbol, description, current_price, exchange, base_trend FROM Stocks ORDER BY exchange, name');
 
     const stocksWithHistory = await Promise.all(stocks.map(async (stock) => {
-      const history = await db.all('SELECT price, timestamp FROM StockPriceHistory WHERE stock_id = ? ORDER BY timestamp DESC LIMIT 30', [stock.id]);
+      const history = await db.all(`
+        SELECT price, 
+               CASE 
+                 WHEN timestamp IS NOT NULL AND timestamp != '' THEN timestamp 
+                 ELSE legacy_timestamp 
+               END as timestamp
+        FROM StockPriceHistory 
+        WHERE stock_id = ? 
+        ORDER BY 
+          CASE 
+            WHEN timestamp IS NOT NULL AND timestamp != '' THEN timestamp 
+            ELSE legacy_timestamp 
+          END DESC 
+        LIMIT 30
+      `, [stock.id]);
       return { ...stock, history };
     }));
 
@@ -2503,7 +2501,21 @@ router.get('/market/stocks/:ticker', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Акция не найдена' });
     }
 
-    const history = await db.all('SELECT price, timestamp FROM StockPriceHistory WHERE stock_id = ? ORDER BY timestamp DESC LIMIT 100', [stock.id]);
+    const history = await db.all(`
+      SELECT price, 
+             CASE 
+               WHEN timestamp IS NOT NULL AND timestamp != '' THEN timestamp 
+               ELSE legacy_timestamp 
+             END as timestamp
+      FROM StockPriceHistory 
+      WHERE stock_id = ? 
+      ORDER BY 
+        CASE 
+          WHEN timestamp IS NOT NULL AND timestamp != '' THEN timestamp 
+          ELSE legacy_timestamp 
+        END DESC 
+      LIMIT 100
+    `, [stock.id]);
     res.json({ ...stock, history });
   } catch (error) {
     console.error('Failed to fetch stock details:', error);
@@ -2535,14 +2547,64 @@ router.get('/market/portfolio/:character_id', async (req: Request, res: Response
       }
     }
 
+    // Обычные длинные позиции
     const assets = await db.all(`
-      SELECT s.name, s.ticker_symbol, s.current_price, pa.quantity, pa.average_purchase_price
+      SELECT 
+        pa.quantity,
+        pa.average_purchase_price,
+        pa.position_type,
+        s.name,
+        s.ticker_symbol,
+        s.current_price
       FROM PortfolioAssets pa
       JOIN Stocks s ON pa.stock_id = s.id
       WHERE pa.portfolio_id = ?
-    `, [portfolio.id])
+    `, [portfolio.id]);
 
-    res.json({ ...portfolio, assets });
+    // Короткие позиции
+    const shortPositions = await db.all(`
+      SELECT 
+        sp.id,
+        sp.quantity,
+        sp.short_price,
+        sp.margin_requirement,
+        sp.interest_rate,
+        sp.opened_at,
+        s.name,
+        s.ticker_symbol,
+        s.current_price,
+        (sp.short_price - s.current_price) * sp.quantity as unrealized_pnl
+      FROM ShortPositions sp
+      JOIN Stocks s ON sp.stock_id = s.id
+      WHERE sp.portfolio_id = ? AND sp.status = 'open'
+    `, [portfolio.id]);
+
+    // Активные ордера
+    const activeOrders = await db.all(`
+      SELECT 
+        o.id,
+        o.order_type,
+        o.side,
+        o.quantity,
+        o.price,
+        o.stop_price,
+        o.status,
+        o.created_at,
+        s.name as stock_name,
+        s.ticker_symbol,
+        s.current_price
+      FROM TradingOrders o
+      JOIN Stocks s ON o.stock_id = s.id
+      WHERE o.portfolio_id = ? AND o.status IN ('pending', 'partially_filled')
+      ORDER BY o.created_at DESC
+    `, [portfolio.id]);
+
+    res.json({ 
+      ...portfolio, 
+      assets,
+      short_positions: shortPositions,
+      active_orders: activeOrders
+    });
   } catch (error) {
     console.error('Failed to fetch portfolio:', error);
     res.status(500).json({ error: 'Не удалось получить портфолио' });
@@ -2818,6 +2880,247 @@ router.get('/market/leaderboard', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/market/short - Открыть короткую позицию
+router.post('/market/short', async (req: Request, res: Response) => {
+  const { character_id, ticker_symbol, quantity } = req.body;
+  if (!character_id || !ticker_symbol || !quantity || quantity <= 0) {
+    return res.status(400).json({ error: 'Неверные параметры для короткой позиции' });
+  }
+
+  const db = await initDB();
+  try {
+    await db.run('BEGIN TRANSACTION');
+
+    const stock = await db.get('SELECT * FROM Stocks WHERE ticker_symbol = ?', [ticker_symbol]);
+    if (!stock) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Акция не найдена' });
+    }
+
+    let portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
+    const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+    
+    if (!character) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (!portfolio) {
+      const result = await db.run('INSERT INTO Portfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, character.currency || 0]);
+      portfolio = { id: result.lastID, character_id, cash_balance: character.currency || 0 };
+    }
+
+    // Рассчитываем маржевое требование (50% от стоимости позиции)
+    const marginRequirement = stock.current_price * quantity * 0.5;
+    
+    if (character.currency < marginRequirement) {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Недостаточно средств для маржевого требования' });
+    }
+
+    // Списываем маржу
+    await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [marginRequirement, character_id]);
+    await db.run('UPDATE Portfolios SET cash_balance = cash_balance - ? WHERE id = ?', [marginRequirement, portfolio.id]);
+
+    // Создаем короткую позицию
+    await db.run(`
+      INSERT INTO ShortPositions (portfolio_id, stock_id, quantity, short_price, margin_requirement)
+      VALUES (?, ?, ?, ?, ?)
+    `, [portfolio.id, stock.id, quantity, stock.current_price, marginRequirement]);
+
+    await db.run('COMMIT');
+    res.json({ message: 'Короткая позиция открыта успешно' });
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Short position failed:', error);
+    res.status(500).json({ error: 'Не удалось открыть короткую позицию' });
+  }
+});
+
+// POST /api/market/cover - Закрыть короткую позицию
+router.post('/market/cover', async (req: Request, res: Response) => {
+  const { character_id, short_position_id, quantity } = req.body;
+  if (!character_id || !short_position_id || !quantity || quantity <= 0) {
+    return res.status(400).json({ error: 'Неверные параметры для закрытия позиции' });
+  }
+
+  const db = await initDB();
+  try {
+    await db.run('BEGIN TRANSACTION');
+
+    const shortPosition = await db.get(`
+      SELECT sp.*, s.current_price, s.name as stock_name
+      FROM ShortPositions sp
+      JOIN Stocks s ON sp.stock_id = s.id
+      WHERE sp.id = ? AND sp.status = 'open'
+    `, [short_position_id]);
+
+    if (!shortPosition) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Короткая позиция не найдена' });
+    }
+
+    if (quantity > shortPosition.quantity) {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Нельзя закрыть больше акций чем в позиции' });
+    }
+
+    // Рассчитываем прибыль/убыток от короткой позиции
+    const profitLoss = (shortPosition.short_price - shortPosition.current_price) * quantity;
+    const marginToReturn = (shortPosition.margin_requirement / shortPosition.quantity) * quantity;
+    const totalReturn = marginToReturn + profitLoss;
+
+    // Возвращаем деньги персонажу
+    await db.run('UPDATE Characters SET currency = currency + ? WHERE id = ?', [totalReturn, character_id]);
+
+    // Обновляем или удаляем короткую позицию
+    if (quantity === shortPosition.quantity) {
+      await db.run('UPDATE ShortPositions SET status = ? WHERE id = ?', ['closed', short_position_id]);
+    } else {
+      const newQuantity = shortPosition.quantity - quantity;
+      const newMargin = shortPosition.margin_requirement - marginToReturn;
+      await db.run(`
+        UPDATE ShortPositions 
+        SET quantity = ?, margin_requirement = ? 
+        WHERE id = ?
+      `, [newQuantity, newMargin, short_position_id]);
+    }
+
+    await db.run('COMMIT');
+    res.json({ 
+      message: 'Короткая позиция закрыта успешно',
+      profit_loss: profitLoss,
+      total_return: totalReturn
+    });
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Cover position failed:', error);
+    res.status(500).json({ error: 'Не удалось закрыть короткую позицию' });
+  }
+});
+
+// POST /api/market/order - Создать торговый ордер
+router.post('/market/order', async (req: Request, res: Response) => {
+  const { character_id, ticker_symbol, order_type, side, quantity, price, stop_price, time_in_force } = req.body;
+  
+  if (!character_id || !ticker_symbol || !order_type || !side || !quantity || quantity <= 0) {
+    return res.status(400).json({ error: 'Неверные параметры ордера' });
+  }
+
+  const db = await initDB();
+  try {
+    await db.run('BEGIN TRANSACTION');
+
+    const stock = await db.get('SELECT * FROM Stocks WHERE ticker_symbol = ?', [ticker_symbol]);
+    if (!stock) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Акция не найдена' });
+    }
+
+    let portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
+    if (!portfolio) {
+      const result = await db.run('INSERT INTO Portfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, 0]);
+      portfolio = { id: result.lastID, character_id, cash_balance: 0 };
+    }
+
+    // Проверяем возможность выставления ордера
+    if (['buy', 'short'].includes(side)) {
+      const orderPrice = order_type === 'market' ? stock.current_price : price;
+      const requiredFunds = side === 'buy' ? orderPrice * quantity : (orderPrice * quantity * 0.5); // Маржа для шорта
+      
+      const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+      if (character.currency < requiredFunds) {
+        await db.run('ROLLBACK');
+        return res.status(400).json({ error: 'Недостаточно средств для ордера' });
+      }
+    }
+
+    // Создаем ордер
+    const orderResult = await db.run(`
+      INSERT INTO TradingOrders (
+        portfolio_id, stock_id, order_type, side, quantity, price, stop_price, time_in_force
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [portfolio.id, stock.id, order_type, side, quantity, price, stop_price, time_in_force || 'GTC']);
+
+    // Если это рыночный ордер, исполняем его сразу
+    if (order_type === 'market') {
+      const executionPrice = stock.current_price;
+      
+      if (side === 'buy') {
+        const totalCost = executionPrice * quantity;
+        await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [totalCost, character_id]);
+        
+        const existingAsset = await db.get(`
+          SELECT * FROM PortfolioAssets 
+          WHERE portfolio_id = ? AND stock_id = ? AND position_type = 'long'
+        `, [portfolio.id, stock.id]);
+        
+        if (existingAsset) {
+          const newQuantity = existingAsset.quantity + quantity;
+          const newAvgPrice = ((existingAsset.average_purchase_price * existingAsset.quantity) + totalCost) / newQuantity;
+          await db.run(`
+            UPDATE PortfolioAssets 
+            SET quantity = ?, average_purchase_price = ? 
+            WHERE id = ?
+          `, [newQuantity, newAvgPrice, existingAsset.id]);
+        } else {
+          await db.run(`
+            INSERT INTO PortfolioAssets (portfolio_id, stock_id, quantity, average_purchase_price, position_type)
+            VALUES (?, ?, ?, ?, 'long')
+          `, [portfolio.id, stock.id, quantity, executionPrice]);
+        }
+      } else if (side === 'short') {
+        const marginRequirement = executionPrice * quantity * 0.5;
+        await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [marginRequirement, character_id]);
+        
+        await db.run(`
+          INSERT INTO ShortPositions (portfolio_id, stock_id, quantity, short_price, margin_requirement)
+          VALUES (?, ?, ?, ?, ?)
+        `, [portfolio.id, stock.id, quantity, executionPrice, marginRequirement]);
+      }
+
+      await db.run(`
+        UPDATE TradingOrders 
+        SET status = 'filled', filled_quantity = ?, avg_fill_price = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [quantity, executionPrice, orderResult.lastID]);
+    }
+
+    await db.run('COMMIT');
+    res.json({ message: 'Ордер создан успешно' });
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Order creation failed:', error);
+    res.status(500).json({ error: 'Не удалось создать ордер' });
+  }
+});
+
+// GET /api/market/orders/:character_id - Получить активные ордера персонажа
+router.get('/market/orders/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const orders = await db.all(`
+      SELECT 
+        o.*,
+        s.name as stock_name,
+        s.ticker_symbol,
+        s.current_price
+      FROM TradingOrders o
+      JOIN Portfolios p ON o.portfolio_id = p.id
+      JOIN Stocks s ON o.stock_id = s.id
+      WHERE p.character_id = ? AND o.status IN ('pending', 'partially_filled')
+      ORDER BY o.created_at DESC
+    `, [character_id]);
+
+    res.json(orders);
+  } catch (error) {
+    console.error('Failed to fetch orders:', error);
+    res.status(500).json({ error: 'Не удалось получить ордера' });
+  }
+});
+
 // ==================== CASINO API ====================
 
 // POST /api/casino/blackjack/start - Начать игру в блэкджек (списать ставку)
@@ -2934,7 +3237,10 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
     const { character_id, bet_amount, result, winAmount, gameData } = req.body;
     const db = await initDB();
 
+    console.log('Blackjack API called:', { character_id, bet_amount, result, winAmount, gameData });
+
     if (!character_id || !bet_amount || bet_amount <= 0 || !result || winAmount === undefined) {
+      console.log('Parameter validation failed:', { character_id, bet_amount, result, winAmount });
       return res.status(400).json({ error: 'Неверные параметры' });
     }
 
@@ -2943,6 +3249,7 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Персонаж не найден' });
     }
 
+    console.log('Character currency before:', character.currency, 'winAmount:', winAmount);
     // Ставка уже была списана при начале игры, только начисляем выигрыш
     const newCurrency = character.currency + winAmount;
     

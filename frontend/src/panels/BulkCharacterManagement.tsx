@@ -18,16 +18,13 @@ interface Character {
   rank: string;
   faction: string;
   currency: number;
-  strength: number;
-  agility: number;
-  intellect: number;
-  endurance: number;
-  luck: number;
+  attribute_points_total: number;
+  vk_id: number;
   first_name?: string;
   last_name?: string;
 }
 
-type ModalType = 'attributes' | 'currency' | 'inventory' | null;
+type ModalType = 'attribute_points' | 'currency' | 'inventory' | null;
 
 export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -39,13 +36,7 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   // Состояние для модальных окон
-  const [attributeChanges, setAttributeChanges] = useState({
-    strength: 0,
-    agility: 0,
-    intellect: 0,
-    endurance: 0,
-    luck: 0
-  });
+  const [attributePointsChange, setAttributePointsChange] = useState(0);
   const [currencyChange, setCurrencyChange] = useState(0);
   const [inventoryItem, setInventoryItem] = useState({
     name: '',
@@ -93,7 +84,7 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
     );
   };
 
-  const handleCharacterSelect = (characterId: number) => {
+  const toggleCharacterSelection = (characterId: number) => {
     const newSelected = new Set(selectedCharacters);
     if (newSelected.has(characterId)) {
       newSelected.delete(characterId);
@@ -103,31 +94,32 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
     setSelectedCharacters(newSelected);
   };
 
-  const selectAllVisible = () => {
-    const allVisibleIds = new Set(characters.map(c => c.id));
-    setSelectedCharacters(allVisibleIds);
+  const toggleSelectAll = () => {
+    if (selectedCharacters.size === characters.length) {
+      setSelectedCharacters(new Set());
+    } else {
+      setSelectedCharacters(new Set(characters.map(c => c.id)));
+    }
   };
 
   const clearSelection = () => {
     setSelectedCharacters(new Set());
   };
 
-  const bulkUpdateAttributes = async () => {
+  const bulkUpdateAttributePoints = async () => {
     if (selectedCharacters.size === 0) {
       showSnackbar('Выберите персонажей', false);
       return;
     }
 
-    // Проверяем что есть изменения
-    const hasChanges = Object.values(attributeChanges).some(value => value !== 0);
-    if (!hasChanges) {
-      showSnackbar('Укажите изменения атрибутов', false);
+    if (attributePointsChange === 0) {
+      showSnackbar('Укажите изменение очков атрибутов', false);
       return;
     }
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/admin/characters/bulk-update-attributes`, {
+      const response = await fetch(`${API_URL}/admin/characters/bulk-update-attribute-points`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -135,23 +127,22 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
         },
         body: JSON.stringify({
           character_ids: Array.from(selectedCharacters),
-          attribute_changes: attributeChanges
+          attribute_points_change: attributePointsChange
         })
       });
 
+      const data = await response.json();
       if (response.ok) {
-        const result = await response.json();
-        showSnackbar(`Обновлено ${result.updated_count} персонажей`, true);
-        setActiveModal(null);
-        resetForms();
+        showSnackbar(`Очки атрибутов обновлены для ${selectedCharacters.size} персонажей`, true);
         fetchCharacters();
+        setActiveModal(null);
+        setAttributePointsChange(0);
       } else {
-        const errorData = await response.json();
-        showSnackbar(errorData.error || 'Ошибка обновления', false);
+        showSnackbar(data.error || 'Ошибка обновления очков атрибутов', false);
       }
     } catch (error) {
-      console.error('Failed to update attributes:', error);
-      showSnackbar('Ошибка соединения', false);
+      console.error('Error updating attribute points:', error);
+      showSnackbar('Ошибка сети при обновлении очков атрибутов', false);
     } finally {
       setLoading(false);
     }
@@ -182,25 +173,24 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
         })
       });
 
+      const data = await response.json();
       if (response.ok) {
-        const result = await response.json();
-        showSnackbar(`Обновлено ${result.updated_count} персонажей`, true);
-        setActiveModal(null);
-        resetForms();
+        showSnackbar(`Валюта обновлена для ${selectedCharacters.size} персонажей`, true);
         fetchCharacters();
+        setActiveModal(null);
+        setCurrencyChange(0);
       } else {
-        const errorData = await response.json();
-        showSnackbar(errorData.error || 'Ошибка обновления', false);
+        showSnackbar(data.error || 'Ошибка обновления валюты', false);
       }
     } catch (error) {
-      console.error('Failed to update currency:', error);
-      showSnackbar('Ошибка соединения', false);
+      console.error('Error updating currency:', error);
+      showSnackbar('Ошибка сети при обновлении валюты', false);
     } finally {
       setLoading(false);
     }
   };
 
-  const bulkAddInventory = async () => {
+  const bulkAddInventoryItem = async () => {
     if (selectedCharacters.size === 0) {
       showSnackbar('Выберите персонажей', false);
       return;
@@ -221,49 +211,30 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
         },
         body: JSON.stringify({
           character_ids: Array.from(selectedCharacters),
-          item_name: inventoryItem.name.trim(),
-          item_description: inventoryItem.description.trim(),
-          quantity: inventoryItem.quantity
+          item: {
+            name: inventoryItem.name.trim(),
+            description: inventoryItem.description.trim() || '',
+            type: 'Обычный',
+            quantity: inventoryItem.quantity
+          }
         })
       });
 
+      const data = await response.json();
       if (response.ok) {
-        const result = await response.json();
-        showSnackbar(`Обновлено ${result.updated_count} персонажей`, true);
+        showSnackbar(`Предмет добавлен ${selectedCharacters.size} персонажам`, true);
         setActiveModal(null);
-        resetForms();
-        fetchCharacters();
+        setInventoryItem({ name: '', description: '', quantity: 1 });
+        // Не обновляем список персонажей, так как инвентарь не отображается в списке
       } else {
-        const errorData = await response.json();
-        showSnackbar(errorData.error || 'Ошибка добавления', false);
+        showSnackbar(data.error || 'Ошибка добавления предмета', false);
       }
     } catch (error) {
-      console.error('Failed to add inventory:', error);
-      showSnackbar('Ошибка соединения', false);
+      console.error('Error adding inventory item:', error);
+      showSnackbar('Ошибка сети при добавлении предмета', false);
     } finally {
       setLoading(false);
     }
-  };
-
-  const resetForms = () => {
-    setAttributeChanges({
-      strength: 0,
-      agility: 0,
-      intellect: 0,
-      endurance: 0,
-      luck: 0
-    });
-    setCurrencyChange(0);
-    setInventoryItem({
-      name: '',
-      description: '',
-      quantity: 1
-    });
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(0);
   };
 
   const nextPage = () => {
@@ -288,130 +259,107 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
         {/* Поиск */}
         <Card style={{ marginBottom: 16 }}>
           <Div>
-            <Text weight="2" style={{ fontSize: 18, marginBottom: 12 }}>
-              Поиск персонажей
-            </Text>
-            
             <Search
               value={searchQuery}
-              onChange={handleSearchChange}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Поиск по имени, рангу, фракции..."
-              before={<Icon28SearchOutline />}
+              icon={<Icon28SearchOutline />}
             />
-            
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginTop: 12,
-              fontSize: 14,
-              color: '#666'
-            }}>
-              <Text>
-                Найдено: {totalCharacters} | Выбрано: {selectedCharacters.size}
-              </Text>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Button size="s" mode="secondary" onClick={selectAllVisible}>
-                  Выбрать все на странице
-                </Button>
-                <Button size="s" mode="secondary" onClick={clearSelection}>
-                  Очистить выбор
-                </Button>
-              </div>
-            </div>
           </Div>
         </Card>
 
-        {/* Действия */}
+        {/* Массовые операции */}
         <Card style={{ marginBottom: 16 }}>
           <Div>
-            <Text weight="2" style={{ fontSize: 18, marginBottom: 12 }}>
-              Массовые операции
-            </Text>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-              <Button
-                onClick={() => setActiveModal('attributes')}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text weight="2">
+                <Icon28UsersOutline style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                Массовые операции
+              </Text>
+              <Text style={{ color: '#666', fontSize: 14 }}>
+                Выбрано: {selectedCharacters.size}
+              </Text>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+              <Button 
+                size="s" 
+                mode="outline" 
+                onClick={toggleSelectAll}
+              >
+                {selectedCharacters.size === characters.length ? 'Снять выбор' : 'Выбрать все'}
+              </Button>
+              <Button 
+                size="s" 
+                mode="outline" 
+                onClick={clearSelection}
+                disabled={selectedCharacters.size === 0}
+              >
+                Очистить выбор
+              </Button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+              <Button 
+                mode="secondary" 
+                size="m"
+                onClick={() => setActiveModal('attribute_points')}
                 disabled={selectedCharacters.size === 0}
                 before={<Icon28UsersOutline />}
-                style={{ backgroundColor: '#2196F3', color: 'white' }}
               >
-                Изменить атрибуты ({selectedCharacters.size})
+                Очки атрибутов
               </Button>
-              
-              <Button
+              <Button 
+                mode="secondary" 
+                size="m"
                 onClick={() => setActiveModal('currency')}
                 disabled={selectedCharacters.size === 0}
                 before={<Icon28MoneyCircleOutline />}
-                style={{ backgroundColor: '#4CAF50', color: 'white' }}
               >
-                Изменить валюту ({selectedCharacters.size})
+                Изменить валюту
               </Button>
-              
-              <Button
+              <Button 
+                mode="secondary" 
+                size="m"
                 onClick={() => setActiveModal('inventory')}
                 disabled={selectedCharacters.size === 0}
                 before={<Icon28GiftOutline />}
-                style={{ backgroundColor: '#FF9800', color: 'white' }}
               >
-                Добавить предмет ({selectedCharacters.size})
+                Добавить предмет
               </Button>
             </div>
           </Div>
         </Card>
 
         {/* Список персонажей */}
-        {loading && characters.length === 0 ? (
-          <Placeholder>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
             <Spinner size="l" />
-          </Placeholder>
-        ) : characters.length === 0 ? (
-          <Placeholder
-            icon={<Icon28SearchOutline />}
-          >
-            <Text weight="2" style={{ fontSize: 18, marginBottom: 8 }}>
-              Персонажи не найдены
-            </Text>
-            <Text style={{ color: '#666' }}>
-              {searchQuery ? 'Попробуйте изменить поисковый запрос' : 'Нет персонажей в системе'}
-            </Text>
-          </Placeholder>
-        ) : (
+          </div>
+        ) : characters.length > 0 ? (
           <>
             {characters.map(character => (
-              <Card key={character.id} style={{ marginBottom: 8 }}>
+              <Card key={character.id} style={{ marginBottom: 12 }}>
                 <Div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                     <Checkbox
                       checked={selectedCharacters.has(character.id)}
-                      onChange={() => handleCharacterSelect(character.id)}
+                      onChange={() => toggleCharacterSelection(character.id)}
                     />
                     
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <Text weight="2" style={{ fontSize: 16 }}>
-                          {character.character_name}
-                        </Text>
-                        <Text style={{ fontSize: 14, color: '#666' }}>
-                          ID: {character.id}
-                        </Text>
-                      </div>
+                      <Text weight="2" style={{ marginBottom: 4 }}>
+                        {character.character_name}
+                      </Text>
                       
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, fontSize: 14 }}>
                         <Text>Ранг: {character.rank}</Text>
                         <Text>Фракция: {character.faction}</Text>
                         <Text>💰 {character.currency}</Text>
+                        <Text>⚡ Очки атрибутов: {character.attribute_points_total}</Text>
                         {character.first_name && (
-                          <Text>Игрок: {character.first_name} {character.last_name}</Text>
+                          <Text>Игрок: {character.first_name && character.last_name ? `${character.first_name} ${character.last_name}` : `VK ID: ${character.vk_id}`}</Text>
                         )}
-                      </div>
-                      
-                      <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 12, color: '#666' }}>
-                        <span>💪 {character.strength}</span>
-                        <span>⚡ {character.agility}</span>
-                        <span>🧠 {character.intellect}</span>
-                        <span>🛡️ {character.endurance}</span>
-                        <span>🍀 {character.luck}</span>
                       </div>
                     </div>
                   </div>
@@ -420,121 +368,78 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
             ))}
 
             {/* Пагинация */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginTop: 16
-            }}>
-              <Button 
-                size="s" 
-                mode="secondary" 
-                onClick={prevPage}
-                disabled={currentPage === 0}
-              >
-                ← Назад
-              </Button>
-              
-              <Text style={{ fontSize: 14, color: '#666' }}>
-                Страница {currentPage + 1} из {Math.ceil(totalCharacters / limit)}
-              </Text>
-              
-              <Button 
-                size="s" 
-                mode="secondary" 
-                onClick={nextPage}
-                disabled={(currentPage + 1) * limit >= totalCharacters}
-              >
-                Вперед →
-              </Button>
-            </div>
+            <Card>
+              <Div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Button
+                    size="m"
+                    mode="secondary"
+                    onClick={prevPage}
+                    disabled={currentPage === 0}
+                  >
+                    Предыдущая
+                  </Button>
+
+                  <Text style={{ fontSize: 14, color: '#666' }}>
+                    Страница {currentPage + 1}, показано {characters.length} из {totalCharacters}
+                  </Text>
+
+                  <Button
+                    size="m"
+                    mode="secondary"
+                    onClick={nextPage}
+                    disabled={(currentPage + 1) * limit >= totalCharacters}
+                  >
+                    Следующая
+                  </Button>
+                </div>
+              </Div>
+            </Card>
           </>
+        ) : (
+          <Placeholder
+            icon={<Icon28UsersOutline />}
+          >
+            <Text>Персонажи не найдены</Text>
+          </Placeholder>
         )}
       </Div>
 
       {/* Модальные окна */}
       <ModalRoot activeModal={activeModal}>
-        {/* Модальное окно изменения атрибутов */}
+        {/* Модальное окно изменения очков атрибутов */}
         <ModalPage
-          id="attributes"
+          id="attribute_points"
           onClose={() => setActiveModal(null)}
-          header={<ModalPageHeader>Изменить атрибуты</ModalPageHeader>}
+          header={<ModalPageHeader>Изменить очки атрибутов</ModalPageHeader>}
         >
           <Div>
             <Text style={{ marginBottom: 16, fontSize: 14, color: '#666' }}>
               Выбрано персонажей: {selectedCharacters.size}
             </Text>
+            
+            <Text style={{ marginBottom: 16, fontSize: 14 }}>
+              Очки атрибутов используются игроками для распределения по навыкам (Сила, Ловкость, Выносливость и т.д.). 
+              Указывайте изменение количества доступных очков.
+            </Text>
 
-            <div style={{ display: 'grid', gap: 12 }}>
-              <FormItem top="💪 Сила">
-                <Input
-                  type="number"
-                  value={attributeChanges.strength.toString()}
-                  onChange={(e) => setAttributeChanges(prev => ({
-                    ...prev,
-                    strength: parseInt(e.target.value) || 0
-                  }))}
-                  placeholder="0 (без изменений)"
-                />
-              </FormItem>
-
-              <FormItem top="⚡ Ловкость">
-                <Input
-                  type="number"
-                  value={attributeChanges.agility.toString()}
-                  onChange={(e) => setAttributeChanges(prev => ({
-                    ...prev,
-                    agility: parseInt(e.target.value) || 0
-                  }))}
-                  placeholder="0 (без изменений)"
-                />
-              </FormItem>
-
-              <FormItem top="🧠 Интеллект">
-                <Input
-                  type="number"
-                  value={attributeChanges.intellect.toString()}
-                  onChange={(e) => setAttributeChanges(prev => ({
-                    ...prev,
-                    intellect: parseInt(e.target.value) || 0
-                  }))}
-                  placeholder="0 (без изменений)"
-                />
-              </FormItem>
-
-              <FormItem top="🛡️ Выносливость">
-                <Input
-                  type="number"
-                  value={attributeChanges.endurance.toString()}
-                  onChange={(e) => setAttributeChanges(prev => ({
-                    ...prev,
-                    endurance: parseInt(e.target.value) || 0
-                  }))}
-                  placeholder="0 (без изменений)"
-                />
-              </FormItem>
-
-              <FormItem top="🍀 Удача">
-                <Input
-                  type="number"
-                  value={attributeChanges.luck.toString()}
-                  onChange={(e) => setAttributeChanges(prev => ({
-                    ...prev,
-                    luck: parseInt(e.target.value) || 0
-                  }))}
-                  placeholder="0 (без изменений)"
-                />
-              </FormItem>
-            </div>
-
-            <Text style={{ fontSize: 12, color: '#666', marginTop: 8, marginBottom: 16 }}>
-              Используйте отрицательные числа для уменьшения атрибутов
+            <FormItem top="⚡ Изменение очков атрибутов">
+              <Input
+                type="number"
+                value={attributePointsChange}
+                onChange={(e) => setAttributePointsChange(Number(e.target.value))}
+                placeholder="Например: +5 или -3"
+              />
+            </FormItem>
+            
+            <Text style={{ marginBottom: 16, fontSize: 12, color: '#666' }}>
+              Используйте отрицательные числа для уменьшения очков атрибутов
             </Text>
 
             <Button
               size="l"
-              onClick={bulkUpdateAttributes}
-              disabled={loading}
+              onClick={bulkUpdateAttributePoints}
+              disabled={loading || attributePointsChange === 0}
               style={{ width: '100%' }}
             >
               {loading ? 'Обновление...' : 'Применить изменения'}
@@ -556,14 +461,14 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
             <FormItem top="💰 Изменение валюты">
               <Input
                 type="number"
-                value={currencyChange.toString()}
-                onChange={(e) => setCurrencyChange(parseInt(e.target.value) || 0)}
-                placeholder="Введите изменение (положительное или отрицательное)"
+                value={currencyChange}
+                onChange={(e) => setCurrencyChange(Number(e.target.value))}
+                placeholder="Например: +1000 или -500"
               />
             </FormItem>
-
-            <Text style={{ fontSize: 12, color: '#666', marginBottom: 16 }}>
-              Положительное число для добавления, отрицательное для вычитания валюты
+            
+            <Text style={{ marginBottom: 16, fontSize: 12, color: '#666' }}>
+              Используйте отрицательные числа для списания валюты
             </Text>
 
             <Button
@@ -591,22 +496,16 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
             <FormItem top="🎁 Название предмета *">
               <Input
                 value={inventoryItem.name}
-                onChange={(e) => setInventoryItem(prev => ({
-                  ...prev,
-                  name: e.target.value
-                }))}
-                placeholder="Например: Меч дракона"
+                onChange={(e) => setInventoryItem(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Например: Исцеляющий эликсир"
               />
             </FormItem>
 
             <FormItem top="📝 Описание предмета">
               <Textarea
                 value={inventoryItem.description}
-                onChange={(e) => setInventoryItem(prev => ({
-                  ...prev,
-                  description: e.target.value
-                }))}
-                placeholder="Описание предмета (необязательно)"
+                onChange={(e) => setInventoryItem(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Описание предмета..."
                 rows={3}
               />
             </FormItem>
@@ -614,18 +513,15 @@ export const BulkCharacterManagement: FC<NavIdProps> = ({ id }) => {
             <FormItem top="🔢 Количество">
               <Input
                 type="number"
-                value={inventoryItem.quantity.toString()}
-                onChange={(e) => setInventoryItem(prev => ({
-                  ...prev,
-                  quantity: Math.max(1, parseInt(e.target.value) || 1)
-                }))}
                 min="1"
+                value={inventoryItem.quantity}
+                onChange={(e) => setInventoryItem(prev => ({ ...prev, quantity: Math.max(1, Number(e.target.value)) }))}
               />
             </FormItem>
 
             <Button
               size="l"
-              onClick={bulkAddInventory}
+              onClick={bulkAddInventoryItem}
               disabled={loading || !inventoryItem.name.trim()}
               style={{ width: '100%' }}
             >

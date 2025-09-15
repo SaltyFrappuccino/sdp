@@ -23,6 +23,8 @@ import {
   ButtonGroup,
   ScreenSpinner,
   Snackbar,
+  Tabs,
+  TabsItem,
 } from '@vkontakte/vkui';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
@@ -59,11 +61,40 @@ interface PortfolioAsset {
   average_purchase_price: number;
 }
 
+interface ShortPosition {
+  id: number;
+  quantity: number;
+  short_price: number;
+  margin_requirement: number;
+  interest_rate: number;
+  opened_at: string;
+  name: string;
+  ticker_symbol: string;
+  current_price: number;
+  unrealized_pnl: number;
+}
+
+interface TradingOrder {
+  id: number;
+  order_type: string;
+  side: string;
+  quantity: number;
+  price: number;
+  stop_price: number;
+  status: string;
+  created_at: string;
+  stock_name: string;
+  ticker_symbol: string;
+  current_price: number;
+}
+
 interface Portfolio {
   id: number;
   character_id: number;
   cash_balance: number;
   assets: PortfolioAsset[];
+  short_positions?: ShortPosition[];
+  active_orders?: TradingOrder[];
 }
 
 interface MarketEvent {
@@ -107,6 +138,7 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
   const [marketEvents, setMarketEvents] = useState<MarketEvent[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [hoveredCharacterId, setHoveredCharacterId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'trading' | 'portfolio' | 'orders' | 'leaderboard'>('trading');
 
   const groupedStocks = stocks.reduce((acc, stock) => {
     (acc[stock.exchange] = acc[stock.exchange] || []).push(stock);
@@ -250,7 +282,37 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>Биржа</PanelHeader>
       {loading && <ScreenSpinner />}
-      <Group>
+      
+      <Tabs>
+        <TabsItem 
+          selected={activeTab === 'trading'} 
+          onClick={() => setActiveTab('trading')}
+        >
+          📈 Торговля
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'portfolio'} 
+          onClick={() => setActiveTab('portfolio')}
+        >
+          💼 Портфолио
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'orders'} 
+          onClick={() => setActiveTab('orders')}
+        >
+          📋 Ордера
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'leaderboard'} 
+          onClick={() => setActiveTab('leaderboard')}
+        >
+          🏆 Рейтинг
+        </TabsItem>
+      </Tabs>
+
+      {activeTab === 'trading' && (
+        <>
+          <Group>
         <Header>Выбор персонажа</Header>
         <Div>
           {characters.length > 0 ? (
@@ -266,7 +328,107 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
         </Div>
       </Group>
 
-      {leaderboard.length > 0 && (
+      </>
+      )}
+
+      {activeTab === 'portfolio' && selectedCharacter && !loading && portfolio && (
+        <Group header={<Header>Портфолио персонажа</Header>}>
+          <Div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Text>Баланс: {portfolio.cash_balance.toLocaleString('ru-RU')} ₭</Text>
+            <Text>Стоимость активов: {portfolioValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('₽', '₭')}</Text>
+            <Text>Итого: {totalPortfolioValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('₽', '₭')}</Text>
+          </Div>
+          
+          {portfolio.assets.length > 0 && (
+            <CardGrid size="l">
+              {portfolio.assets.map(asset => {
+                const profit = (asset.current_price - asset.average_purchase_price) * asset.quantity;
+                const isProfit = profit >= 0;
+                return (
+                  <Card key={asset.ticker_symbol} mode="shadow">
+                    <Div>
+                      <Text weight="2">{asset.name} ({asset.ticker_symbol})</Text>
+                      <Text>Количество: {asset.quantity}</Text>
+                      <Text>Средняя цена: {asset.average_purchase_price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>
+                      <Text>Текущая цена: {asset.current_price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>
+                      <Text style={{ color: isProfit ? 'var(--vkui--color_text_positive)' : 'var(--vkui--color_text_negative)' }}>
+                        P&L: {isProfit ? '+' : ''}{profit.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭
+                      </Text>
+                    </Div>
+                  </Card>
+                );
+              })}
+            </CardGrid>
+          )}
+
+          {portfolio.short_positions && portfolio.short_positions.length > 0 && (
+            <>
+              <Header>🔻 Короткие позиции</Header>
+              <CardGrid size="l">
+                {portfolio.short_positions.map(short => (
+                  <Card key={short.id} mode="shadow">
+                    <Div>
+                      <Text weight="2">{short.name} ({short.ticker_symbol}) - SHORT</Text>
+                      <Text>Количество: {short.quantity}</Text>
+                      <Text>Цена открытия: {short.short_price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>
+                      <Text>Текущая цена: {short.current_price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>
+                      <Text>Маржа: {short.margin_requirement.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>
+                      <Text style={{ color: short.unrealized_pnl >= 0 ? 'var(--vkui--color_text_positive)' : 'var(--vkui--color_text_negative)' }}>
+                        P&L: {short.unrealized_pnl >= 0 ? '+' : ''}{short.unrealized_pnl.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭
+                      </Text>
+                      <Button size="s" mode="destructive" onClick={() => {
+                        // Закрыть короткую позицию
+                        fetch(`${API_URL}/market/cover`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            character_id: selectedCharacter,
+                            short_position_id: short.id,
+                            quantity: short.quantity
+                          })
+                        }).then(() => {
+                          setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24CheckCircleOutline />Короткая позиция закрыта</Snackbar>);
+                          fetchPortfolio(selectedCharacter);
+                        });
+                      }}>
+                        Закрыть позицию
+                      </Button>
+                    </Div>
+                  </Card>
+                ))}
+              </CardGrid>
+            </>
+          )}
+        </Group>
+      )}
+
+      {activeTab === 'orders' && selectedCharacter && !loading && portfolio && (
+        <Group header={<Header>Активные ордера</Header>}>
+          {portfolio.active_orders && portfolio.active_orders.length > 0 ? (
+            <CardGrid size="l">
+              {portfolio.active_orders.map(order => (
+                <Card key={order.id} mode="shadow">
+                  <Div>
+                    <Text weight="2">{order.stock_name} ({order.ticker_symbol})</Text>
+                    <Text>Тип: {order.order_type.toUpperCase()} / {order.side.toUpperCase()}</Text>
+                    <Text>Количество: {order.quantity}</Text>
+                    {order.price && <Text>Цена: {order.price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>}
+                    {order.stop_price && <Text>Стоп-цена: {order.stop_price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>}
+                    <Text>Статус: {order.status}</Text>
+                    <Text>Создан: {new Date(order.created_at).toLocaleString('ru-RU')}</Text>
+                  </Div>
+                </Card>
+              ))}
+            </CardGrid>
+          ) : (
+            <Div>
+              <Text>Нет активных ордеров</Text>
+            </Div>
+          )}
+        </Group>
+      )}
+
+      {activeTab === 'leaderboard' && leaderboard.length > 0 && (
         <Group header={<Header>Рейтинг Трейдеров</Header>}>
           {leaderboard.map((entry, index) => (
             <Tooltip
@@ -356,6 +518,58 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                         <ButtonGroup stretched>
                           <Button size="m" mode="primary" onClick={() => openTradeModal(stock, 'buy')}>Купить</Button>
                           <Button size="m" mode="secondary" onClick={() => openTradeModal(stock, 'sell')}>Продать</Button>
+                        </ButtonGroup>
+                        <ButtonGroup stretched style={{ marginTop: '8px' }}>
+                          <Button size="m" mode="destructive" onClick={() => {
+                            // Открыть короткую позицию
+                            if (!selectedCharacter) return;
+                            fetch(`${API_URL}/market/short`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                character_id: selectedCharacter,
+                                ticker_symbol: stock.ticker_symbol,
+                                quantity: 1 // По умолчанию 1, можно сделать настраиваемым
+                              })
+                            }).then(async (res) => {
+                              if (res.ok) {
+                                setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24CheckCircleOutline />Короткая позиция открыта</Snackbar>);
+                                fetchPortfolio(selectedCharacter);
+                                fetchCharacters();
+                              } else {
+                                const error = await res.json();
+                                setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24ErrorCircle />{error.error}</Snackbar>);
+                              }
+                            });
+                          }}>🔻 Шорт</Button>
+                          <Button size="m" mode="outline" onClick={() => {
+                            // Создать лимитный ордер
+                            if (!selectedCharacter) return;
+                            const price = prompt('Введите цену лимитного ордера:');
+                            const quantity = prompt('Введите количество:');
+                            if (price && quantity) {
+                              fetch(`${API_URL}/market/order`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  character_id: selectedCharacter,
+                                  ticker_symbol: stock.ticker_symbol,
+                                  order_type: 'limit',
+                                  side: 'buy',
+                                  quantity: parseInt(quantity),
+                                  price: parseFloat(price)
+                                })
+                              }).then(async (res) => {
+                                if (res.ok) {
+                                  setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24CheckCircleOutline />Лимитный ордер создан</Snackbar>);
+                                  fetchPortfolio(selectedCharacter);
+                                } else {
+                                  const error = await res.json();
+                                  setSnackbar(<Snackbar onClose={() => setSnackbar(null)}><Icon24ErrorCircle />{error.error}</Snackbar>);
+                                }
+                              });
+                            }
+                          }}>📋 Лимит</Button>
                         </ButtonGroup>
                       </Div>
                     </Card>

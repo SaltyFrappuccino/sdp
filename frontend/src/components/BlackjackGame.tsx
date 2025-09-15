@@ -108,7 +108,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     } else if (playerValue === 21) {
       gameStatus = 'finished';
       result = 'win';
-      winAmount = Math.floor(betAmount * 2.2); // уменьшили с 2.5 до 2.2
+      winAmount = Math.floor(betAmount * 1.9); // уменьшили с 2.2 до 1.9
     }
     
     setGameState({
@@ -155,7 +155,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     } else if (newPlayerValue === 21) {
       newGameStatus = 'finished';
       result = 'win';
-      winAmount = Math.floor(betAmount * 1.8); // уменьшили с 2 до 1.8
+      winAmount = Math.floor(betAmount * 1.6); // уменьшили с 1.8 до 1.6
     }
     
     setGameState({
@@ -209,7 +209,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     
     if (dealerValue > 21) {
       result = 'win';
-      winAmount = Math.floor(betAmount * 1.8); // уменьшили с 2 до 1.8
+      winAmount = Math.floor(betAmount * 1.6); // уменьшили с 1.8 до 1.6
     } else if (dealerValue > gameState.playerValue) {
       result = 'lose';
     } else if (dealerValue === gameState.playerValue) {
@@ -217,7 +217,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
       winAmount = betAmount; // возврат ставки
     } else {
       result = 'win';
-      winAmount = Math.floor(betAmount * 1.8); // уменьшили с 2 до 1.8
+      winAmount = Math.floor(betAmount * 1.6); // уменьшили с 1.8 до 1.6
     }
     
     setGameState(prev => prev ? {

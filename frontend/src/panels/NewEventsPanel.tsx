@@ -503,7 +503,7 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
                     value={selectedCharacter?.toString() || ''}
                     onChange={(e) => setSelectedCharacter(parseInt(e.target.value))}
                     options={characters.map(char => ({
-                      label: `${char.character_name} (${char.rank}) - ${char.faction}`,
+                      label: `${char.character_name || 'Неизвестно'} (${char.rank || 'Нет ранга'}) - ${char.faction || 'Нет фракции'}`,
                       value: char.id.toString()
                     }))}
                   />
@@ -757,7 +757,7 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
                     value={selectedCharacter?.toString() || ''}
                     onChange={(e) => setSelectedCharacter(parseInt(e.target.value))}
                     options={characters.map(char => ({
-                      label: `${char.character_name} - ${char.currency} 💰`,
+                      label: `${char.character_name || 'Неизвестно'} - ${char.currency || 0} 💰`,
                       value: char.id.toString()
                     }))}
                   />

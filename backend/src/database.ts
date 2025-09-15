@@ -273,7 +273,8 @@ export async function initDB() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         stock_id INTEGER NOT NULL,
         price REAL NOT NULL,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        timestamp TEXT NOT NULL, -- ISO 8601 format with milliseconds (YYYY-MM-DDTHH:mm:ss.sssZ)
+        legacy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, -- Keep for backward compatibility
         FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
       );
 
@@ -292,6 +293,71 @@ export async function initDB() {
         stock_id INTEGER NOT NULL,
         quantity INTEGER NOT NULL,
         average_purchase_price REAL NOT NULL,
+        position_type TEXT DEFAULT 'long' CHECK (position_type IN ('long', 'short')),
+        FOREIGN KEY(portfolio_id) REFERENCES Portfolios(id) ON DELETE CASCADE,
+        FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS ShortPositions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        portfolio_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        short_price REAL NOT NULL,
+        margin_requirement REAL NOT NULL,
+        interest_rate REAL DEFAULT 0.05,
+        opened_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed', 'margin_call')),
+        FOREIGN KEY(portfolio_id) REFERENCES Portfolios(id) ON DELETE CASCADE,
+        FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS OptionsContracts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        portfolio_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        contract_type TEXT NOT NULL CHECK (contract_type IN ('call', 'put')),
+        strike_price REAL NOT NULL,
+        expiry_date DATETIME NOT NULL,
+        premium_paid REAL NOT NULL,
+        quantity INTEGER NOT NULL,
+        status TEXT DEFAULT 'open' CHECK (status IN ('open', 'exercised', 'expired')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(portfolio_id) REFERENCES Portfolios(id) ON DELETE CASCADE,
+        FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS FuturesContracts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        portfolio_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        contract_price REAL NOT NULL,
+        quantity INTEGER NOT NULL,
+        expiry_date DATETIME NOT NULL,
+        margin_requirement REAL NOT NULL,
+        position_type TEXT CHECK (position_type IN ('long', 'short')),
+        status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed', 'expired')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(portfolio_id) REFERENCES Portfolios(id) ON DELETE CASCADE,
+        FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS TradingOrders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        portfolio_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        order_type TEXT NOT NULL CHECK (order_type IN ('market', 'limit', 'stop', 'stop_limit')),
+        side TEXT NOT NULL CHECK (side IN ('buy', 'sell', 'short', 'cover')),
+        quantity INTEGER NOT NULL,
+        price REAL,
+        stop_price REAL,
+        instrument_type TEXT DEFAULT 'stock' CHECK (instrument_type IN ('stock', 'option', 'future')),
+        time_in_force TEXT DEFAULT 'GTC' CHECK (time_in_force IN ('GTC', 'IOC', 'FOK', 'DAY')),
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'filled', 'partially_filled', 'cancelled', 'rejected')),
+        filled_quantity INTEGER DEFAULT 0,
+        avg_fill_price REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(portfolio_id) REFERENCES Portfolios(id) ON DELETE CASCADE,
         FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
       );
@@ -308,6 +374,16 @@ export async function initDB() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(impacted_stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
       );
+
+      -- Migrate existing StockPriceHistory records to use new timestamp format
+      -- This updates old records that don't have the new timestamp field
+      UPDATE StockPriceHistory 
+      SET timestamp = CASE 
+        WHEN timestamp IS NULL OR timestamp = '' 
+        THEN datetime(legacy_timestamp || 'Z') 
+        ELSE timestamp 
+      END 
+      WHERE timestamp IS NULL OR timestamp = '';
 
       CREATE TABLE IF NOT EXISTS CasinoGames (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

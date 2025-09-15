@@ -38,10 +38,14 @@ export async function updateStockPrices() {
           stock.id
         );
 
+        // Record precise timestamp with milliseconds
+        const preciseTimestamp = new Date().toISOString(); // Format: 2025-01-15T14:30:45.123Z
+        
         await db.run(
-          'INSERT INTO StockPriceHistory (stock_id, price) VALUES (?, ?)',
+          'INSERT INTO StockPriceHistory (stock_id, price, timestamp) VALUES (?, ?, ?)',
           stock.id,
-          newPrice.toFixed(2)
+          newPrice.toFixed(2),
+          preciseTimestamp
         );
       }
     }

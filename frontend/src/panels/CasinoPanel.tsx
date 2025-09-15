@@ -209,6 +209,94 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
               </Div>
             </Card>
 
+            {showHistory && gameHistory.length > 0 && (
+              <Card style={{ marginTop: 16 }}>
+                <Div>
+                  <Text weight="2" style={{ marginBottom: 16 }}>
+                    📈 История игр
+                  </Text>
+                  
+                  {(() => {
+                    const totalBet = gameHistory.reduce((sum, game) => sum + game.bet_amount, 0);
+                    const totalWin = gameHistory.reduce((sum, game) => sum + game.win_amount, 0);
+                    const netBalance = totalWin - totalBet;
+                    const isProfit = netBalance > 0;
+                    
+                    return (
+                      <div style={{ 
+                        padding: '12px', 
+                        backgroundColor: isProfit ? '#1a4f1a' : '#4f1a1a', 
+                        borderRadius: '8px', 
+                        marginBottom: '16px',
+                        border: `2px solid ${isProfit ? '#28a745' : '#dc3545'}`
+                      }}>
+                        <Text weight="2" style={{ color: '#fff' }}>
+                          💰 Общий баланс: {isProfit ? '+' : ''}{netBalance.toLocaleString()} 💰
+                        </Text>
+                        <div style={{ fontSize: '14px', color: '#ccc', marginTop: '4px' }}>
+                          Поставлено: {totalBet.toLocaleString()} | Выиграно: {totalWin.toLocaleString()} | Игр: {gameHistory.length}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
+                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {gameHistory.slice(0, 10).map((game, index) => {
+                      const netChange = game.win_amount - game.bet_amount;
+                      const isWin = netChange > 0;
+                      const gameTypeEmoji = game.game_type === 'blackjack' ? '🃏' : 
+                                           game.game_type === 'slots' ? '🎰' : '🎲';
+                      
+                      return (
+                        <div key={game.id} style={{ 
+                          padding: '8px 12px', 
+                          marginBottom: '8px', 
+                          backgroundColor: isWin ? '#1f4a1f' : '#4a1f1f',
+                          borderRadius: '6px',
+                          borderLeft: `4px solid ${isWin ? '#28a745' : '#dc3545'}`
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <Text style={{ color: '#fff', fontSize: '14px' }}>
+                                {gameTypeEmoji} {game.game_type === 'blackjack' ? 'Блэкджек' : 
+                                                game.game_type === 'slots' ? 'Слоты' : 'Кости'}
+                              </Text>
+                              <div style={{ fontSize: '12px', color: '#ccc' }}>
+                                Ставка: {game.bet_amount} | Выигрыш: {game.win_amount}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ 
+                                color: isWin ? '#28a745' : '#dc3545', 
+                                fontWeight: 'bold',
+                                fontSize: '14px'
+                              }}>
+                                {isWin ? '+' : ''}{netChange}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#999' }}>
+                                {new Date(game.created_at).toLocaleDateString('ru-RU', { 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {gameHistory.length > 10 && (
+                    <Text style={{ fontSize: '12px', color: '#666', textAlign: 'center', marginTop: '8px' }}>
+                      Показаны последние 10 игр из {gameHistory.length}
+                    </Text>
+                  )}
+                </Div>
+              </Card>
+            )}
+
             <Card style={{ marginTop: 16 }}>
               <Div>
                 <Text weight="2" style={{ marginBottom: 16 }}>
@@ -241,6 +329,15 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                     disabled={!betAmount || parseInt(betAmount) > selectedCharacterData.currency}
                   >
                     🎲 Кости
+                  </Button>
+                  
+                  <Button
+                    size="m"
+                    mode="secondary"
+                    onClick={() => setShowHistory(!showHistory)}
+                    disabled={gameHistory.length === 0}
+                  >
+                    📈 {showHistory ? 'Скрыть историю' : 'Показать историю'} ({gameHistory.length})
                   </Button>
                 </div>
               </Div>

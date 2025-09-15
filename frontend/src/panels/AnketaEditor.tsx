@@ -455,6 +455,19 @@ export const AnketaEditor: FC<NavIdProps & {
                 </FormItem>
               </>
             ) : null}
+            {!isAdminEditor && (
+              <FormItem top="⚡ Общее количество очков атрибутов">
+                <Input
+                  type="number"
+                  value={String(character.attribute_points_total ?? getAttributePointsForRank(character.rank))}
+                  onChange={(e) => character && onCharacterChange({ ...character, attribute_points_total: Number(e.target.value) })}
+                  placeholder={`По умолчанию: ${getAttributePointsForRank(character.rank)} для ранга ${character.rank}`}
+                />
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                  Эти очки распределяются по навыкам ниже. При отправке анкеты на проверку администратор увидит ваши изменения.
+                </div>
+              </FormItem>
+            )}
             <AttributeManager
               attributes={character.attributes}
               onAttributeChange={handleAttributeChange}

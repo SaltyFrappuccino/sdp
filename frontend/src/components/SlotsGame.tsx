@@ -109,7 +109,7 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameStart, onGameEn
     if (reel1 === '💎' && reel2 === '💎' && reel3 === '💎') {
       return {
         type: 'jackpot',
-        winAmount: betAmount * 50, // уменьшили с 100 до 50
+        winAmount: betAmount * 30, // уменьшили с 50 до 30
         message: '🎰 ДЖЕКПОТ! Три алмаза! 🎰'
       };
     }
@@ -127,7 +127,7 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameStart, onGameEn
     // Два одинаковых символа
     if (reel1 === reel2 || reel2 === reel3 || reel1 === reel3) {
       const symbol = reel1 === reel2 ? reel1 : reel2;
-      const multiplier = getSymbolMultiplier(symbol) * 0.2; // уменьшили с 0.3 до 0.2
+      const multiplier = getSymbolMultiplier(symbol) * 0.15; // уменьшили с 0.2 до 0.15
       return {
         type: 'win',
         winAmount: Math.floor(betAmount * multiplier),
@@ -144,13 +144,13 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameStart, onGameEn
 
   const getSymbolMultiplier = (symbol: string): number => {
     switch (symbol) {
-      case '💎': return 25; // уменьшили с 50 до 25
-      case '⭐': return 10; // уменьшили с 20 до 10
-      case '🔔': return 5;  // уменьшили с 10 до 5
-      case '🍇': return 3;  // уменьшили с 5 до 3
-      case '🍊': return 2;  // уменьшили с 3 до 2
-      case '🍋': return 1.5; // уменьшили с 2 до 1.5
-      case '🍒': return 1.2; // уменьшили с 1.5 до 1.2
+      case '💎': return 15; // уменьшили с 25 до 15
+      case '⭐': return 7;  // уменьшили с 10 до 7
+      case '🔔': return 4;  // уменьшили с 5 до 4
+      case '🍇': return 2.5;  // уменьшили с 3 до 2.5
+      case '🍊': return 1.8;  // уменьшили с 2 до 1.8
+      case '🍋': return 1.3;  // уменьшили с 1.5 до 1.3
+      case '🍒': return 1.1;  // уменьшили с 1.2 до 1.1
       default: return 1;
     }
   };
