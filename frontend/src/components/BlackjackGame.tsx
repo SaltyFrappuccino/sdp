@@ -5,6 +5,7 @@ import { Icon28AddOutline, Icon28ChecksOutline } from '@vkontakte/icons';
 interface BlackjackGameProps {
   characterId: number;
   betAmount: number;
+  onGameStart: () => void;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -20,7 +21,7 @@ interface GameState {
   dealerCards: Card[];
   playerValue: number;
   dealerValue: number;
-  gameStatus: 'playing' | 'playerBust' | 'dealerTurn' | 'finished';
+  gameStatus: 'waiting' | 'playing' | 'playerBust' | 'dealerTurn' | 'finished';
   result?: 'win' | 'lose' | 'push';
   winAmount?: number;
 }
@@ -28,13 +29,21 @@ interface GameState {
 const SUITS = ['♠️', '♥️', '♦️', '♣️'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameEnd, onClose }) => {
+export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, onGameEnd, onClose }) => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState(false);
   const [animating, setAnimating] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
 
   useEffect(() => {
-    startNewGame();
+    // Инициализируем игру в состоянии ожидания
+    setGameState({
+      playerCards: [],
+      dealerCards: [],
+      playerValue: 0,
+      dealerValue: 0,
+      gameStatus: 'waiting'
+    });
   }, []);
 
   const createDeck = (): Card[] => {
@@ -74,6 +83,10 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameEnd, on
   const startNewGame = async () => {
     setLoading(true);
     setAnimating(true);
+    setGameStarted(true);
+    
+    // Уведомляем родительский компонент о начале игры (для списания ставки)
+    onGameStart();
     
     // Создаем колоду и раздаем карты
     const deck = createDeck();
@@ -256,18 +269,56 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameEnd, on
     );
   }
 
+  // Экран ожидания начала игры
+  if (gameState.gameStatus === 'waiting') {
+    return (
+      <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
+        <Div style={{ backgroundColor: '#2a2a2a', textAlign: 'center', padding: 40 }}>
+          <Text weight="2" style={{ fontSize: 24, color: '#fff', marginBottom: 16 }}>
+            🃏 Блэкджек
+          </Text>
+          <Text style={{ color: '#ccc', marginBottom: 24 }}>
+            Ставка: {betAmount} 💰
+          </Text>
+          <Text style={{ color: '#ccc', marginBottom: 32 }}>
+            Готовы начать игру? После начала игры ставка будет списана и вы не сможете выйти без завершения.
+          </Text>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <Button
+              size="l"
+              onClick={startNewGame}
+              disabled={loading}
+              style={{ backgroundColor: '#4caf50', color: '#fff' }}
+            >
+              Начать игру
+            </Button>
+            <Button
+              size="l"
+              onClick={onClose}
+              style={{ backgroundColor: '#444', color: '#fff' }}
+            >
+              Отмена
+            </Button>
+          </div>
+        </Div>
+      </Card>
+    );
+  }
+
   return (
     <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
       <Div style={{ backgroundColor: '#2a2a2a' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <Text weight="2" style={{ fontSize: 18, color: '#fff' }}>🃏 Блэкджек</Text>
-          <Button 
-            size="s" 
-            onClick={onClose}
-            style={{ backgroundColor: '#444', color: '#fff' }}
-          >
-            ✕
-          </Button>
+          {gameState.gameStatus === 'finished' && (
+            <Button 
+              size="s" 
+              onClick={onClose}
+              style={{ backgroundColor: '#444', color: '#fff' }}
+            >
+              ✕
+            </Button>
+          )}
         </div>
 
         {/* Карты дилера */}

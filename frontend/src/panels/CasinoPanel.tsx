@@ -91,6 +91,32 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     setActiveModal('dice');
   };
 
+  const handleGameStart = async (gameType: string) => {
+    try {
+      // Списываем ставку при начале игры
+      const response = await fetch(`${API_URL}/casino/${gameType}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_id: selectedCharacter,
+          bet_amount: parseInt(betAmount),
+          ...(gameType === 'dice' && { prediction: dicePrediction })
+        })
+      });
+
+      if (response.ok) {
+        await fetchCharacters(); // Обновляем валюту
+        showResultSnackbar(`Ставка ${parseInt(betAmount)} 💰 списана. Игра началась!`, true);
+      } else {
+        const errorData = await response.json();
+        showResultSnackbar(errorData.error || 'Ошибка начала игры', false);
+      }
+    } catch (error) {
+      console.error('Game start error:', error);
+      showResultSnackbar('Ошибка при начале игры', false);
+    }
+  };
+
   const handleGameEnd = async (gameType: string, result: any) => {
     try {
       const response = await fetch(`${API_URL}/casino/${gameType}`, {
@@ -290,6 +316,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
             <BlackjackGame
               characterId={selectedCharacter}
               betAmount={parseInt(betAmount)}
+              onGameStart={() => handleGameStart('blackjack')}
               onGameEnd={(result) => handleGameEnd('blackjack', result)}
               onClose={() => setActiveModal(null)}
             />

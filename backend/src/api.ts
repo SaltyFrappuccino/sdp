@@ -2129,6 +2129,42 @@ router.get('/market/leaderboard', async (req: Request, res: Response) => {
 
 // ==================== CASINO API ====================
 
+// POST /api/casino/blackjack/start - Начать игру в блэкджек (списать ставку)
+router.post('/casino/blackjack/start', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < bet_amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Списываем ставку
+    await db.run(
+      'UPDATE Characters SET currency = currency - ? WHERE id = ?',
+      [bet_amount, character_id]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Ставка списана, игра началась',
+      new_currency: character.currency - bet_amount
+    });
+  } catch (error) {
+    console.error('Blackjack start error:', error);
+    res.status(500).json({ error: 'Не удалось начать игру' });
+  }
+});
+
 // POST /api/casino/blackjack - Сохранить результат игры в блэкджек
 router.post('/casino/blackjack', async (req: Request, res: Response) => {
   try {
@@ -2144,11 +2180,8 @@ router.post('/casino/blackjack', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Персонаж не найден' });
     }
 
-    if (character.currency < bet_amount) {
-      return res.status(400).json({ error: 'Недостаточно средств' });
-    }
-
-    const newCurrency = character.currency - bet_amount + winAmount;
+    // Ставка уже была списана при начале игры, только начисляем выигрыш
+    const newCurrency = character.currency + winAmount;
     
     await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
 
