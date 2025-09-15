@@ -273,7 +273,7 @@ export async function initDB() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         stock_id INTEGER NOT NULL,
         price REAL NOT NULL,
-        timestamp TEXT NOT NULL, -- ISO 8601 format with milliseconds (YYYY-MM-DDTHH:mm:ss.sssZ)
+        timestamp TEXT, -- ISO 8601 format with milliseconds (YYYY-MM-DDTHH:mm:ss.sssZ)
         legacy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, -- Keep for backward compatibility
         FOREIGN KEY(stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
       );
@@ -375,15 +375,6 @@ export async function initDB() {
         FOREIGN KEY(impacted_stock_id) REFERENCES Stocks(id) ON DELETE CASCADE
       );
 
-      -- Migrate existing StockPriceHistory records to use new timestamp format
-      -- This updates old records that don't have the new timestamp field
-      UPDATE StockPriceHistory 
-      SET timestamp = CASE 
-        WHEN timestamp IS NULL OR timestamp = '' 
-        THEN datetime(legacy_timestamp || 'Z') 
-        ELSE timestamp 
-      END 
-      WHERE timestamp IS NULL OR timestamp = '';
 
       CREATE TABLE IF NOT EXISTS CasinoGames (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -451,6 +442,45 @@ export async function initDB() {
       }
     } catch (error) {
       console.error('Error migrating CasinoGames table:', error);
+    }
+
+    // Безопасная миграция для StockPriceHistory
+    try {
+      // Добавляем legacy_timestamp колонку если её нет
+      await db.run('ALTER TABLE StockPriceHistory ADD COLUMN legacy_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP');
+      console.log('Added legacy_timestamp column to StockPriceHistory');
+    } catch (error: any) {
+      // Колонка уже существует, это нормально
+      if (!error.message.includes('duplicate column name') && !error.message.includes('already exists')) {
+        console.warn('Warning adding legacy_timestamp column:', error.message);
+      }
+    }
+
+    try {
+      // Обновляем legacy_timestamp для записей где она NULL
+      await db.run(`
+        UPDATE StockPriceHistory 
+        SET legacy_timestamp = CURRENT_TIMESTAMP 
+        WHERE legacy_timestamp IS NULL
+      `);
+    } catch (error: any) {
+      console.warn('Warning updating legacy_timestamp:', error.message);
+    }
+
+    try {
+      // Миграция существующих записей на новый формат timestamp
+      await db.run(`
+        UPDATE StockPriceHistory 
+        SET timestamp = CASE 
+          WHEN timestamp IS NULL OR timestamp = '' 
+          THEN datetime(IFNULL(legacy_timestamp, CURRENT_TIMESTAMP) || 'Z') 
+          ELSE timestamp 
+        END 
+        WHERE timestamp IS NULL OR timestamp = ''
+      `);
+      console.log('Migrated StockPriceHistory timestamp format');
+    } catch (error: any) {
+      console.warn('Warning migrating timestamp format:', error.message);
     }
 
     await seedStocks(db);
