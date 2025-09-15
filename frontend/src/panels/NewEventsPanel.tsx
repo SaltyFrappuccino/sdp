@@ -1,8 +1,9 @@
 import React, { FC, useState, useEffect } from 'react';
 import {
-  Panel, PanelHeader, Div, Card, Text, Button, Snackbar, Select, ModalRoot, ModalPage, ModalPageHeader, Input, FormItem
+  Panel, PanelHeader, Div, Card, Text, Button, Snackbar, Select, ModalRoot, ModalPage, ModalPageHeader, Input, FormItem, PanelHeaderBack
 } from '@vkontakte/vkui';
 import { Icon28CalendarOutline, Icon28UsersOutline } from '@vkontakte/icons';
+import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
 
 interface NavIdProps {
@@ -71,6 +72,7 @@ interface EventBranch {
 }
 
 export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => {
+  const routeNavigator = useRouteNavigator();
   const [events, setEvents] = useState<Event[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -346,7 +348,9 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
 
   return (
     <Panel id={id}>
-      <PanelHeader>📅 События</PanelHeader>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
+        📅 События
+      </PanelHeader>
       
       <Div>
         {loading ? (

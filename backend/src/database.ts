@@ -9,6 +9,17 @@ export async function initDB() {
     });
 
     await db.exec(`
+      CREATE TABLE IF NOT EXISTS Users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vk_id INTEGER UNIQUE NOT NULL,
+        first_name TEXT,
+        last_name TEXT,
+        photo_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.exec(`
       CREATE TABLE IF NOT EXISTS Characters (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         vk_id INTEGER NOT NULL,
@@ -168,12 +179,9 @@ export async function initDB() {
       );
     `);
 
-    // Пересоздаем таблицы для новой системы ивентов
-    await db.exec(`DROP TABLE IF EXISTS EventParticipants`);
-    await db.exec(`DROP TABLE IF EXISTS Events`);
-    
+    // Создаем таблицы для новой системы ивентов
     await db.exec(`
-      CREATE TABLE Events (
+      CREATE TABLE IF NOT EXISTS Events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         estimated_start_date DATETIME NOT NULL,
@@ -200,7 +208,7 @@ export async function initDB() {
     `);
 
     await db.exec(`
-      CREATE TABLE EventParticipants (
+      CREATE TABLE IF NOT EXISTS EventParticipants (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_id INTEGER NOT NULL,
         character_id INTEGER NOT NULL,

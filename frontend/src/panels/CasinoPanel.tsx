@@ -1,5 +1,6 @@
 import React, { FC, useState, useEffect } from 'react';
-import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar, ModalRoot, ModalPage, ModalPageHeader } from '@vkontakte/vkui';
+import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar, ModalRoot, ModalPage, ModalPageHeader, PanelHeaderBack } from '@vkontakte/vkui';
+import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
 import { Icon28GameOutline, Icon28Dice1Outline, Icon28Cards2Outline } from '@vkontakte/icons';
 import { BlackjackGame } from '../components/BlackjackGame';
@@ -31,6 +32,7 @@ interface CasinoPanelProps extends NavIdProps {
 }
 
 export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
+  const routeNavigator = useRouteNavigator();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
   const [betAmount, setBetAmount] = useState<string>('100');
@@ -158,7 +160,9 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader>🎰 Казино</PanelHeader>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
+        🎰 Казино
+      </PanelHeader>
       
       <Div>
         <Card>

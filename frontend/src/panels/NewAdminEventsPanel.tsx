@@ -1,9 +1,10 @@
 import React, { FC, useState, useEffect } from 'react';
 import {
   Panel, PanelHeader, Div, Card, Text, Button, Input, Snackbar,
-  ModalRoot, ModalPage, ModalPageHeader, FormItem, Textarea, Select
+  ModalRoot, ModalPage, ModalPageHeader, FormItem, Textarea, Select, PanelHeaderBack
 } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon28CalendarOutline, Icon28UsersOutline } from '@vkontakte/icons';
+import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
 
 interface NavIdProps {
@@ -52,6 +53,7 @@ interface EventBranch {
 const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
 
 export const NewAdminEventsPanel: FC<NavIdProps> = ({ id }) => {
+  const routeNavigator = useRouteNavigator();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<React.ReactNode>(null);
@@ -427,7 +429,9 @@ export const NewAdminEventsPanel: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader>📅 Управление Событиями</PanelHeader>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/admin_panel')} />}>
+        📅 Управление Событиями
+      </PanelHeader>
       
       <Div>
         <Card>
