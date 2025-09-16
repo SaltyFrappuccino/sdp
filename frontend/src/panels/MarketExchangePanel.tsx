@@ -500,25 +500,68 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                 </div>
                 
                 {isHovered && character && (
-                  <div
-                    style={{
+                  <>
+                    {/* Полупрозрачный фон */}
+                    <div
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        zIndex: 9999,
+                        backdropFilter: 'blur(4px)'
+                      }}
+                      onClick={() => setHoveredCharacterId(null)}
+                    />
+                    
+                    {/* Модальное окно */}
+                    <div
+                      style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        backgroundColor: '#1a1a1a',
+                        border: '2px solid #4a9eff',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        maxWidth: '350px',
+                        width: '90vw',
+                        maxHeight: '70vh',
+                        overflowY: 'auto',
+                        zIndex: 10000,
+                        boxShadow: '0 8px 32px rgba(74, 158, 255, 0.3), 0 0 0 1px rgba(74, 158, 255, 0.1)',
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        whiteSpace: 'pre-line',
+                        backdropFilter: 'blur(10px)',
+                        color: '#ffffff'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                    {/* Кнопка закрытия */}
+                    <div style={{
                       position: 'absolute',
-                      top: '50%',
-                      left: '100%',
-                      transform: 'translateY(-50%)',
-                      marginLeft: '10px',
-                      backgroundColor: 'var(--vkui--color_background_modal)',
-                      border: '1px solid var(--vkui--color_separator_primary)',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      maxWidth: '300px',
-                      zIndex: 1000,
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                      fontSize: '14px',
-                      lineHeight: '1.4',
-                      whiteSpace: 'pre-line'
+                      top: '8px',
+                      right: '8px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(244, 67, 54, 0.8)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      color: '#ffffff',
+                      fontWeight: 'bold'
                     }}
-                  >
+                    onClick={() => setHoveredCharacterId(null)}
+                    >
+                      ×
+                    </div>
                     {(() => {
                       const assets = character.assets || [];
                       const totalGainLoss = assets.reduce((sum, asset) => {
@@ -532,31 +575,165 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                       }, 0);
                       
                       const gainLossPercent = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
+                      const isProfit = totalGainLoss > 0;
+                      const isLoss = totalGainLoss < 0;
                       
-                      let tooltipText = `${character.character_name}\n💰 Наличные: ${character.cash_balance?.toLocaleString('ru-RU')} ₭\n📊 Общая стоимость: ${character.total_value?.toLocaleString('ru-RU')} ₭\n`;
-                      
-                      if (totalGainLoss !== 0) {
-                        const sign = totalGainLoss > 0 ? '+' : '';
-                        tooltipText += `📈 Прибыль/Убыток: ${sign}${totalGainLoss.toLocaleString('ru-RU')} ₭ (${sign}${gainLossPercent.toFixed(2)}%)\n`;
-                      }
-                      
-                      tooltipText += `📋 Активов: ${assets.length}\n`;
-                      
-                      if (assets.length > 0) {
-                        tooltipText += `\nПортфель:\n`;
-                        assets.slice(0, 5).forEach(asset => {
-                          const assetGainLoss = asset.value - (asset.quantity * asset.average_purchase_price);
-                          const sign = assetGainLoss > 0 ? '+' : '';
-                          tooltipText += `• ${asset.name} (${asset.ticker}): ${asset.quantity.toLocaleString()} шт.\n  ${sign}${assetGainLoss.toLocaleString('ru-RU')} ₭\n`;
-                        });
-                        if (assets.length > 5) {
-                          tooltipText += `... и еще ${assets.length - 5} активов`;
-                        }
-                      }
-                      
-                      return tooltipText;
+                      return (
+                        <div>
+                          {/* Заголовок */}
+                          <div style={{ 
+                            borderBottom: '2px solid #4a9eff', 
+                            paddingBottom: '8px', 
+                            marginBottom: '12px',
+                            textAlign: 'center'
+                          }}>
+                            <div style={{ 
+                              fontSize: '16px', 
+                              fontWeight: 'bold', 
+                              color: '#4a9eff',
+                              marginBottom: '4px'
+                            }}>
+                              {character.character_name}
+                            </div>
+                          </div>
+                          
+                          {/* Основная информация */}
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              marginBottom: '6px',
+                              padding: '6px 8px',
+                              backgroundColor: 'rgba(74, 158, 255, 0.1)',
+                              borderRadius: '6px'
+                            }}>
+                              <span style={{ color: '#4a9eff' }}>💰 Наличные:</span>
+                              <span style={{ color: '#ffffff', fontWeight: 'bold' }}>
+                                {character.cash_balance?.toLocaleString('ru-RU')} ₭
+                              </span>
+                            </div>
+                            
+                            <div style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              marginBottom: '6px',
+                              padding: '6px 8px',
+                              backgroundColor: 'rgba(74, 158, 255, 0.1)',
+                              borderRadius: '6px'
+                            }}>
+                              <span style={{ color: '#4a9eff' }}>📊 Общая стоимость:</span>
+                              <span style={{ color: '#ffffff', fontWeight: 'bold' }}>
+                                {character.total_value?.toLocaleString('ru-RU')} ₭
+                              </span>
+                            </div>
+                            
+                            {totalGainLoss !== 0 && (
+                              <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                marginBottom: '6px',
+                                padding: '6px 8px',
+                                backgroundColor: isProfit ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)',
+                                borderRadius: '6px',
+                                border: `1px solid ${isProfit ? '#4caf50' : '#f44336'}`
+                              }}>
+                                <span style={{ color: isProfit ? '#4caf50' : '#f44336' }}>
+                                  📈 {isProfit ? 'Прибыль' : 'Убыток'}:
+                                </span>
+                                <span style={{ 
+                                  color: isProfit ? '#4caf50' : '#f44336', 
+                                  fontWeight: 'bold' 
+                                }}>
+                                  {isProfit ? '+' : ''}{totalGainLoss.toLocaleString('ru-RU')} ₭ 
+                                  ({isProfit ? '+' : ''}{gainLossPercent.toFixed(2)}%)
+                                </span>
+                              </div>
+                            )}
+                            
+                            <div style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              backgroundColor: 'rgba(74, 158, 255, 0.1)',
+                              borderRadius: '6px'
+                            }}>
+                              <span style={{ color: '#4a9eff' }}>📋 Активов:</span>
+                              <span style={{ color: '#ffffff', fontWeight: 'bold' }}>
+                                {assets.length}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Портфель */}
+                          {assets.length > 0 && (
+                            <div>
+                              <div style={{ 
+                                color: '#4a9eff', 
+                                fontWeight: 'bold', 
+                                marginBottom: '8px',
+                                textAlign: 'center',
+                                borderBottom: '1px solid #4a9eff',
+                                paddingBottom: '4px'
+                              }}>
+                                📋 Портфель
+                              </div>
+                              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                {assets.slice(0, 5).map((asset, idx) => {
+                                  const assetGainLoss = asset.value - (asset.quantity * asset.average_purchase_price);
+                                  const isAssetProfit = assetGainLoss > 0;
+                                  const isAssetLoss = assetGainLoss < 0;
+                                  
+                                  return (
+                                    <div key={idx} style={{ 
+                                      marginBottom: '8px',
+                                      padding: '8px',
+                                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                      borderRadius: '6px',
+                                      border: `1px solid ${isAssetProfit ? 'rgba(76, 175, 80, 0.3)' : isAssetLoss ? 'rgba(244, 67, 54, 0.3)' : 'rgba(74, 158, 255, 0.3)'}`
+                                    }}>
+                                      <div style={{ 
+                                        fontWeight: 'bold', 
+                                        color: '#ffffff',
+                                        marginBottom: '4px'
+                                      }}>
+                                        {asset.name} ({asset.ticker})
+                                      </div>
+                                      <div style={{ 
+                                        fontSize: '12px', 
+                                        color: '#cccccc',
+                                        marginBottom: '2px'
+                                      }}>
+                                        Количество: {asset.quantity.toLocaleString()} шт.
+                                      </div>
+                                      <div style={{ 
+                                        fontSize: '12px',
+                                        color: isAssetProfit ? '#4caf50' : isAssetLoss ? '#f44336' : '#ffffff',
+                                        fontWeight: 'bold'
+                                      }}>
+                                        {isAssetProfit ? '+' : ''}{assetGainLoss.toLocaleString('ru-RU')} ₭
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                {assets.length > 5 && (
+                                  <div style={{ 
+                                    textAlign: 'center', 
+                                    color: '#4a9eff', 
+                                    fontSize: '12px',
+                                    fontStyle: 'italic',
+                                    marginTop: '8px'
+                                  }}>
+                                    ... и еще {assets.length - 5} активов
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
                     })()}
-                  </div>
+                    </div>
+                  </>
                 )}
               </div>
             );
