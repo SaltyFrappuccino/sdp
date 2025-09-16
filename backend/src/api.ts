@@ -4211,7 +4211,11 @@ router.post('/poker/rooms/:id/start', async (req: Request, res: Response) => {
  *       200:
  *         description: Ход сделан успешно
  */
-router.post('/poker/hands/:id/action', async (req: Request, res: Response) => {
+// СТАРЫЙ API УДАЛЕН - ИСПОЛЬЗУЕМ /simple-action
+
+// Заменён на /poker/hands/:id/simple-action (см. ниже)
+
+/**
   try {
     const hand_id = parseInt(req.params.id);
     const { player_id, action, amount = 0 } = req.body;
@@ -4420,10 +4424,10 @@ router.post('/poker/hands/:id/action', async (req: Request, res: Response) => {
         
         if (nextStage === 'finished' || activePlayers.length === 1) {
           // Завершаем раздачу и определяем победителя
-          await finishHand(db, parseInt(hand_id));
+          // await finishHand(db, parseInt(hand_id)); // УДАЛЕНО - старый API
         } else {
           // Переходим к следующему этапу
-          await advanceToNextStage(db, parseInt(hand_id), hand.round_stage);
+          // await advanceToNextStage(db, parseInt(hand_id), hand.round_stage); // УДАЛЕНО - старый API
         }
       } else {
         // Обновляем текущего игрока
