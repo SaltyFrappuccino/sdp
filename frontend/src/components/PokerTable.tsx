@@ -118,6 +118,23 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
     }
   }, [roomId, lastUpdateHash, pauseUpdates]);
 
+  const checkTimeout = useCallback(async () => {
+    if (!currentHand) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/poker/hands/${currentHand.id}/timeout-check`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.timeout_expired) {
+          setLastAction(`⏰ Таймаут! Игрок автоматически сбросил карты`);
+          fetchRoomData(true); // Принудительное обновление
+        }
+      }
+    } catch (error) {
+      console.error('Timeout check failed:', error);
+    }
+  }, [currentHand, fetchRoomData]);
+
   const fetchMyCards = useCallback(async () => {
     if (!currentHand || !currentPlayer) return;
     
@@ -155,10 +172,15 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
       if (currentHand && currentPlayerId && !pauseUpdates) {
         fetchMyCards();
       }
+      
+      // Проверяем таймауты если есть активная раздача
+      if (currentHand && currentHand.round_stage !== 'finished') {
+        checkTimeout();
+      }
     }, 5000); // Увеличили интервал до 5 секунд
 
     return () => clearInterval(interval);
-  }, [fetchRoomData, fetchMyCards, currentHand, currentPlayerId, pauseUpdates]);
+  }, [fetchRoomData, fetchMyCards, checkTimeout, currentHand, currentPlayerId, pauseUpdates]);
 
   const handleStartGame = async () => {
     if (!room) return;
@@ -205,7 +227,8 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
         body.amount = amount;
       }
 
-      const response = await fetch(`${API_URL}/poker/hands/${currentHand.id}/action`, {
+      // Используем новый упрощенный API
+      const response = await fetch(`${API_URL}/poker/hands/${currentHand.id}/simple-action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

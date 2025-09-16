@@ -3911,8 +3911,21 @@ router.post('/poker/rooms/:id/leave', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Вы не в этой комнате' });
     }
     
+    // Если игра идет - помечаем игрока как исключенного (фолд + исключение)
     if (room.status === 'playing') {
-      return res.status(400).json({ error: 'Нельзя покинуть комнату во время игры' });
+      await db.run('UPDATE PokerPlayers SET status = ? WHERE id = ?', ['eliminated', player.id]);
+      console.log(`Player ${character_id} left room ${room_id} during game (eliminated)`);
+      
+      // Проверяем, остались ли активные игроки для продолжения игры
+      const activePlayers = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? AND status = ?', [room_id, 'active']);
+      if (activePlayers.length <= 1 && room.current_hand_id) {
+        // Завершаем текущую руку, если остался 1 или менее игроков
+        await db.run('UPDATE PokerHands SET round_stage = ?, winner_id = ? WHERE id = ?', 
+          ['finished', activePlayers[0]?.id || null, room.current_hand_id]);
+      }
+      
+      await db.run('COMMIT');
+      return res.json({ message: 'Вы покинули игру (исключены из текущей раздачи)' });
     }
     
     await db.run('BEGIN TRANSACTION');
@@ -4407,16 +4420,10 @@ router.post('/poker/hands/:id/action', async (req: Request, res: Response) => {
         
         if (nextStage === 'finished' || activePlayers.length === 1) {
           // Завершаем раздачу и определяем победителя
-          await finishHand(db, hand_id);
+          await finishHand(db, parseInt(hand_id));
         } else {
           // Переходим к следующему этапу
-          await db.run('UPDATE PokerHands SET round_stage = ?, current_bet = 0, current_player_position = ? WHERE id = ?', 
-            [nextStage, activePlayers[0].seat_position, hand_id]);
-          
-          // Открываем общие карты если нужно
-          if (nextStage !== 'preflop') {
-            await dealCommunityCards(db, hand_id, nextStage);
-          }
+          await advanceToNextStage(db, parseInt(hand_id), hand.round_stage);
         }
       } else {
         // Обновляем текущего игрока
@@ -4541,147 +4548,8 @@ function getNextStage(currentStage: string): string {
   }
 }
 
-async function dealCommunityCards(db: any, hand_id: number, stage: string) {
-  const hand = await db.get('SELECT * FROM PokerHands WHERE id = ?', [hand_id]);
-  const communityCards = JSON.parse(hand.community_cards);
-  const { stringToCard, cardToString } = await import('./pokerLogic.js');
-  
-  // Восстанавливаем состояние колоды
-  const deckState = JSON.parse(hand.deck_state);
-  const deck = deckState.map(stringToCard);
-  
-  switch (stage) {
-    case 'flop':
-      // Сжигаем карту и открываем 3
-      deck.shift(); // burn card
-      for (let i = 0; i < 3; i++) {
-        const card = deck.shift();
-        if (card) communityCards.push(cardToString(card));
-      }
-      break;
-    case 'turn':
-      // Сжигаем карту и открываем 1
-      deck.shift(); // burn card
-      const turnCard = deck.shift();
-      if (turnCard) communityCards.push(cardToString(turnCard));
-      break;
-    case 'river':
-      // Сжигаем карту и открываем 1
-      deck.shift(); // burn card
-      const riverCard = deck.shift();
-      if (riverCard) communityCards.push(cardToString(riverCard));
-      break;
-  }
-  
-  // Сохраняем обновленное состояние колоды и общих карт
-  const newDeckState = deck.map(cardToString);
-  await db.run('UPDATE PokerHands SET community_cards = ?, deck_state = ? WHERE id = ?', [
-    JSON.stringify(communityCards), 
-    JSON.stringify(newDeckState), 
-    hand_id
-  ]);
-}
 
-async function finishHand(db: any, hand_id: number) {
-  const { evaluateHand, compareHands, stringToCard, calculatePots } = await import('./pokerLogic.js');
-  
-  // Получаем информацию о раздаче
-  const hand = await db.get('SELECT * FROM PokerHands WHERE id = ?', [hand_id]);
-  
-  // Получаем всех игроков в раздаче (включая сброшенных для расчета side-pot'ов)
-  const allPlayers = await db.all(`
-    SELECT pp.*, ppc.card1, ppc.card2 
-    FROM PokerPlayers pp 
-    LEFT JOIN PokerPlayerCards ppc ON pp.id = ppc.player_id AND ppc.hand_id = ?
-    WHERE pp.room_id = ?
-  `, [hand_id, hand.room_id]);
-  
-  // Получаем активных игроков (не сбросивших карты)
-  const activePlayers = allPlayers.filter((p: any) => p.status === 'active');
-  
-  const communityCards = JSON.parse(hand.community_cards).map(stringToCard);
-  
-  if (activePlayers.length === 1) {
-    // Только один игрок остался - он получает весь банк
-    const winnerId = activePlayers[0].id;
-    await db.run('UPDATE PokerPlayers SET chips = chips + ? WHERE id = ?', [hand.pot, winnerId]);
-    await db.run('UPDATE PokerHands SET winner_id = ?, round_stage = "finished" WHERE id = ?', [winnerId, hand_id]);
-  } else {
-    // Оцениваем руки всех активных игроков
-    const playerHands = activePlayers.map((player: any) => {
-      const playerCards = [stringToCard(player.card1), stringToCard(player.card2)];
-      const allCards = [...playerCards, ...communityCards];
-      const handResult = evaluateHand(allCards);
-      
-      return {
-        player_id: player.id,
-        player: player,
-        hand: handResult
-      };
-    });
-    
-    // Получаем ставки игроков для расчета side-pot'ов
-    const playerBets = await db.all(`
-      SELECT player_id, SUM(amount) as total_bet
-      FROM PokerActions 
-      WHERE hand_id = ? AND action_type IN ('call', 'raise', 'all_in', 'small_blind', 'big_blind')
-      GROUP BY player_id
-    `, [hand_id]);
-    
-    // Подготавливаем данные для расчета side-pot'ов
-    const playersWithBets = allPlayers.map((player: any) => {
-      const bet = playerBets.find((b: any) => b.player_id === player.id);
-      return {
-        id: player.id,
-        current_bet: bet ? bet.total_bet : 0,
-        status: player.status
-      };
-    });
-    
-    // Рассчитываем side-pot'ы
-    const pots = calculatePots(playersWithBets);
-    
-    // Распределяем каждый pot между победителями
-    for (const pot of pots) {
-      // Игроки, имеющие право на этот pot (только активные)
-      const eligiblePlayerHands = playerHands.filter((ph: any) => 
-        pot.eligiblePlayers.includes(ph.player_id)
-      );
-      
-      if (eligiblePlayerHands.length === 0) continue;
-      
-      // Сортируем по силе руки
-      eligiblePlayerHands.sort((a: any, b: any) => compareHands(b.hand, a.hand));
-      
-      // Находим всех игроков с лучшей рукой (может быть несколько при равенстве)
-      const bestHand = eligiblePlayerHands[0].hand;
-      const winners = eligiblePlayerHands.filter((ph: any) => 
-        compareHands(ph.hand, bestHand) === 0
-      );
-      
-      // Делим pot между победителями
-      const potShare = Math.floor(pot.amount / winners.length);
-      for (const winner of winners) {
-        await db.run('UPDATE PokerPlayers SET chips = chips + ? WHERE id = ?', 
-          [potShare, winner.player_id]);
-      }
-    }
-    
-    // Записываем главного победителя (с лучшей рукой среди всех)
-    playerHands.sort((a: any, b: any) => compareHands(b.hand, a.hand));
-    const mainWinner = playerHands[0];
-    await db.run('UPDATE PokerHands SET winner_id = ?, round_stage = "finished" WHERE id = ?', 
-      [mainWinner.player_id, hand_id]);
-  }
-  
-  // Проверяем, нужно ли завершить игру
-  const playersWithChips = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? AND chips > 0', [hand.room_id]);
-  
-  if (playersWithChips.length === 1) {
-    // Игра завершена
-    await db.run('UPDATE PokerRooms SET status = "finished" WHERE id = ?', [hand.room_id]);
-  }
-}
+// СТАРАЯ ФУНКЦИЯ УДАЛЕНА - ИСПОЛЬЗУЕМ НОВУЮ НИЖЕ
 
 /**
  * @swagger
@@ -4840,5 +4708,329 @@ router.post('/admin/market/reset', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Ошибка при сбросе биржи' });
   }
 });
+
+// GET /api/poker/hands/:id/timeout-check - Проверка таймаута хода
+router.get('/poker/hands/:id/timeout-check', async (req: Request, res: Response) => {
+  const { id: hand_id } = req.params;
+  
+  const db = await initDB();
+  
+  try {
+    const hand = await db.get('SELECT * FROM PokerHands WHERE id = ?', [hand_id]);
+    if (!hand || hand.round_stage === 'finished') {
+      return res.status(404).json({ error: 'Раздача не найдена или завершена' });
+    }
+
+    const now = new Date().toISOString();
+    const timeoutExpired = hand.turn_timeout_at && hand.turn_timeout_at < now;
+
+    if (timeoutExpired && hand.current_player_position) {
+      // Автоматически делаем фолд для игрока, превысившего таймаут
+      const timedOutPlayer = await db.get('SELECT * FROM PokerPlayers WHERE room_id = ? AND seat_position = ?', 
+        [hand.room_id, hand.current_player_position]);
+
+      if (timedOutPlayer && timedOutPlayer.status === 'active') {
+        await db.run('BEGIN TRANSACTION');
+        
+        // Помечаем игрока как сбросившего
+        await db.run('UPDATE PokerPlayers SET status = ? WHERE id = ?', ['folded', timedOutPlayer.id]);
+        
+        // Записываем действие фолда
+        const nextOrder = await db.get('SELECT MAX(action_order) as max_order FROM PokerActions WHERE hand_id = ?', [hand_id]);
+        await db.run(`
+          INSERT INTO PokerActions (hand_id, player_id, action_type, amount, round_stage, action_order)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [hand_id, timedOutPlayer.id, 'fold', 0, hand.round_stage, (nextOrder?.max_order || 0) + 1]);
+
+        // Определяем следующего игрока
+        const roomPlayers = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? AND status IN (?, ?)', [hand.room_id, 'active', 'all_in']);
+        const { getNextActivePlayer } = await import('./pokerLogic.js');
+        const nextPlayer = getNextActivePlayer(roomPlayers, timedOutPlayer.seat_position);
+        
+        if (nextPlayer) {
+          const timeoutAt = new Date(Date.now() + 60000).toISOString();
+          await db.run('UPDATE PokerHands SET current_player_position = ?, turn_timeout_at = ? WHERE id = ?', 
+            [nextPlayer.seat_position, timeoutAt, hand_id]);
+        } else {
+          // Если нет следующего игрока, завершаем раздачу
+          await finishHand(db, parseInt(hand_id));
+        }
+
+        await db.run('COMMIT');
+        
+        res.json({ 
+          timeout_expired: true, 
+          action_taken: 'fold',
+          timed_out_player: timedOutPlayer.id 
+        });
+      } else {
+        res.json({ timeout_expired: false });
+      }
+    } else {
+      res.json({ timeout_expired: false });
+    }
+
+  } catch (error) {
+    console.error('Timeout check failed:', error);
+    res.status(500).json({ error: 'Ошибка при проверке таймаута' });
+  }
+});
+
+// NEW SIMPLIFIED POKER ACTION API
+// POST /api/poker/hands/:id/simple-action - Упрощенный API для покерных действий
+router.post('/poker/hands/:id/simple-action', async (req: Request, res: Response) => {
+  const { id: hand_id } = req.params;
+  const { player_id, action, amount } = req.body;
+
+  if (!player_id || !action) {
+    return res.status(400).json({ error: 'player_id и action обязательны', type: 'validation_error' });
+  }
+
+  const db = await initDB();
+  
+  try {
+    await db.run('BEGIN TRANSACTION');
+
+    // Получаем раздачу
+    const hand = await db.get('SELECT * FROM PokerHands WHERE id = ?', [hand_id]);
+    if (!hand || hand.round_stage === 'finished') {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Раздача завершена или не найдена', type: 'validation_error' });
+    }
+
+    // Получаем игрока
+    const player = await db.get('SELECT * FROM PokerPlayers WHERE id = ? AND room_id = ?', [player_id, hand.room_id]);
+    if (!player || player.status !== 'active') {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Игрок не найден или не активен', type: 'validation_error' });
+    }
+
+    // Проверяем, что сейчас ход этого игрока
+    if (hand.current_player_position !== player.seat_position) {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Сейчас не ваш ход', type: 'validation_error' });
+    }
+
+    // Получаем ставки игрока в текущем раунде
+    const playerBetsThisRound = await db.all(`
+      SELECT SUM(amount) as total_bet FROM PokerActions 
+      WHERE hand_id = ? AND player_id = ? AND round_stage = ?
+    `, [hand_id, player_id, hand.round_stage]);
+    
+    const playerTotalBet = playerBetsThisRound[0]?.total_bet || 0;
+    const callAmount = Math.max(0, hand.current_bet - playerTotalBet);
+
+    let actionAmount = 0;
+    let newPlayerStatus = player.status;
+
+    // Обрабатываем действие
+    switch (action) {
+      case 'fold':
+        newPlayerStatus = 'folded';
+        break;
+
+      case 'check':
+        if (hand.current_bet > playerTotalBet) {
+          await db.run('ROLLBACK');
+          return res.status(400).json({ error: 'Нельзя чекать при наличии ставки. Используйте колл или фолд', type: 'validation_error' });
+        }
+        break;
+
+      case 'call':
+        if (callAmount <= 0) {
+          await db.run('ROLLBACK');
+          return res.status(400).json({ error: 'Нет ставки для колла. Используйте чек', type: 'validation_error' });
+        }
+        
+        actionAmount = Math.min(callAmount, player.chips);
+        if (actionAmount === player.chips) {
+          newPlayerStatus = 'all_in';
+        }
+        break;
+
+      case 'raise':
+        if (!amount || amount <= hand.current_bet) {
+          await db.run('ROLLBACK');
+          return res.status(400).json({ error: 'Размер рейза должен быть больше текущей ставки', type: 'validation_error' });
+        }
+        
+        const raiseAmount = amount - playerTotalBet;
+        if (raiseAmount > player.chips) {
+          await db.run('ROLLBACK');
+          return res.status(400).json({ error: 'Недостаточно фишек для рейза', type: 'validation_error' });
+        }
+        
+        actionAmount = raiseAmount;
+        if (actionAmount === player.chips) {
+          newPlayerStatus = 'all_in';
+        }
+        
+        // Обновляем текущую ставку
+        await db.run('UPDATE PokerHands SET current_bet = ? WHERE id = ?', [amount, hand_id]);
+        break;
+
+      case 'all_in':
+        actionAmount = player.chips;
+        newPlayerStatus = 'all_in';
+        
+        const newBet = playerTotalBet + actionAmount;
+        if (newBet > hand.current_bet) {
+          await db.run('UPDATE PokerHands SET current_bet = ? WHERE id = ?', [newBet, hand_id]);
+        }
+        break;
+
+      default:
+        await db.run('ROLLBACK');
+        return res.status(400).json({ error: 'Неизвестное действие', type: 'validation_error' });
+    }
+
+    // Записываем действие
+    const nextOrder = await db.get('SELECT MAX(action_order) as max_order FROM PokerActions WHERE hand_id = ?', [hand_id]);
+    await db.run(`
+      INSERT INTO PokerActions (hand_id, player_id, action_type, amount, round_stage, action_order)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [hand_id, player_id, action, actionAmount, hand.round_stage, (nextOrder?.max_order || 0) + 1]);
+
+    // Обновляем фишки и статус игрока
+    if (actionAmount > 0) {
+      await db.run('UPDATE PokerPlayers SET chips = chips - ? WHERE id = ?', [actionAmount, player_id]);
+      await db.run('UPDATE PokerHands SET pot = pot + ? WHERE id = ?', [actionAmount, hand_id]);
+    }
+    
+    if (newPlayerStatus !== player.status) {
+      await db.run('UPDATE PokerPlayers SET status = ? WHERE id = ?', [newPlayerStatus, player_id]);
+    }
+
+    // Определяем следующего игрока
+    const roomPlayers = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? AND status IN (?, ?)', [hand.room_id, 'active', 'all_in']);
+    const { getNextActivePlayer } = await import('./pokerLogic.js');
+    const nextPlayer = getNextActivePlayer(roomPlayers, player.seat_position);
+    
+    if (nextPlayer) {
+      // Устанавливаем таймаут на ход (60 секунд)
+      const timeoutAt = new Date(Date.now() + 60000).toISOString();
+      await db.run('UPDATE PokerHands SET current_player_position = ?, turn_timeout_at = ? WHERE id = ?', 
+        [nextPlayer.seat_position, timeoutAt, hand_id]);
+    }
+
+    // Проверяем, закончился ли раунд торгов
+    const activePlayers = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? AND status IN (?, ?)', [hand.room_id, 'active', 'all_in']);
+    const allPlayersActed = await checkIfAllPlayersActed(db, parseInt(hand_id), hand.round_stage, activePlayers);
+    
+    if (allPlayersActed || activePlayers.filter(p => p.status === 'active').length === 0) {
+      // Переходим к следующей стадии или завершаем
+      await advanceToNextStage(db, parseInt(hand_id), hand.round_stage);
+    }
+
+    await db.run('COMMIT');
+    
+    res.json({ 
+      message: 'Действие выполнено',
+      action,
+      amount: actionAmount,
+      next_player: nextPlayer ? nextPlayer.seat_position : null
+    });
+
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Poker action failed:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Ошибка сервера', type: 'server_error' });
+  }
+});
+
+// Вспомогательные функции
+async function checkIfAllPlayersActed(db: any, hand_id: number, round_stage: string, activePlayers: any[]): Promise<boolean> {
+  // Простая проверка: все активные игроки поставили одинаковую сумму или сбросили/олл-ин
+  for (const player of activePlayers) {
+    if (player.status === 'active') {
+      const playerBet = await db.get(`
+        SELECT SUM(amount) as total_bet FROM PokerActions 
+        WHERE hand_id = ? AND player_id = ? AND round_stage = ?
+      `, [hand_id, player.id, round_stage]);
+      
+      const currentBet = await db.get('SELECT current_bet FROM PokerHands WHERE id = ?', [hand_id]);
+      
+      if ((playerBet?.total_bet || 0) < currentBet.current_bet) {
+        return false; // Этот игрок еще не уровнял ставку
+      }
+    }
+  }
+  return true;
+}
+
+async function advanceToNextStage(db: any, hand_id: number, current_stage: string) {
+  const stages = ['preflop', 'flop', 'turn', 'river', 'showdown'];
+  const currentIndex = stages.indexOf(current_stage);
+  
+  if (currentIndex >= 0 && currentIndex < stages.length - 1) {
+    const nextStage = stages[currentIndex + 1];
+    await db.run('UPDATE PokerHands SET round_stage = ?, current_bet = 0 WHERE id = ?', [nextStage, hand_id]);
+    
+    // Сбрасываем позицию хода на первого активного игрока
+    const firstActivePlayer = await db.get(`
+      SELECT seat_position FROM PokerPlayers 
+      WHERE room_id = (SELECT room_id FROM PokerHands WHERE id = ?) 
+      AND status = 'active' 
+      ORDER BY seat_position ASC LIMIT 1
+    `, [hand_id]);
+    
+    if (firstActivePlayer) {
+      // Устанавливаем таймаут на ход (60 секунд)
+      const timeoutAt = new Date(Date.now() + 60000).toISOString();
+      await db.run('UPDATE PokerHands SET current_player_position = ?, turn_timeout_at = ? WHERE id = ?', 
+        [firstActivePlayer.seat_position, timeoutAt, hand_id]);
+    }
+    
+    // Добавляем общие карты если нужно
+    if (nextStage === 'flop') {
+      await dealCommunityCards(db, hand_id, 3);
+    } else if (nextStage === 'turn' || nextStage === 'river') {
+      await dealCommunityCards(db, hand_id, 1);
+    } else if (nextStage === 'showdown') {
+      await finishHand(db, hand_id);
+    }
+  } else {
+    // Завершаем раздачу
+    await finishHand(db, hand_id);
+  }
+}
+
+async function dealCommunityCards(db: any, hand_id: number, count: number) {
+  // Получаем текущую колоду
+  const hand = await db.get('SELECT deck_state, community_cards FROM PokerHands WHERE id = ?', [hand_id]);
+  const { stringToCard, cardToString } = await import('./pokerLogic.js');
+  
+  let deck = hand.deck_state ? JSON.parse(hand.deck_state) : [];
+  let communityCards = hand.community_cards ? JSON.parse(hand.community_cards) : [];
+  
+  // Добавляем карты
+  for (let i = 0; i < count && deck.length > 0; i++) {
+    communityCards.push(deck.pop());
+  }
+  
+  await db.run('UPDATE PokerHands SET deck_state = ?, community_cards = ? WHERE id = ?', [
+    JSON.stringify(deck),
+    JSON.stringify(communityCards),
+    hand_id
+  ]);
+}
+
+async function finishHand(db: any, hand_id: number) {
+  // Определяем победителя и завершаем раздачу
+  await db.run('UPDATE PokerHands SET round_stage = ? WHERE id = ?', ['finished', hand_id]);
+  
+  // Простая логика: последний активный игрок выигрывает
+  const winner = await db.get(`
+    SELECT p.*, h.pot FROM PokerPlayers p
+    JOIN PokerHands h ON h.room_id = p.room_id
+    WHERE h.id = ? AND p.status IN ('active', 'all_in')
+    ORDER BY p.seat_position ASC LIMIT 1
+  `, [hand_id]);
+  
+  if (winner) {
+    await db.run('UPDATE PokerHands SET winner_id = ? WHERE id = ?', [winner.id, hand_id]);
+    await db.run('UPDATE PokerPlayers SET chips = chips + ? WHERE id = ?', [winner.pot, winner.id]);
+  }
+}
 
 export default router;

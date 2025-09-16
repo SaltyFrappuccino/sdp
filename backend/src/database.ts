@@ -630,6 +630,7 @@ export async function initDB() {
         winner_id INTEGER,
         side_pots TEXT DEFAULT '[]', -- JSON для side pots
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        turn_timeout_at DATETIME, -- Когда истекает время хода текущего игрока
         FOREIGN KEY(room_id) REFERENCES PokerRooms(id) ON DELETE CASCADE
       );
     `);
@@ -708,6 +709,20 @@ export async function initDB() {
       }
     } catch (error) {
       console.warn('Could not add deck_state column:', error);
+    }
+
+    // Миграция для добавления turn_timeout_at в PokerHands
+    try {
+      const pokerHandsColumns = await db.all("PRAGMA table_info(PokerHands)");
+      const hasTurnTimeout = pokerHandsColumns.some((col: any) => col.name === 'turn_timeout_at');
+      
+      if (!hasTurnTimeout) {
+        console.log('Adding turn_timeout_at column to PokerHands table...');
+        await db.run('ALTER TABLE PokerHands ADD COLUMN turn_timeout_at DATETIME');
+        console.log('turn_timeout_at column added successfully');
+      }
+    } catch (error) {
+      console.warn('Could not add turn_timeout_at column:', error);
     }
 
     await seedStocks(db);
