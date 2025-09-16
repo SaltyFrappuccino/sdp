@@ -381,7 +381,7 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
                     onClick={() => addBet(horse.id, 'win')}
                     style={{ backgroundColor: '#28a745', fontSize: 10 }}
                   >
-                    Win
+                    Победа
                   </Button>
                   <Button
                     size="s"
