@@ -2458,37 +2458,7 @@ router.get('/characters/:character_id/bet-history', async (req: Request, res: Re
 
 // ==================== MARKET API ====================
 
-// GET /api/market/stocks - Получить список всех акций
-router.get('/market/stocks', async (req: Request, res: Response) => {
-  try {
-    const db = await initDB();
-    const stocks = await db.all('SELECT id, name, ticker_symbol, description, current_price, exchange, base_trend FROM Stocks ORDER BY exchange, name');
-
-    const stocksWithHistory = await Promise.all(stocks.map(async (stock) => {
-      const history = await db.all(`
-        SELECT price, 
-               CASE 
-                 WHEN timestamp IS NOT NULL AND timestamp != '' THEN timestamp 
-                 ELSE legacy_timestamp 
-               END as timestamp
-        FROM StockPriceHistory 
-        WHERE stock_id = ? 
-        ORDER BY 
-          CASE 
-            WHEN timestamp IS NOT NULL AND timestamp != '' THEN timestamp 
-            ELSE legacy_timestamp 
-          END DESC 
-        LIMIT 30
-      `, [stock.id]);
-      return { ...stock, history };
-    }));
-
-    res.json(stocksWithHistory);
-  } catch (error) {
-    console.error('Failed to fetch stocks:', error);
-    res.status(500).json({ error: 'Не удалось получить список акций' });
-  }
-});
+// Удален дублирующий эндпоинт - используется новый ниже
 
 // GET /api/market/stocks/:ticker - Получить детали акции и историю цен
 router.get('/market/stocks/:ticker', async (req: Request, res: Response) => {

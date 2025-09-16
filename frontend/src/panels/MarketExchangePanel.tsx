@@ -487,9 +487,39 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
               key={entry.character_id}
               shown={hoveredCharacterId === entry.character_id}
               placement="right"
-              content={hoveredCharacter ? 
-                `${hoveredCharacter.character_name}\n💰 ${hoveredCharacter.cash_balance?.toLocaleString('ru-RU')} ₭\n📊 Общая стоимость: ${hoveredCharacter.total_value?.toLocaleString('ru-RU')} ₭\n📈 Активов: ${hoveredCharacter.assets?.length || 0}` 
-                : ""}
+              content={hoveredCharacter ? (() => {
+                const assets = hoveredCharacter.assets || [];
+                const totalGainLoss = assets.reduce((sum, asset) => {
+                  const currentValue = asset.value;
+                  const costBasis = asset.quantity * asset.average_purchase_price;
+                  return sum + (currentValue - costBasis);
+                }, 0);
+                const gainLossPercent = hoveredCharacter.total_value > 0 ? 
+                  ((totalGainLoss / (hoveredCharacter.total_value - totalGainLoss)) * 100) : 0;
+                
+                let tooltipText = `${hoveredCharacter.character_name}\n💰 Наличные: ${hoveredCharacter.cash_balance?.toLocaleString('ru-RU')} ₭\n📊 Общая стоимость: ${hoveredCharacter.total_value?.toLocaleString('ru-RU')} ₭\n`;
+                
+                if (totalGainLoss !== 0) {
+                  const sign = totalGainLoss > 0 ? '+' : '';
+                  tooltipText += `📈 Прибыль/Убыток: ${sign}${totalGainLoss.toLocaleString('ru-RU')} ₭ (${sign}${gainLossPercent.toFixed(2)}%)\n`;
+                }
+                
+                tooltipText += `📋 Активов: ${assets.length}\n`;
+                
+                if (assets.length > 0) {
+                  tooltipText += `\nПортфель:\n`;
+                  assets.slice(0, 5).forEach(asset => {
+                    const assetGainLoss = asset.value - (asset.quantity * asset.average_purchase_price);
+                    const sign = assetGainLoss > 0 ? '+' : '';
+                    tooltipText += `• ${asset.name} (${asset.ticker}): ${asset.quantity.toLocaleString()} шт.\n  ${sign}${assetGainLoss.toLocaleString('ru-RU')} ₭\n`;
+                  });
+                  if (assets.length > 5) {
+                    tooltipText += `... и еще ${assets.length - 5} активов`;
+                  }
+                }
+                
+                return tooltipText;
+              })() : ""}
             >
               <div
                 onMouseEnter={() => setHoveredCharacterId(entry.character_id)}
