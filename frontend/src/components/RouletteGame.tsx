@@ -38,6 +38,7 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
   const [result, setResult] = useState<{ number: number; color: string; winAmount: number; message: string } | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
+  const [displayNumber, setDisplayNumber] = useState<number>(0);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedBetType, setSelectedBetType] = useState<'number' | 'color' | 'even' | 'odd' | 'high' | 'low'>('number');
 
@@ -89,8 +90,10 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
     
     let currentNumber = 0;
     for (let i = 0; i < totalUpdates; i++) {
-      await new Promise(resolve => setTimeout(resolve, spinInterval));
+      const timeout = spinInterval + i * (spinInterval / totalUpdates); // Замедление
+      await new Promise(resolve => setTimeout(resolve, timeout));
       currentNumber = Math.floor(Math.random() * 37);
+      setDisplayNumber(currentNumber);
     }
     
     const winningNumber = ROULETTE_NUMBERS[currentNumber];
@@ -181,24 +184,20 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
         margin: '0 auto 20px',
         overflow: 'hidden'
       }}>
-        {ROULETTE_NUMBERS.map((item, index) => (
-          <div
-            key={index}
-            style={{
-              width: '33.33%',
-              height: '33.33%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              border: '1px solid #444',
-              ...getColorStyle(item.color)
-            }}
-          >
-            {item.number}
-          </div>
-        ))}
+        <div style={{
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '48px',
+          fontWeight: 'bold',
+          transition: 'transform 0.1s ease-out',
+          ...getColorStyle(ROULETTE_NUMBERS[displayNumber]?.color || 'green')
+        }}>
+          {displayNumber}
+        </div>
         
         {/* Центральная точка */}
         <div style={{

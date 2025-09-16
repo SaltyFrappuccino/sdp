@@ -101,7 +101,7 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
     setRaceProgress(new Array(HORSES.length).fill(0));
     
     // Анимация гонки
-    const raceDuration = 5000; // 5 секунд
+    const raceDuration = 8000; // 8 секунд
     const updateInterval = 50; // Обновляем каждые 50мс
     const totalUpdates = raceDuration / updateInterval;
     
@@ -388,14 +388,14 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
                     onClick={() => addBet(horse.id, 'place')}
                     style={{ backgroundColor: '#ffc107', color: '#000', fontSize: 10 }}
                   >
-                    Place
+                    Место
                   </Button>
                   <Button
                     size="s"
                     onClick={() => addBet(horse.id, 'show')}
                     style={{ backgroundColor: '#17a2b8', fontSize: 10 }}
                   >
-                    Show
+                    Показ
                   </Button>
                 </div>
               </div>
@@ -428,10 +428,10 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
         <div style={{ marginTop: 20, padding: 12, backgroundColor: '#2a2a2a', borderRadius: 8, border: '1px solid #444' }}>
           <Text weight="2" style={{ marginBottom: 8, fontSize: 14, color: '#fff' }}>Правила:</Text>
           <Text style={{ fontSize: 12, lineHeight: 1.4, color: '#ccc' }}>
-            🏆 Win: Лошадь должна прийти первой<br/>
-            🥈 Place: Лошадь должна прийти 1-2<br/>
-            🥉 Show: Лошадь должна прийти 1-3<br/>
-            Коэффициенты указаны для Win ставок
+            🏆 Победа: Лошадь должна прийти первой<br/>
+            🥈 Место: Лошадь должна прийти 1-2<br/>
+            🥉 Показ: Лошадь должна прийти 1-3<br/>
+            Коэффициенты указаны для ставок на Победу
           </Text>
         </div>
       </Div>

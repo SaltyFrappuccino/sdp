@@ -388,6 +388,45 @@ export async function initDB() {
       );
     `);
 
+    // Миграция для CasinoGames - добавляем новые типы игр
+    try {
+      // Это дорогая операция, но SQLite не позволяет легко менять CHECK constraints
+      await db.exec('PRAGMA foreign_keys=off;');
+      await db.exec('BEGIN TRANSACTION;');
+      
+      const tempTable = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='CasinoGames'`);
+      if (tempTable && tempTable.sql && !tempTable.sql.includes('roulette')) {
+        console.log('Migrating CasinoGames table to include new game types...');
+
+        await db.exec(`
+          CREATE TABLE IF NOT EXISTS CasinoGames_temp (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            character_id INTEGER NOT NULL,
+            game_type TEXT NOT NULL CHECK (game_type IN ('blackjack', 'slots', 'dice', 'roulette', 'horseracing')),
+            bet_amount REAL NOT NULL,
+            win_amount REAL DEFAULT 0,
+            game_data TEXT DEFAULT '{}',
+            result TEXT NOT NULL CHECK (result IN ('win', 'lose', 'push')),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+          );
+        `);
+        
+        await db.exec(`INSERT INTO CasinoGames_temp SELECT * FROM CasinoGames;`);
+        await db.exec(`DROP TABLE CasinoGames;`);
+        await db.exec(`ALTER TABLE CasinoGames_temp RENAME TO CasinoGames;`);
+        
+        console.log('CasinoGames table migrated successfully.');
+      }
+      
+      await db.exec('COMMIT;');
+      await db.exec('PRAGMA foreign_keys=on;');
+    } catch (error) {
+      await db.exec('ROLLBACK;');
+      await db.exec('PRAGMA foreign_keys=on;');
+      console.warn('Could not migrate CasinoGames table:', error);
+    }
+
     // Миграция для CasinoGames - проверяем и пересоздаем таблицу если нужно
     try {
       // Проверяем есть ли колонка game_type
