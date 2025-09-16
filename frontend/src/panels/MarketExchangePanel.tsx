@@ -488,14 +488,39 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
             return (
               <div key={entry.character_id} style={{ position: 'relative' }}>
                 <div
-                  onMouseEnter={() => setHoveredCharacterId(entry.character_id)}
-                  onMouseLeave={() => setHoveredCharacterId(null)}
+                  onClick={() => setHoveredCharacterId(hoveredCharacterId === entry.character_id ? null : entry.character_id)}
+                  style={{ 
+                    cursor: 'pointer',
+                    borderRadius: '8px',
+                    transition: 'background-color 0.2s ease',
+                    backgroundColor: isHovered ? 'rgba(74, 158, 255, 0.1)' : 'transparent'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isHovered) {
+                      e.currentTarget.style.backgroundColor = 'rgba(74, 158, 255, 0.05)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isHovered) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
                 >
                   <SimpleCell
                     before={<Avatar size={28}>{index + 1}</Avatar>}
                     subtitle={`${entry.total_value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`}
                   >
-                    {entry.character_name}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>{entry.character_name}</span>
+                      <span style={{ 
+                        fontSize: '12px', 
+                        color: '#4a9eff', 
+                        opacity: 0.7,
+                        marginLeft: '8px'
+                      }}>
+                        👆 Нажмите для деталей
+                      </span>
+                    </div>
                   </SimpleCell>
                 </div>
                 
