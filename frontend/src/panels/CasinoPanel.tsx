@@ -6,6 +6,8 @@ import { Icon28GameOutline, Icon28Dice1Outline, Icon28Cards2Outline } from '@vko
 import { BlackjackGame } from '../components/BlackjackGame';
 import { SlotsGame } from '../components/SlotsGame';
 import { DiceGame } from '../components/DiceGame';
+import { RouletteGame } from '../components/RouletteGame';
+import { HorseRacingGame } from '../components/HorseRacingGame';
 
 interface NavIdProps {
   id: string;
@@ -93,7 +95,18 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     setActiveModal('dice');
   };
 
+  const playRoulette = () => {
+    if (!selectedCharacter || !betAmount) return;
+    setActiveModal('roulette');
+  };
+
+  const playHorseRacing = () => {
+    if (!selectedCharacter || !betAmount) return;
+    setActiveModal('horseracing');
+  };
+
   const handleGameStart = async (gameType: string) => {
+    if (!selectedCharacter) return;
     try {
       // Списываем ставку при начале игры
       const response = await fetch(`${API_URL}/casino/${gameType}/start`, {
@@ -120,6 +133,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
   };
 
   const handleGameEnd = async (gameType: string, result: any) => {
+    if (!selectedCharacter) return;
     try {
       const response = await fetch(`${API_URL}/casino/${gameType}`, {
         method: 'POST',
@@ -245,7 +259,10 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                       const netChange = game.win_amount - game.bet_amount;
                       const isWin = netChange > 0;
                       const gameTypeEmoji = game.game_type === 'blackjack' ? '🃏' : 
-                                           game.game_type === 'slots' ? '🎰' : '🎲';
+                                           game.game_type === 'slots' ? '🎰' : 
+                                           game.game_type === 'dice' ? '🎲' :
+                                           game.game_type === 'roulette' ? '🎰' :
+                                           game.game_type === 'horseracing' ? '🐎' : '❓';
                       
                       return (
                         <div key={game.id} style={{ 
@@ -258,8 +275,13 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                               <Text style={{ color: '#fff', fontSize: '14px' }}>
-                                {gameTypeEmoji} {game.game_type === 'blackjack' ? 'Блэкджек' : 
-                                                game.game_type === 'slots' ? 'Слоты' : 'Кости'}
+                                {gameTypeEmoji} {
+                                  game.game_type === 'blackjack' ? 'Блэкджек' : 
+                                  game.game_type === 'slots' ? 'Слоты' : 
+                                  game.game_type === 'dice' ? 'Кости' :
+                                  game.game_type === 'roulette' ? 'Рулетка' :
+                                  game.game_type === 'horseracing' ? 'Скачки' : 'Игра'
+                                }
                               </Text>
                               <div style={{ fontSize: '12px', color: '#ccc' }}>
                                 Ставка: {game.bet_amount} | Выигрыш: {game.win_amount}
@@ -332,6 +354,22 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                   </Button>
                   
                   <Button
+                    size="l"
+                    onClick={playRoulette}
+                    disabled={!betAmount || parseInt(betAmount) > selectedCharacterData.currency}
+                  >
+                    🎰 Рулетка
+                  </Button>
+
+                  <Button
+                    size="l"
+                    onClick={playHorseRacing}
+                    disabled={!betAmount || parseInt(betAmount) > selectedCharacterData.currency}
+                  >
+                    🐎 Скачки
+                  </Button>
+                  
+                  <Button
                     size="m"
                     mode="secondary"
                     onClick={() => setShowHistory(!showHistory)}
@@ -370,9 +408,17 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Text weight="2">
                               {game.game_type === 'blackjack' ? '🃏' : 
-                               game.game_type === 'slots' ? '🎰' : '🎲'} 
+                               game.game_type === 'slots' ? '🎰' : 
+                               game.game_type === 'dice' ? '🎲' :
+                               game.game_type === 'roulette' ? '🎰' :
+                               game.game_type === 'horseracing' ? '🐎' :
+                               '❓'} 
                               {game.game_type === 'blackjack' ? 'Блэкджек' : 
-                               game.game_type === 'slots' ? 'Слоты' : 'Кости'}
+                               game.game_type === 'slots' ? 'Слоты' :
+                               game.game_type === 'dice' ? 'Кости' :
+                               game.game_type === 'roulette' ? 'Рулетка' :
+                               game.game_type === 'horseracing' ? 'Скачки' :
+                               'Игра'}
                             </Text>
                             <Text style={{ color: game.result === 'win' ? 'green' : game.result === 'lose' ? 'red' : 'orange' }}>
                               {game.result === 'win' ? '+' : game.result === 'lose' ? '-' : '='}
@@ -475,6 +521,62 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
               betAmount={parseInt(betAmount)}
               onGameStart={() => handleGameStart('dice')}
               onGameEnd={(result) => handleGameEnd('dice', result)}
+              onClose={() => setActiveModal(null)}
+            />
+          )}
+        </ModalPage>
+
+        <ModalPage 
+          id="roulette" 
+          onClose={() => setActiveModal(null)}
+          style={{ backgroundColor: '#1a1a1a' }}
+        >
+          <ModalPageHeader style={{ backgroundColor: '#2a2a2a', borderBottom: '1px solid #444' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <Text weight="2" style={{ color: '#fff' }}>🎰 Рулетка</Text>
+              <Button 
+                size="s" 
+                onClick={() => setActiveModal(null)}
+                style={{ backgroundColor: '#444', color: '#fff' }}
+              >
+                ✕
+              </Button>
+            </div>
+          </ModalPageHeader>
+          {selectedCharacter && (
+            <RouletteGame
+              characterId={selectedCharacter}
+              betAmount={parseInt(betAmount)}
+              onGameStart={() => handleGameStart('roulette')}
+              onGameEnd={(result) => handleGameEnd('roulette', result)}
+              onClose={() => setActiveModal(null)}
+            />
+          )}
+        </ModalPage>
+
+        <ModalPage 
+          id="horseracing" 
+          onClose={() => setActiveModal(null)}
+          style={{ backgroundColor: '#1a1a1a' }}
+        >
+          <ModalPageHeader style={{ backgroundColor: '#2a2a2a', borderBottom: '1px solid #444' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <Text weight="2" style={{ color: '#fff' }}>🐎 Скачки</Text>
+              <Button 
+                size="s" 
+                onClick={() => setActiveModal(null)}
+                style={{ backgroundColor: '#444', color: '#fff' }}
+              >
+                ✕
+              </Button>
+            </div>
+          </ModalPageHeader>
+          {selectedCharacter && (
+            <HorseRacingGame
+              characterId={selectedCharacter}
+              betAmount={parseInt(betAmount)}
+              onGameStart={() => handleGameStart('horseracing')}
+              onGameEnd={(result) => handleGameEnd('horseracing', result)}
               onClose={() => setActiveModal(null)}
             />
           )}

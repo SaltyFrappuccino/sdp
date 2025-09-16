@@ -505,11 +505,11 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
+              >
+                <SimpleCell
+                  before={<Avatar size={28}>{index + 1}</Avatar>}
+                  subtitle={`${entry.total_value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`}
                 >
-                  <SimpleCell
-                    before={<Avatar size={28}>{index + 1}</Avatar>}
-                    subtitle={`${entry.total_value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`}
-                  >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span>{entry.character_name}</span>
                       <span style={{ 
@@ -521,8 +521,8 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                         👆 Нажмите для деталей
                       </span>
                     </div>
-                  </SimpleCell>
-                </div>
+                </SimpleCell>
+              </div>
                 
                 {isHovered && character && (
                   <>

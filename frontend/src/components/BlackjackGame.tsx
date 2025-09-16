@@ -153,9 +153,8 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
       newGameStatus = 'playerBust';
       result = 'lose';
     } else if (newPlayerValue === 21) {
-      newGameStatus = 'finished';
-      result = 'win';
-      winAmount = Math.floor(betAmount * 1.6); // уменьшили с 1.8 до 1.6
+      // Игрок собрал 21, его ход окончен, передаем управление дилеру
+      newGameStatus = 'dealerTurn';
     }
     
     setGameState({
@@ -169,10 +168,15 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     
     setTimeout(() => {
       setAnimating(false);
+      // Если у игрока перебор, сразу заканчиваем игру
       if (newGameStatus === 'playerBust') {
         setTimeout(() => {
-          onGameEnd({ result, winAmount, gameData: { playerCards: newPlayerCards, dealerCards: gameState.dealerCards, playerValue: newPlayerValue, dealerValue: gameState.dealerValue } });
+          onGameEnd({ result: 'lose', winAmount: 0, gameData: { playerCards: newPlayerCards, dealerCards: gameState.dealerCards, playerValue: newPlayerValue, dealerValue: gameState.dealerValue } });
         }, 1000);
+      }
+      // Если игрок собрал 21, автоматически запускаем ход дилера
+      if (newGameStatus === 'dealerTurn') {
+        stand();
       }
     }, 1000);
   };

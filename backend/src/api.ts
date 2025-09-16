@@ -2581,93 +2581,7 @@ router.get('/market/portfolio/:character_id', async (req: Request, res: Response
   }
 });
 
-// POST /api/market/trade - Совершить сделку
-router.post('/market/trade', async (req: Request, res: Response) => {
-  const { character_id, ticker_symbol, quantity, trade_type } = req.body; // trade_type: 'buy' or 'sell'
-  if (!character_id || !ticker_symbol || !quantity || !trade_type || quantity <= 0) {
-    return res.status(400).json({ error: 'Неверные параметры для сделки' });
-  }
-  const db = await initDB();
-  try {
-    await db.run('BEGIN TRANSACTION');
-
-    const stock = await db.get('SELECT * FROM Stocks WHERE ticker_symbol = ?', [ticker_symbol]);
-    if (!stock) {
-      await db.run('ROLLBACK');
-      return res.status(404).json({ error: 'Акция не найдена' });
-    }
-
-    let portfolio = await db.get('SELECT * FROM Portfolios WHERE character_id = ?', [character_id]);
-    const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
-    if (!character) {
-      await db.run('ROLLBACK');
-      return res.status(404).json({ error: 'Персонаж не найден' });
-    }
-    
-    if (!portfolio) {
-      // Создаем портфолио, если его нет
-      const result = await db.run('INSERT INTO Portfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, character.currency || 0]);
-      portfolio = { id: result.lastID, character_id, cash_balance: character.currency || 0 };
-    } else {
-      // Синхронизируем валюту с персонажем
-      if (portfolio.cash_balance !== character.currency) {
-        await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [character.currency || 0, portfolio.id]);
-        portfolio.cash_balance = character.currency || 0;
-      }
-    }
-
-    const total_cost = stock.current_price * quantity;
-
-    if (trade_type === 'buy') {
-      if (character.currency < total_cost) {
-        await db.run('ROLLBACK');
-        return res.status(400).json({ error: 'Недостаточно средств' });
-      }
-
-      const new_balance = character.currency - total_cost;
-      await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [new_balance, character_id]);
-      await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [new_balance, portfolio.id]);
-
-      const existing_asset = await db.get('SELECT * FROM PortfolioAssets WHERE portfolio_id = ? AND stock_id = ?', [portfolio.id, stock.id]);
-      if (existing_asset) {
-        const new_quantity = existing_asset.quantity + quantity;
-        const new_avg_price = ((existing_asset.average_purchase_price * existing_asset.quantity) + total_cost) / new_quantity;
-        await db.run('UPDATE PortfolioAssets SET quantity = ?, average_purchase_price = ? WHERE id = ?', [new_quantity, new_avg_price, existing_asset.id]);
-      } else {
-        await db.run('INSERT INTO PortfolioAssets (portfolio_id, stock_id, quantity, average_purchase_price) VALUES (?, ?, ?, ?)', [portfolio.id, stock.id, quantity, stock.current_price]);
-      }
-
-    } else if (trade_type === 'sell') {
-      const existing_asset = await db.get('SELECT * FROM PortfolioAssets WHERE portfolio_id = ? AND stock_id = ?', [portfolio.id, stock.id]);
-      if (!existing_asset || existing_asset.quantity < quantity) {
-        await db.run('ROLLBACK');
-        return res.status(400).json({ error: 'Недостаточно акций для продажи' });
-      }
-
-      const new_balance = character.currency + total_cost;
-      await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [new_balance, character_id]);
-      await db.run('UPDATE Portfolios SET cash_balance = ? WHERE id = ?', [new_balance, portfolio.id]);
-
-      const new_quantity = existing_asset.quantity - quantity;
-      if (new_quantity > 0) {
-        await db.run('UPDATE PortfolioAssets SET quantity = ? WHERE id = ?', [new_quantity, existing_asset.id]);
-      } else {
-        await db.run('DELETE FROM PortfolioAssets WHERE id = ?', [existing_asset.id]);
-      }
-    } else {
-      await db.run('ROLLBACK');
-      return res.status(400).json({ error: 'Неверный тип сделки' });
-    }
-
-    await db.run('COMMIT');
-    res.json({ message: 'Сделка совершена успешно' });
-
-  } catch (error) {
-    await db.run('ROLLBACK');
-    console.error('Trade failed:', error);
-    res.status(500).json({ error: 'Не удалось совершить сделку' });
-  }
-});
+// Удален старый дублирующий эндпоинт - используется новый ниже
 
 // PUT /api/market/admin/stocks/:ticker - Обновить базовый тренд акции
 router.put('/market/admin/stocks/:ticker', async (req: Request, res: Response) => {
@@ -3201,6 +3115,78 @@ router.post('/casino/dice/start', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/casino/roulette/start - Начать игру в рулетку (списать ставку)
+router.post('/casino/roulette/start', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < bet_amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Списываем ставку
+    await db.run(
+      'UPDATE Characters SET currency = currency - ? WHERE id = ?',
+      [bet_amount, character_id]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Ставка списана, игра началась',
+      new_currency: character.currency - bet_amount
+    });
+  } catch (error) {
+    console.error('Roulette start error:', error);
+    res.status(500).json({ error: 'Не удалось начать игру' });
+  }
+});
+
+// POST /api/casino/horseracing/start - Начать игру в скачки (списать ставку)
+router.post('/casino/horseracing/start', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    if (character.currency < bet_amount) {
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Списываем ставку
+    await db.run(
+      'UPDATE Characters SET currency = currency - ? WHERE id = ?',
+      [bet_amount, character_id]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Ставка списана, игра началась',
+      new_currency: character.currency - bet_amount
+    });
+  } catch (error) {
+    console.error('Horse racing start error:', error);
+    res.status(500).json({ error: 'Не удалось начать игру' });
+  }
+});
+
 // POST /api/casino/blackjack - Сохранить результат игры в блэкджек
 router.post('/casino/blackjack', async (req: Request, res: Response) => {
   try {
@@ -3312,6 +3298,80 @@ router.post('/casino/dice', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Dice game failed:', error);
+    res.status(500).json({ error: 'Не удалось сохранить результат игры' });
+  }
+});
+
+// POST /api/casino/roulette - Сохранить результат игры в рулетку
+router.post('/casino/roulette', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount, result, winAmount, gameData } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0 || !result || winAmount === undefined) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    // Ставка уже была списана при начале игры, только начисляем выигрыш
+    const newCurrency = character.currency + winAmount;
+    
+    await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
+
+    await db.run(`
+      INSERT INTO CasinoGames (character_id, game_type, bet_amount, win_amount, game_data, result)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [character_id, 'roulette', bet_amount, winAmount, JSON.stringify(gameData), result]);
+
+    res.json({
+      result: result,
+      winAmount: winAmount,
+      newCurrency,
+      gameData: gameData
+    });
+  } catch (error) {
+    console.error('Roulette game failed:', error);
+    res.status(500).json({ error: 'Не удалось сохранить результат игры' });
+  }
+});
+
+// POST /api/casino/horseracing - Сохранить результат игры в скачки
+router.post('/casino/horseracing', async (req: Request, res: Response) => {
+  try {
+    const { character_id, bet_amount, result, winAmount, gameData } = req.body;
+    const db = await initDB();
+
+    if (!character_id || !bet_amount || bet_amount <= 0 || !result || winAmount === undefined) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
+    // Ставка уже была списана при начале игры, только начисляем выигрыш
+    const newCurrency = character.currency + winAmount;
+    
+    await db.run('UPDATE Characters SET currency = ? WHERE id = ?', [newCurrency, character_id]);
+
+    await db.run(`
+      INSERT INTO CasinoGames (character_id, game_type, bet_amount, win_amount, game_data, result)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [character_id, 'horseracing', bet_amount, winAmount, JSON.stringify(gameData), result]);
+
+    res.json({
+      result: result,
+      winAmount: winAmount,
+      newCurrency,
+      gameData: gameData
+    });
+  } catch (error) {
+    console.error('Horse racing game failed:', error);
     res.status(500).json({ error: 'Не удалось сохранить результат игры' });
   }
 });
