@@ -3190,7 +3190,7 @@ router.post('/casino/horseracing/start', async (req: Request, res: Response) => 
     const { character_id, bet_amount, selected_horses } = req.body;
     const db = await initDB();
 
-    if (!character_id || !bet_amount || bet_amount <= 0 || !selected_horses || !Array.isArray(selected_horses)) {
+    if (!character_id || !bet_amount || bet_amount <= 0) {
       return res.status(400).json({ error: 'Неверные параметры' });
     }
 
@@ -3213,7 +3213,7 @@ router.post('/casino/horseracing/start', async (req: Request, res: Response) => 
       success: true, 
       message: 'Ставка списана, игра началась',
       new_currency: character.currency - bet_amount,
-      horses: selected_horses
+      ...(selected_horses && { horses: selected_horses })
     });
   } catch (error) {
     console.error('Horse racing start error:', error);
@@ -4658,5 +4658,69 @@ async function finishHand(db: any, hand_id: number) {
     await db.run('UPDATE PokerRooms SET status = "finished" WHERE id = ?', [hand.room_id]);
   }
 }
+
+/**
+ * @swagger
+ * /api/poker/rooms/{id}:
+ *   delete:
+ *     summary: Удалить покерную комнату
+ *     tags: [Poker]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: body
+ *         name: body
+ *         required: true
+ *         schema:
+ *           type: object
+ *           properties:
+ *             character_id:
+ *               type: integer
+ *     responses:
+ *       200:
+ *         description: Комната успешно удалена
+ *       403:
+ *         description: Только создатель может удалить комнату
+ *       404:
+ *         description: Комната не найдена
+ */
+router.delete('/poker/rooms/:id', async (req: Request, res: Response) => {
+  try {
+    const room_id = parseInt(req.params.id);
+    const { character_id } = req.body; // ID персонажа, который пытается удалить
+
+    const db = await initDB();
+
+    const room = await db.get('SELECT * FROM PokerRooms WHERE id = ?', [room_id]);
+    if (!room) {
+      return res.status(404).json({ error: 'Комната не найдена' });
+    }
+
+    if (room.creator_id !== character_id) {
+      return res.status(403).json({ error: 'Только создатель может удалить комнату' });
+    }
+    
+    if (room.status === 'playing') {
+      return res.status(400).json({ error: 'Нельзя удалить комнату во время игры' });
+    }
+
+    // Возвращаем buy-in всем игрокам в комнате
+    const players = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ?', [room_id]);
+    for (const player of players) {
+      await db.run('UPDATE Characters SET currency = currency + ? WHERE id = ?', [room.buy_in, player.character_id]);
+    }
+
+    // Удаляем комнату (игроки удалятся каскадно)
+    await db.run('DELETE FROM PokerRooms WHERE id = ?', [room_id]);
+
+    res.json({ message: 'Комната успешно удалена' });
+  } catch (error) {
+    console.error('Failed to delete room:', error);
+    res.status(500).json({ error: 'Не удалось удалить комнату' });
+  }
+});
 
 export default router;

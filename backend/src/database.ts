@@ -388,18 +388,21 @@ export async function initDB() {
       );
     `);
 
-    // Миграция для CasinoGames - добавляем новые типы игр
+    // Принудительная миграция для CasinoGames - добавляем новые типы игр
     try {
-      // Это дорогая операция, но SQLite не позволяет легко менять CHECK constraints
       await db.exec('PRAGMA foreign_keys=off;');
       await db.exec('BEGIN TRANSACTION;');
       
-      const tempTable = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='CasinoGames'`);
-      if (tempTable && tempTable.sql && !tempTable.sql.includes('roulette')) {
-        console.log('Migrating CasinoGames table to include new game types...');
+      // Проверяем существование таблицы CasinoGames
+      const tableExists = await db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='CasinoGames'`);
+      
+      if (tableExists) {
+        // Всегда пересоздаем таблицу для обеспечения корректности constraint
+        console.log('Force migrating CasinoGames table to include new game types...');
 
+        // Создаем временную таблицу с правильными constraint
         await db.exec(`
-          CREATE TABLE IF NOT EXISTS CasinoGames_temp (
+          CREATE TABLE CasinoGames_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             character_id INTEGER NOT NULL,
             game_type TEXT NOT NULL CHECK (game_type IN ('blackjack', 'slots', 'dice', 'roulette', 'horseracing')),
@@ -412,11 +415,14 @@ export async function initDB() {
           );
         `);
         
-        await db.exec(`INSERT INTO CasinoGames_temp SELECT * FROM CasinoGames;`);
-        await db.exec(`DROP TABLE CasinoGames;`);
-        await db.exec(`ALTER TABLE CasinoGames_temp RENAME TO CasinoGames;`);
+        // Копируем данные из старой таблицы
+        await db.exec(`INSERT OR IGNORE INTO CasinoGames_new SELECT * FROM CasinoGames;`);
         
-        console.log('CasinoGames table migrated successfully.');
+        // Удаляем старую таблицу и переименовываем новую
+        await db.exec(`DROP TABLE CasinoGames;`);
+        await db.exec(`ALTER TABLE CasinoGames_new RENAME TO CasinoGames;`);
+        
+        console.log('CasinoGames table force migrated successfully.');
       }
       
       await db.exec('COMMIT;');
@@ -424,7 +430,7 @@ export async function initDB() {
     } catch (error) {
       await db.exec('ROLLBACK;');
       await db.exec('PRAGMA foreign_keys=on;');
-      console.warn('Could not migrate CasinoGames table:', error);
+      console.warn('Could not force migrate CasinoGames table:', error);
     }
 
     // Миграция для CasinoGames - проверяем и пересоздаем таблицу если нужно

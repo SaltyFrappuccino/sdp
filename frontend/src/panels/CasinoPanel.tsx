@@ -2,6 +2,7 @@ import React, { FC, useState, useEffect } from 'react';
 import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar, ModalRoot, ModalPage, ModalPageHeader, PanelHeaderBack } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
+import { DEFAULT_VIEW_PANELS } from '../routes';
 import { Icon28GameOutline, Icon28Dice1Outline, Icon28Cards2Outline } from '@vkontakte/icons';
 import { BlackjackGame } from '../components/BlackjackGame';
 import { SlotsGame } from '../components/SlotsGame';
@@ -377,6 +378,22 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                     disabled={gameHistory.length === 0}
                   >
                     📈 {showHistory ? 'Скрыть историю' : 'Показать историю'} ({gameHistory.length})
+                  </Button>
+                  
+                  <Button
+                    size="m"
+                    mode="tertiary"
+                    onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HORSE_STATS}`)}
+                  >
+                    📊 Статистика лошадей
+                  </Button>
+                  
+                  <Button
+                    size="m"
+                    mode="secondary"
+                    onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POKER}`)}
+                  >
+                    🃏 Покер (мультиплеер)
                   </Button>
                 </div>
               </Div>

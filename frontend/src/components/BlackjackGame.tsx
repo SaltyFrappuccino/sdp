@@ -178,11 +178,11 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
       if (newGameStatus === 'dealerTurn') {
         stand();
       }
-    }, 1000);
+    }, 500); // Уменьшил задержку для более быстрого перехода
   };
 
   const stand = async () => {
-    if (!gameState || gameState.gameStatus !== 'playing') return;
+    if (!gameState || (gameState.gameStatus !== 'playing' && gameState.gameStatus !== 'dealerTurn')) return;
     
     setLoading(true);
     setAnimating(true);

@@ -85,11 +85,6 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
           </ButtonGroup>
         </Div>
         <Div>
-          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('poker')}>
-            🃏 Покер
-          </Button>
-        </Div>
-        <Div>
           <Button stretched size="l" mode="tertiary" onClick={() => routeNavigator.push('admin_login')}>
             Админ-панель
           </Button>

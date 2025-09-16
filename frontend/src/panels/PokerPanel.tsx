@@ -18,6 +18,7 @@ interface Character {
 interface PokerRoom {
   id: number;
   room_name: string;
+  creator_id: number;
   creator_name: string;
   current_players: number;
   max_players: number;
@@ -107,7 +108,15 @@ export const PokerPanel: FC<PokerPanelProps> = ({ id, fetchedUser }) => {
 
       if (response.ok) {
         const data = await response.json();
-        showResultSnackbar('Комната создана успешно!', true);
+        showResultSnackbar('Комната создана! Переход в комнату...', true);
+        
+        // Автоматически входим в созданную комнату
+        if (data.room_id) {
+          setCurrentRoomId(data.room_id);
+          setCurrentPlayerId(selectedCharacter);
+          setShowTable(true);
+        }
+        
         setActiveModal(null);
         setNewRoomName('');
         setNewRoomBuyIn('1000');
@@ -120,6 +129,35 @@ export const PokerPanel: FC<PokerPanelProps> = ({ id, fetchedUser }) => {
       }
     } catch (error) {
       console.error('Failed to create room:', error);
+      showResultSnackbar('Ошибка соединения', false);
+    }
+  };
+
+  const deleteRoom = async (roomId: number) => {
+    if (!selectedCharacter) {
+      showResultSnackbar('Сначала выберите персонажа', false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/poker/rooms/${roomId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_id: selectedCharacter
+        })
+      });
+
+      if (response.ok) {
+        showResultSnackbar('Комната успешно удалена', true);
+        await fetchPokerRooms();
+        await fetchCharacters(); // Обновляем баланс после возврата buy-in
+      } else {
+        const errorData = await response.json();
+        showResultSnackbar(errorData.error || 'Ошибка удаления комнаты', false);
+      }
+    } catch (error) {
+      console.error('Failed to delete room:', error);
       showResultSnackbar('Ошибка соединения', false);
     }
   };
@@ -231,26 +269,42 @@ export const PokerPanel: FC<PokerPanelProps> = ({ id, fetchedUser }) => {
                   Пока нет активных комнат. Создайте первую!
                 </Text>
               ) : (
-                <Group>
-                  {pokerRooms.map((room) => (
-                    <SimpleCell
-                      key={room.id}
-                      before={<Icon28Users3Outline />}
-                      after={
-                        <Button
-                          size="s"
-                          onClick={() => joinRoom(room.id)}
-                          disabled={room.current_players >= room.max_players || room.status !== 'waiting'}
-                        >
-                          {room.status === 'waiting' ? 'Войти' : 'Игра идёт'}
-                        </Button>
-                      }
-                      subtitle={`${room.creator_name} • Buy-in: ${room.buy_in} 💰 • Блайнды: ${room.small_blind}/${room.big_blind} • Игроки: ${room.current_players}/${room.max_players}`}
-                    >
-                      {room.room_name}
-                    </SimpleCell>
-                  ))}
-                </Group>
+                pokerRooms.map((room) => (
+                  <Card key={room.id} style={{ marginBottom: 12, backgroundColor: '#333' }}>
+                    <Div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <Text weight="2" style={{ color: '#fff' }}>{room.room_name}</Text>
+                          <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>
+                            {room.creator_name} • Buy-in: {room.buy_in} 💰 • Блайнды: {room.small_blind}/{room.big_blind}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>
+                            Игроки: {room.current_players}/{room.max_players} • {room.status === 'waiting' ? 'Ожидание' : 'Идет игра'}
+                          </Text>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          {room.creator_id === selectedCharacter && room.status === 'waiting' && (
+                            <Button
+                              size="s"
+                              mode="secondary"
+                              onClick={() => deleteRoom(room.id)}
+                              style={{ backgroundColor: '#ff5c5c', color: '#fff' }}
+                            >
+                              Удалить
+                            </Button>
+                          )}
+                          <Button
+                            size="s"
+                            onClick={() => joinRoom(room.id)}
+                            disabled={room.current_players >= room.max_players || room.status !== 'waiting'}
+                          >
+                            {room.status === 'waiting' ? 'Войти' : 'Игра идёт'}
+                          </Button>
+                        </div>
+                      </div>
+                    </Div>
+                  </Card>
+                ))
               )}
             </Div>
           </Card>

@@ -77,7 +77,7 @@ export const ALL_HORSES: Horse[] = [
     id: 6,
     name: "Илон Маск",
     emoji: "🚀",
-    baseSpeed: 10,
+    baseSpeed: 9,
     baseStamina: 4,
     baseLuck: 7,
     description: "К Марсу и обратно за 2 минуты"
