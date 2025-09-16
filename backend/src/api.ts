@@ -4723,4 +4723,83 @@ router.delete('/poker/rooms/:id', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/market/reset - Полный сброс биржи (только для админов)
+router.post('/admin/market/reset', async (req: Request, res: Response) => {
+  try {
+    const adminId = req.headers['x-admin-id'] as string;
+    
+    if (!adminId) {
+      return res.status(401).json({ error: 'Админ ID не указан' });
+    }
+
+    const db = await initDB();
+    
+    console.log('Starting market reset by admin:', adminId);
+    
+    // 1. Обнуляем валюту у всех персонажей
+    await db.run('UPDATE Characters SET currency = 0');
+    console.log('✓ Валюта всех персонажей обнулена');
+    
+    // 2. Удаляем все портфели (акции)
+    await db.run('DELETE FROM Portfolios');
+    console.log('✓ Все акции удалены');
+    
+    // 3. Удаляем все шорты
+    await db.run('DELETE FROM ShortPositions');
+    console.log('✓ Все шорты удалены');
+    
+    // 4. Удаляем все ордера
+    await db.run('DELETE FROM TradingOrders');
+    console.log('✓ Все ордера удалены');
+    
+    // 5. Сбрасываем цены акций к базовым значениям и максимальное количество
+    const basePrice = 100; // Базовая цена
+    const maxShares = 1000000; // Максимальное количество акций
+    
+    await db.run(`
+      UPDATE Stocks SET 
+        price = ?, 
+        available_shares = ?, 
+        total_shares = ?
+    `, [basePrice, maxShares, maxShares]);
+    console.log('✓ Цены и количество акций сброшены к базовым');
+    
+    // 6. Очищаем историю торгов
+    await db.run('DELETE FROM Trades');
+    console.log('✓ История торгов очищена');
+    
+    // 7. Очищаем историю цен
+    await db.run('DELETE FROM PriceHistory');
+    console.log('✓ История цен очищена');
+    
+    // Добавляем базовую запись в историю цен для каждой акции
+    const stocks = await db.all('SELECT id FROM Stocks');
+    for (const stock of stocks) {
+      await db.run(
+        'INSERT INTO PriceHistory (stock_id, price, timestamp) VALUES (?, ?, ?)',
+        [stock.id, basePrice, new Date().toISOString()]
+      );
+    }
+    console.log('✓ Базовая история цен создана');
+    
+    console.log('Market reset completed successfully');
+    
+    res.json({ 
+      message: 'Биржа полностью сброшена',
+      details: {
+        currency_reset: true,
+        portfolios_cleared: true,
+        shorts_cleared: true,
+        orders_cleared: true,
+        prices_reset: true,
+        shares_reset: true,
+        history_cleared: true
+      }
+    });
+  } catch (error) {
+    console.error('Market reset failed:', error);
+    res.status(500).json({ error: 'Ошибка при сбросе биржи' });
+  }
+});
+
 export default router;

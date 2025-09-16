@@ -160,6 +160,43 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
       showResultSnackbar('Ошибка при экспорте анкеты', false);
     }
   };
+
+  const handleMarketReset = async () => {
+    const adminId = localStorage.getItem('adminId');
+    
+    // Подтверждение действия
+    const confirmed = confirm(
+      '⚠️ ВНИМАНИЕ! Это действие:\n\n' +
+      '1. Обнулит валюту у всех персонажей\n' +
+      '2. Удалит все акции, шорты и ордера\n' +
+      '3. Сбросит цены акций к базовым значениям\n' +
+      '4. Восстановит максимальное количество акций\n\n' +
+      'Это действие НЕОБРАТИМО!\n\n' +
+      'Продолжить?'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/admin/market/reset`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-id': adminId || '' 
+        }
+      });
+
+      if (response.ok) {
+        showResultSnackbar('✅ Биржа полностью сброшена к базовым значениям!', true);
+      } else {
+        const errorData = await response.json();
+        showResultSnackbar(errorData.error || 'Ошибка при сбросе биржи', false);
+      }
+    } catch (error) {
+      console.error('Market reset error:', error);
+      showResultSnackbar('Ошибка соединения при сбросе биржи', false);
+    }
+  };
   
   const handleStatusChange = async (characterId: number, status: 'Принято' | 'Отклонено') => {
     const adminId = localStorage.getItem('adminId');
@@ -506,6 +543,17 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
             onClick={() => routeNavigator.push('/bulk_characters')}
           >
             👑 Массовое управление персонажами
+          </Button>
+        </Div>
+        <Div>
+          <Button
+            size="l"
+            stretched
+            mode="secondary"
+            onClick={handleMarketReset}
+            style={{ backgroundColor: '#dc3545', color: '#fff' }}
+          >
+            ⚠️ ПОЛНЫЙ СБРОС БИРЖИ
           </Button>
         </Div>
       </Group>

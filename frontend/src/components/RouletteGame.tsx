@@ -5,7 +5,7 @@ import { Icon28GameOutline } from '@vkontakte/icons';
 interface RouletteGameProps {
   characterId: number;
   betAmount: number;
-  onGameStart: () => void;
+  onGameStart: (totalBetAmount?: number) => void;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -55,10 +55,19 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
   const addBet = (type: 'number' | 'color' | 'even' | 'odd' | 'high' | 'low', value: number | string) => {
     const existingBet = bets.find(bet => bet.type === type && bet.value === value);
     
+    // Ограничиваем максимальную ставку на один исход
+    const maxBetMultiplier = 5; // Максимум 5x от базовой ставки
+    
     if (existingBet) {
+      const newAmount = existingBet.amount + betAmount;
+      if (newAmount > betAmount * maxBetMultiplier) {
+        alert(`Максимальная ставка на один исход: ${betAmount * maxBetMultiplier} 💰`);
+        return;
+      }
+      
       setBets(bets.map(bet => 
         bet.type === type && bet.value === value 
-          ? { ...bet, amount: bet.amount + betAmount }
+          ? { ...bet, amount: newAmount }
           : bet
       ));
     } else {
@@ -81,6 +90,24 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
 
   const spin = async () => {
     if (isSpinning || bets.length === 0) return;
+    
+    // Проверка: нельзя ставить на все основные исходы одновременно
+    const hasRedBet = bets.some(bet => bet.type === 'color' && bet.value === 'red');
+    const hasBlackBet = bets.some(bet => bet.type === 'color' && bet.value === 'black');
+    const hasEvenBet = bets.some(bet => bet.type === 'even');
+    const hasOddBet = bets.some(bet => bet.type === 'odd');
+    const hasHighBet = bets.some(bet => bet.type === 'high');
+    const hasLowBet = bets.some(bet => bet.type === 'low');
+    
+    // Запрещаем ставить на противоположные исходы одновременно
+    if ((hasRedBet && hasBlackBet) || (hasEvenBet && hasOddBet) || (hasHighBet && hasLowBet)) {
+      alert('Нельзя ставить на противоположные исходы одновременно!');
+      return;
+    }
+    
+    // Вызываем onGameStart для списания общей суммы ставок
+    const totalBets = getTotalBetAmount();
+    onGameStart(totalBets);
     
     setIsSpinning(true);
     setResult(null);

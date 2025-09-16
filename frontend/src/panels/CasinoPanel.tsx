@@ -106,23 +106,26 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     setActiveModal('horseracing');
   };
 
-  const handleGameStart = async (gameType: string) => {
+  const handleGameStart = async (gameType: string, customBetAmount?: number) => {
     if (!selectedCharacter) return;
     try {
+      // Для рулетки используем общую сумму ставок, для остальных игр - базовую ставку
+      const actualBetAmount = customBetAmount || parseInt(betAmount);
+      
       // Списываем ставку при начале игры
       const response = await fetch(`${API_URL}/casino/${gameType}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           character_id: selectedCharacter,
-          bet_amount: parseInt(betAmount),
+          bet_amount: actualBetAmount,
           ...(gameType === 'dice' && { prediction: dicePrediction })
         })
       });
 
       if (response.ok) {
         await fetchCharacters(); // Обновляем валюту
-        showResultSnackbar(`Ставка ${parseInt(betAmount)} 💰 списана. Игра началась!`, true);
+        showResultSnackbar(`Ставка ${actualBetAmount} 💰 списана. Игра началась!`, true);
       } else {
         const errorData = await response.json();
         showResultSnackbar(errorData.error || 'Ошибка начала игры', false);
@@ -511,7 +514,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
             <RouletteGame
               characterId={selectedCharacter}
               betAmount={parseInt(betAmount)}
-              onGameStart={() => handleGameStart('roulette')}
+              onGameStart={(totalBetAmount) => handleGameStart('roulette', totalBetAmount)}
               onGameEnd={(result) => handleGameEnd('roulette', result)}
               onClose={() => setActiveModal(null)}
             />

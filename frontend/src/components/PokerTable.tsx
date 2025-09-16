@@ -67,7 +67,8 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
   const [lastUpdateHash, setLastUpdateHash] = useState<string>('');
   const [pauseUpdates, setPauseUpdates] = useState<boolean>(false);
 
-  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  // Ищем игрока либо по ID игрока, либо по ID персонажа
+  const currentPlayer = players.find(p => p.id === currentPlayerId || p.character_id === currentPlayerId);
   const isMyTurn = currentHand && currentPlayer && currentHand.current_player_position === currentPlayer.seat_position;
   const isCreator = room && room.creator_id === currentCharacterId;
   const canStartGame = room && room.status === 'waiting' && isCreator && players.length >= 2;
@@ -118,10 +119,11 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
   }, [roomId, lastUpdateHash, pauseUpdates]);
 
   const fetchMyCards = useCallback(async () => {
-    if (!currentHand || !currentPlayerId) return;
+    if (!currentHand || !currentPlayer) return;
     
     try {
-      const response = await fetch(`${API_URL}/poker/hands/${currentHand.id}/cards/${currentPlayerId}`);
+      // Используем ID игрока, а не персонажа
+      const response = await fetch(`${API_URL}/poker/hands/${currentHand.id}/cards/${currentPlayer.id}`);
       const data = await response.json();
       
       if (response.ok) {
@@ -133,7 +135,7 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
       console.error('Failed to fetch my cards:', error);
       setError('Ошибка загрузки карт');
     }
-  }, [currentHand, currentPlayerId]);
+  }, [currentHand, currentPlayer]);
 
   useEffect(() => {
     fetchRoomData();
@@ -487,7 +489,7 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
           stretched
           mode="secondary"
           onClick={handleLeaveRoom}
-          disabled={loading}
+          disabled={loading && room?.status === 'waiting'}
         >
           Покинуть комнату
         </Button>

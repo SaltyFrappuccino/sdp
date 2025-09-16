@@ -67,7 +67,9 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
           ...horse,
           position: 0,
           raceSpeed: Math.random() * 0.02 + 0.01, // Случайная скорость для анимации
-          color: HORSE_COLORS[index % HORSE_COLORS.length]
+          color: HORSE_COLORS[index % HORSE_COLORS.length],
+          // Рассчитываем коэффициенты на основе статов, если их нет
+          odds: horse.odds || (10 - Math.floor((horse.speed + horse.stamina + horse.luck) / 10)) || 2
         }));
         setHorses(initializedHorses);
         setRaceProgress(new Array(data.horses.length).fill(0));
@@ -118,7 +120,7 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
     // Сброс позиций и расчет скоростей на основе статов
     const resetHorses = horses.map(horse => {
       // Расчет скорости на основе статов: скорость + выносливость + удача
-      const baseSpeed = (horse.speed + horse.stamina + horse.luck) / 300; // Нормализуем к базовой скорости
+      const baseSpeed = (horse.speed + horse.stamina + horse.luck) / 150; // Увеличили базовую скорость
       const randomFactor = Math.random() * 0.3 + 0.85; // Случайность от 0.85 до 1.15
       const finalSpeed = baseSpeed * randomFactor;
       
@@ -129,7 +131,9 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
       };
     });
     setHorses(resetHorses);
-    setRaceProgress(new Array(horses.length).fill(0));
+    setRaceProgress(new Array(resetHorses.length).fill(0));
+    
+    console.log('Starting race with horses:', resetHorses.length, 'horses');
     
     // Анимация гонки с учетом статов
     const raceDuration = 8000; // 8 секунд
@@ -153,7 +157,13 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
       
       currentHorsesState = updatedHorses;
       setHorses(updatedHorses);
-      setRaceProgress(updatedHorses.map(horse => horse.position));
+      const newProgress = updatedHorses.map(horse => horse.position);
+      setRaceProgress(newProgress);
+      
+      // Отладочная информация каждые 20 итераций
+      if (i % 20 === 0) {
+        console.log(`Iteration ${i}:`, newProgress);
+      }
     }
     
     // Определяем победителя, используя актуальное состояние
