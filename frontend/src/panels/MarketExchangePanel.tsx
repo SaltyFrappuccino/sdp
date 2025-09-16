@@ -481,65 +481,86 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
 
       {activeTab === 'leaderboard' && leaderboard.length > 0 && (
         <Group header={<Header>Рейтинг Трейдеров</Header>}>
-          {leaderboard.map((entry, index) => (
-            <Tooltip
-              key={entry.character_id}
-              shown={hoveredCharacterId === entry.character_id}
-              placement="right"
-              content={(() => {
-                const character = leaderboard.find(c => c.character_id === hoveredCharacterId);
-                if (!character) return "";
-                
-                const assets = character.assets || [];
-                const totalGainLoss = assets.reduce((sum, asset) => {
-                  const currentValue = asset.value;
-                  const costBasis = asset.quantity * asset.average_purchase_price;
-                  return sum + (currentValue - costBasis);
-                }, 0);
-                
-                const totalInvested = assets.reduce((sum, asset) => {
-                  return sum + (asset.quantity * asset.average_purchase_price);
-                }, 0);
-                
-                const gainLossPercent = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
-                
-                let tooltipText = `${character.character_name}\n💰 Наличные: ${character.cash_balance?.toLocaleString('ru-RU')} ₭\n📊 Общая стоимость: ${character.total_value?.toLocaleString('ru-RU')} ₭\n`;
-                
-                if (totalGainLoss !== 0) {
-                  const sign = totalGainLoss > 0 ? '+' : '';
-                  tooltipText += `📈 Прибыль/Убыток: ${sign}${totalGainLoss.toLocaleString('ru-RU')} ₭ (${sign}${gainLossPercent.toFixed(2)}%)\n`;
-                }
-                
-                tooltipText += `📋 Активов: ${assets.length}\n`;
-                
-                if (assets.length > 0) {
-                  tooltipText += `\nПортфель:\n`;
-                  assets.slice(0, 5).forEach(asset => {
-                    const assetGainLoss = asset.value - (asset.quantity * asset.average_purchase_price);
-                    const sign = assetGainLoss > 0 ? '+' : '';
-                    tooltipText += `• ${asset.name} (${asset.ticker}): ${asset.quantity.toLocaleString()} шт.\n  ${sign}${assetGainLoss.toLocaleString('ru-RU')} ₭\n`;
-                  });
-                  if (assets.length > 5) {
-                    tooltipText += `... и еще ${assets.length - 5} активов`;
-                  }
-                }
-                
-                return tooltipText;
-              })()}
-            >
-              <div
-                onMouseEnter={() => setHoveredCharacterId(entry.character_id)}
-                onMouseLeave={() => setHoveredCharacterId(null)}
-              >
-                <SimpleCell
-                  before={<Avatar size={28}>{index + 1}</Avatar>}
-                  subtitle={`${entry.total_value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`}
+          {leaderboard.map((entry, index) => {
+            const isHovered = hoveredCharacterId === entry.character_id;
+            const character = isHovered ? leaderboard.find(c => c.character_id === hoveredCharacterId) : null;
+            
+            return (
+              <div key={entry.character_id} style={{ position: 'relative' }}>
+                <div
+                  onMouseEnter={() => setHoveredCharacterId(entry.character_id)}
+                  onMouseLeave={() => setHoveredCharacterId(null)}
                 >
-                  {entry.character_name}
-                </SimpleCell>
+                  <SimpleCell
+                    before={<Avatar size={28}>{index + 1}</Avatar>}
+                    subtitle={`${entry.total_value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`}
+                  >
+                    {entry.character_name}
+                  </SimpleCell>
+                </div>
+                
+                {isHovered && character && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '100%',
+                      transform: 'translateY(-50%)',
+                      marginLeft: '10px',
+                      backgroundColor: 'var(--vkui--color_background_modal)',
+                      border: '1px solid var(--vkui--color_separator_primary)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      maxWidth: '300px',
+                      zIndex: 1000,
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                      fontSize: '14px',
+                      lineHeight: '1.4',
+                      whiteSpace: 'pre-line'
+                    }}
+                  >
+                    {(() => {
+                      const assets = character.assets || [];
+                      const totalGainLoss = assets.reduce((sum, asset) => {
+                        const currentValue = asset.value;
+                        const costBasis = asset.quantity * asset.average_purchase_price;
+                        return sum + (currentValue - costBasis);
+                      }, 0);
+                      
+                      const totalInvested = assets.reduce((sum, asset) => {
+                        return sum + (asset.quantity * asset.average_purchase_price);
+                      }, 0);
+                      
+                      const gainLossPercent = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
+                      
+                      let tooltipText = `${character.character_name}\n💰 Наличные: ${character.cash_balance?.toLocaleString('ru-RU')} ₭\n📊 Общая стоимость: ${character.total_value?.toLocaleString('ru-RU')} ₭\n`;
+                      
+                      if (totalGainLoss !== 0) {
+                        const sign = totalGainLoss > 0 ? '+' : '';
+                        tooltipText += `📈 Прибыль/Убыток: ${sign}${totalGainLoss.toLocaleString('ru-RU')} ₭ (${sign}${gainLossPercent.toFixed(2)}%)\n`;
+                      }
+                      
+                      tooltipText += `📋 Активов: ${assets.length}\n`;
+                      
+                      if (assets.length > 0) {
+                        tooltipText += `\nПортфель:\n`;
+                        assets.slice(0, 5).forEach(asset => {
+                          const assetGainLoss = asset.value - (asset.quantity * asset.average_purchase_price);
+                          const sign = assetGainLoss > 0 ? '+' : '';
+                          tooltipText += `• ${asset.name} (${asset.ticker}): ${asset.quantity.toLocaleString()} шт.\n  ${sign}${assetGainLoss.toLocaleString('ru-RU')} ₭\n`;
+                        });
+                        if (assets.length > 5) {
+                          tooltipText += `... и еще ${assets.length - 5} активов`;
+                        }
+                      }
+                      
+                      return tooltipText;
+                    })()}
+                  </div>
+                )}
               </div>
-            </Tooltip>
-          ))}
+            );
+          })}
         </Group>
       )}
 
