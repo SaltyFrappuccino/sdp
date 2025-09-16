@@ -3576,4 +3576,395 @@ router.post('/market/trade', async (req: Request, res: Response) => {
   }
 });
 
+// ===============================
+// POKER API ENDPOINTS
+// ===============================
+
+/**
+ * @swagger
+ * /api/poker/rooms:
+ *   get:
+ *     summary: Получить список покерных комнат
+ *     tags: [Poker]
+ *     responses:
+ *       200:
+ *         description: Список покерных комнат
+ */
+router.get('/poker/rooms', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    
+    const rooms = await db.all(`
+      SELECT 
+        pr.*,
+        c.character_name as creator_name,
+        COUNT(pp.id) as current_players
+      FROM PokerRooms pr
+      LEFT JOIN Characters c ON pr.creator_id = c.id
+      LEFT JOIN PokerPlayers pp ON pr.id = pp.room_id AND pp.status = 'active'
+      WHERE pr.status IN ('waiting', 'playing')
+      GROUP BY pr.id
+      ORDER BY pr.created_at DESC
+    `);
+    
+    res.json(rooms);
+  } catch (error) {
+    console.error('Failed to get poker rooms:', error);
+    res.status(500).json({ error: 'Не удалось загрузить комнаты' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/poker/rooms:
+ *   post:
+ *     summary: Создать покерную комнату
+ *     tags: [Poker]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               character_id:
+ *                 type: integer
+ *               room_name:
+ *                 type: string
+ *               buy_in:
+ *                 type: integer
+ *               max_players:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Комната создана успешно
+ */
+router.post('/poker/rooms', async (req: Request, res: Response) => {
+  try {
+    const { character_id, room_name, buy_in, max_players = 6 } = req.body;
+    
+    if (!character_id || !room_name || !buy_in) {
+      return res.status(400).json({ error: 'Не все обязательные поля заполнены' });
+    }
+    
+    if (buy_in < 100) {
+      return res.status(400).json({ error: 'Минимальный buy-in: 100 💰' });
+    }
+    
+    const db = await initDB();
+    
+    // Проверяем, что персонаж существует и у него достаточно денег
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+    
+    if (character.currency < buy_in) {
+      return res.status(400).json({ error: 'Недостаточно средств для создания комнаты' });
+    }
+    
+    const small_blind = Math.floor(buy_in / 200);
+    const big_blind = Math.floor(buy_in / 100);
+    
+    await db.run('BEGIN TRANSACTION');
+    
+    try {
+      // Создаем комнату
+      const result = await db.run(`
+        INSERT INTO PokerRooms (room_name, creator_id, max_players, buy_in, small_blind, big_blind)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [room_name, character_id, max_players, buy_in, small_blind, big_blind]);
+      
+      const room_id = result.lastID;
+      
+      // Автоматически добавляем создателя в комнату
+      await db.run(`
+        INSERT INTO PokerPlayers (room_id, character_id, seat_position, chips)
+        VALUES (?, ?, 1, ?)
+      `, [room_id, character_id, buy_in]);
+      
+      // Списываем buy-in с создателя
+      await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [buy_in, character_id]);
+      
+      await db.run('COMMIT');
+      
+      res.status(201).json({ 
+        message: 'Комната создана успешно',
+        room_id,
+        room_name,
+        buy_in,
+        small_blind,
+        big_blind
+      });
+      
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+    
+  } catch (error) {
+    console.error('Failed to create poker room:', error);
+    res.status(500).json({ error: 'Не удалось создать комнату' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/poker/rooms/{id}/join:
+ *   post:
+ *     summary: Присоединиться к покерной комнате
+ *     tags: [Poker]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               character_id:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Успешно присоединился к комнате
+ */
+router.post('/poker/rooms/:id/join', async (req: Request, res: Response) => {
+  try {
+    const room_id = parseInt(req.params.id);
+    const { character_id } = req.body;
+    
+    if (!character_id) {
+      return res.status(400).json({ error: 'character_id обязателен' });
+    }
+    
+    const db = await initDB();
+    
+    // Проверяем комнату
+    const room = await db.get('SELECT * FROM PokerRooms WHERE id = ? AND status = "waiting"', [room_id]);
+    if (!room) {
+      return res.status(404).json({ error: 'Комната не найдена или игра уже началась' });
+    }
+    
+    // Проверяем персонажа
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+    
+    if (character.currency < room.buy_in) {
+      return res.status(400).json({ error: 'Недостаточно средств для входа в комнату' });
+    }
+    
+    // Проверяем, не в комнате ли уже игрок
+    const existingPlayer = await db.get('SELECT * FROM PokerPlayers WHERE room_id = ? AND character_id = ?', [room_id, character_id]);
+    if (existingPlayer) {
+      return res.status(400).json({ error: 'Вы уже в этой комнате' });
+    }
+    
+    // Проверяем количество игроков
+    const playerCount = await db.get('SELECT COUNT(*) as count FROM PokerPlayers WHERE room_id = ? AND status = "active"', [room_id]);
+    if (playerCount.count >= room.max_players) {
+      return res.status(400).json({ error: 'Комната заполнена' });
+    }
+    
+    await db.run('BEGIN TRANSACTION');
+    
+    try {
+      // Находим свободное место
+      const occupiedSeats = await db.all('SELECT seat_position FROM PokerPlayers WHERE room_id = ?', [room_id]);
+      const occupiedPositions = occupiedSeats.map(seat => seat.seat_position);
+      
+      let seat_position = 1;
+      while (occupiedPositions.includes(seat_position) && seat_position <= room.max_players) {
+        seat_position++;
+      }
+      
+      // Добавляем игрока
+      await db.run(`
+        INSERT INTO PokerPlayers (room_id, character_id, seat_position, chips)
+        VALUES (?, ?, ?, ?)
+      `, [room_id, character_id, seat_position, room.buy_in]);
+      
+      // Списываем buy-in
+      await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [room.buy_in, character_id]);
+      
+      await db.run('COMMIT');
+      
+      res.json({ 
+        message: 'Успешно присоединились к комнате',
+        seat_position,
+        chips: room.buy_in
+      });
+      
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+    
+  } catch (error) {
+    console.error('Failed to join poker room:', error);
+    res.status(500).json({ error: 'Не удалось присоединиться к комнате' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/poker/rooms/{id}/leave:
+ *   post:
+ *     summary: Покинуть покерную комнату
+ *     tags: [Poker]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               character_id:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Успешно покинул комнату
+ */
+router.post('/poker/rooms/:id/leave', async (req: Request, res: Response) => {
+  try {
+    const room_id = parseInt(req.params.id);
+    const { character_id } = req.body;
+    
+    const db = await initDB();
+    
+    // Проверяем комнату
+    const room = await db.get('SELECT * FROM PokerRooms WHERE id = ?', [room_id]);
+    if (!room) {
+      return res.status(404).json({ error: 'Комната не найдена' });
+    }
+    
+    // Проверяем игрока в комнате
+    const player = await db.get('SELECT * FROM PokerPlayers WHERE room_id = ? AND character_id = ?', [room_id, character_id]);
+    if (!player) {
+      return res.status(404).json({ error: 'Вы не в этой комнате' });
+    }
+    
+    if (room.status === 'playing') {
+      return res.status(400).json({ error: 'Нельзя покинуть комнату во время игры' });
+    }
+    
+    await db.run('BEGIN TRANSACTION');
+    
+    try {
+      // Возвращаем фишки как деньги
+      await db.run('UPDATE Characters SET currency = currency + ? WHERE id = ?', [player.chips, character_id]);
+      
+      // Удаляем игрока
+      await db.run('DELETE FROM PokerPlayers WHERE id = ?', [player.id]);
+      
+      // Если это был создатель и остались другие игроки, передаем создание первому
+      if (room.creator_id === character_id) {
+        const remainingPlayers = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? ORDER BY joined_at ASC', [room_id]);
+        if (remainingPlayers.length > 0) {
+          await db.run('UPDATE PokerRooms SET creator_id = ? WHERE id = ?', [remainingPlayers[0].character_id, room_id]);
+        } else {
+          // Если никого не осталось, удаляем комнату
+          await db.run('DELETE FROM PokerRooms WHERE id = ?', [room_id]);
+        }
+      }
+      
+      await db.run('COMMIT');
+      
+      res.json({ 
+        message: 'Успешно покинули комнату',
+        returned_chips: player.chips
+      });
+      
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+    
+  } catch (error) {
+    console.error('Failed to leave poker room:', error);
+    res.status(500).json({ error: 'Не удалось покинуть комнату' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/poker/rooms/{id}:
+ *   get:
+ *     summary: Получить информацию о покерной комнате
+ *     tags: [Poker]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Информация о комнате
+ */
+router.get('/poker/rooms/:id', async (req: Request, res: Response) => {
+  try {
+    const room_id = parseInt(req.params.id);
+    
+    const db = await initDB();
+    
+    // Получаем информацию о комнате
+    const room = await db.get(`
+      SELECT 
+        pr.*,
+        c.character_name as creator_name
+      FROM PokerRooms pr
+      LEFT JOIN Characters c ON pr.creator_id = c.id
+      WHERE pr.id = ?
+    `, [room_id]);
+    
+    if (!room) {
+      return res.status(404).json({ error: 'Комната не найдена' });
+    }
+    
+    // Получаем игроков
+    const players = await db.all(`
+      SELECT 
+        pp.*,
+        c.character_name
+      FROM PokerPlayers pp
+      LEFT JOIN Characters c ON pp.character_id = c.id
+      WHERE pp.room_id = ?
+      ORDER BY pp.seat_position
+    `, [room_id]);
+    
+    // Получаем текущую раздачу если есть
+    let currentHand = null;
+    if (room.current_hand_id) {
+      currentHand = await db.get('SELECT * FROM PokerHands WHERE id = ?', [room.current_hand_id]);
+      if (currentHand) {
+        currentHand.community_cards = JSON.parse(currentHand.community_cards);
+        currentHand.side_pots = JSON.parse(currentHand.side_pots);
+      }
+    }
+    
+    res.json({
+      room,
+      players,
+      currentHand
+    });
+    
+  } catch (error) {
+    console.error('Failed to get poker room info:', error);
+    res.status(500).json({ error: 'Не удалось загрузить информацию о комнате' });
+  }
+});
+
 export default router;

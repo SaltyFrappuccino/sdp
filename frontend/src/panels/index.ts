@@ -16,6 +16,7 @@ export { Handbook } from './Handbook';
 export { MarketExchangePanel } from './MarketExchangePanel';
 export { AdminMarketPanel } from './AdminMarketPanel';
 export { CasinoPanel } from './CasinoPanel';
+export { PokerPanel } from './PokerPanel';
 export { NewEventsPanel } from './NewEventsPanel';
 export { NewAdminEventsPanel } from './NewAdminEventsPanel';
 export { BulkCharacterManagement } from './BulkCharacterManagement';

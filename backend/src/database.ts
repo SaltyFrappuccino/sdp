@@ -574,6 +574,87 @@ export async function initDB() {
       console.warn('Warning in Stocks migration:', error.message);
     }
 
+    // Создаем таблицы для покера
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS PokerRooms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_name TEXT NOT NULL,
+        creator_id INTEGER NOT NULL,
+        max_players INTEGER DEFAULT 6,
+        buy_in INTEGER NOT NULL,
+        small_blind INTEGER NOT NULL,
+        big_blind INTEGER NOT NULL,
+        status TEXT DEFAULT 'waiting' CHECK (status IN ('waiting', 'playing', 'finished')),
+        current_hand_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(creator_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS PokerPlayers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        seat_position INTEGER NOT NULL,
+        chips INTEGER NOT NULL,
+        status TEXT DEFAULT 'active' CHECK (status IN ('active', 'folded', 'eliminated', 'disconnected')),
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(room_id) REFERENCES PokerRooms(id) ON DELETE CASCADE,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        UNIQUE(room_id, seat_position),
+        UNIQUE(room_id, character_id)
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS PokerHands (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id INTEGER NOT NULL,
+        hand_number INTEGER NOT NULL,
+        dealer_position INTEGER NOT NULL,
+        small_blind_position INTEGER NOT NULL,
+        big_blind_position INTEGER NOT NULL,
+        community_cards TEXT DEFAULT '[]', -- JSON массив карт
+        pot INTEGER DEFAULT 0,
+        current_bet INTEGER DEFAULT 0,
+        current_player_position INTEGER,
+        round_stage TEXT DEFAULT 'preflop' CHECK (round_stage IN ('preflop', 'flop', 'turn', 'river', 'showdown', 'finished')),
+        winner_id INTEGER,
+        side_pots TEXT DEFAULT '[]', -- JSON для side pots
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(room_id) REFERENCES PokerRooms(id) ON DELETE CASCADE
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS PokerPlayerCards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hand_id INTEGER NOT NULL,
+        player_id INTEGER NOT NULL,
+        card1 TEXT NOT NULL, -- например "As" (туз пик)
+        card2 TEXT NOT NULL,
+        FOREIGN KEY(hand_id) REFERENCES PokerHands(id) ON DELETE CASCADE,
+        FOREIGN KEY(player_id) REFERENCES PokerPlayers(id) ON DELETE CASCADE,
+        UNIQUE(hand_id, player_id)
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS PokerActions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hand_id INTEGER NOT NULL,
+        player_id INTEGER NOT NULL,
+        action_type TEXT NOT NULL CHECK (action_type IN ('fold', 'call', 'raise', 'check', 'all_in', 'small_blind', 'big_blind')),
+        amount INTEGER DEFAULT 0,
+        round_stage TEXT NOT NULL CHECK (round_stage IN ('preflop', 'flop', 'turn', 'river')),
+        action_order INTEGER NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(hand_id) REFERENCES PokerHands(id) ON DELETE CASCADE,
+        FOREIGN KEY(player_id) REFERENCES PokerPlayers(id) ON DELETE CASCADE
+      );
+    `);
+
     await seedStocks(db);
 
     return db;
