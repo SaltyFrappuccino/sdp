@@ -67,9 +67,8 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
           ...horse,
           position: 0,
           raceSpeed: Math.random() * 0.02 + 0.01, // Случайная скорость для анимации
-          color: HORSE_COLORS[index % HORSE_COLORS.length],
-          // Рассчитываем коэффициенты на основе статов, если их нет
-          odds: horse.odds || (10 - Math.floor((horse.speed + horse.stamina + horse.luck) / 10)) || 2
+          color: HORSE_COLORS[index % HORSE_COLORS.length]
+          // odds уже приходят с backend
         }));
         setHorses(initializedHorses);
         setRaceProgress(new Array(data.horses.length).fill(0));
@@ -119,10 +118,28 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
     
     // Сброс позиций и расчет скоростей на основе статов
     const resetHorses = horses.map(horse => {
-      // Расчет скорости на основе статов: скорость + выносливость + удача
-      const baseSpeed = (horse.speed + horse.stamina + horse.luck) / 150; // Увеличили базовую скорость
+      // Отладка: проверяем статы лошади
+      console.log('Horse stats:', {
+        name: horse.name,
+        speed: horse.speed,
+        stamina: horse.stamina,
+        luck: horse.luck
+      });
+      
+      // Безопасный расчет скорости с дефолтными значениями
+      const speed = Number(horse.speed) || 5;
+      const stamina = Number(horse.stamina) || 5;
+      const luck = Number(horse.luck) || 5;
+      
+      const baseSpeed = (speed + stamina + luck) / 150; // Увеличили базовую скорость
       const randomFactor = Math.random() * 0.3 + 0.85; // Случайность от 0.85 до 1.15
       const finalSpeed = baseSpeed * randomFactor;
+      
+      console.log('Calculated speed for', horse.name, ':', {
+        baseSpeed,
+        randomFactor,
+        finalSpeed
+      });
       
       return { 
         ...horse, 
@@ -146,13 +163,22 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
       await new Promise(resolve => setTimeout(resolve, updateInterval));
       
       const updatedHorses = currentHorsesState.map(horse => {
-        // Используем raceSpeed, рассчитанную на основе статов
-        const fatigueMultiplier = 1 - (i / totalUpdates) * (1 - horse.stamina / 100); // Усталость
-        const luckBonus = (Math.random() - 0.5) * (horse.luck / 1000); // Бонус удачи
-        const speedWithModifiers = horse.raceSpeed * fatigueMultiplier + luckBonus;
+        // Безопасные расчеты с проверками на NaN
+        const stamina = Number(horse.stamina) || 5;
+        const luck = Number(horse.luck) || 5;
+        const raceSpeed = Number(horse.raceSpeed) || 0.01;
+        const currentPosition = Number(horse.position) || 0;
         
-        const newPosition = Math.min(horse.position + speedWithModifiers, 1);
-        return { ...horse, position: newPosition };
+        const fatigueMultiplier = 1 - (i / totalUpdates) * (1 - stamina / 100); // Усталость
+        const luckBonus = (Math.random() - 0.5) * (luck / 1000); // Бонус удачи
+        const speedWithModifiers = raceSpeed * fatigueMultiplier + luckBonus;
+        
+        const newPosition = Math.min(currentPosition + speedWithModifiers, 1);
+        
+        // Дополнительная проверка на NaN
+        const safeNewPosition = isNaN(newPosition) ? currentPosition : newPosition;
+        
+        return { ...horse, position: safeNewPosition };
       });
       
       currentHorsesState = updatedHorses;

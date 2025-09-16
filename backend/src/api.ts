@@ -3154,10 +3154,23 @@ router.post('/casino/roulette/start', async (req: Request, res: Response) => {
 // GET /api/casino/horseracing/horses - Получить лошадей для гонки
 router.get('/casino/horseracing/horses', async (req: Request, res: Response) => {
   try {
-    const { generateRandomHorseTeam } = await import('./horseLogic.js');
+    const { generateRandomHorseTeam, calculateOdds } = await import('./horseLogic.js');
     const raceHorses = generateRandomHorseTeam();
+    const odds = calculateOdds(raceHorses);
     
-    res.json({ horses: raceHorses });
+    // Преобразуем названия полей для фронтенда и добавляем коэффициенты
+    const horsesWithOdds = raceHorses.map(horse => ({
+      id: horse.id,
+      name: horse.name,
+      emoji: horse.emoji,
+      personality: horse.description, // переименовываем description в personality
+      speed: horse.baseSpeed,         // переименовываем baseSpeed в speed
+      stamina: horse.baseStamina,     // переименовываем baseStamina в stamina
+      luck: horse.baseLuck,           // переименовываем baseLuck в luck
+      odds: odds[horse.id] || 2       // добавляем коэффициенты
+    }));
+    
+    res.json({ horses: horsesWithOdds });
   } catch (error) {
     console.error('Error getting race horses:', error);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -4259,14 +4272,21 @@ router.post('/poker/hands/:id/action', async (req: Request, res: Response) => {
         WHERE hand_id = ? AND player_id = ? AND round_stage = ?
       `, [hand_id, player_id, hand.round_stage]);
       
-      // Разрешаем повторные действия только для call после raise другого игрока
-      if (playerActionsThisRound.length > 0 && action !== 'call' && action !== 'fold') {
-        const lastPlayerAction = playerActionsThisRound[playerActionsThisRound.length - 1];
-        const totalPlayerBet = playerActionsThisRound.reduce((sum, a) => sum + a.amount, 0);
-        
-        if (totalPlayerBet >= hand.current_bet) {
-          throw new Error('Вы уже сделали ход в этом раунде');
+      // Проверяем, может ли игрок делать действия
+      const totalPlayerBet = playerActionsThisRound.reduce((sum, a) => sum + a.amount, 0);
+      const lastPlayerAction = playerActionsThisRound[playerActionsThisRound.length - 1];
+      
+      // Если игрок уже поставил нужную сумму и последнее действие не fold
+      if (totalPlayerBet >= hand.current_bet && lastPlayerAction && lastPlayerAction.action_type !== 'fold') {
+        // Разрешаем только fold или raise
+        if (action !== 'fold' && action !== 'raise') {
+          throw new Error('Вы уже уровняли ставку. Можете только сделать фолд или рейз');
         }
+      }
+      
+      // Не разрешаем дублировать одинаковые действия подряд
+      if (lastPlayerAction && lastPlayerAction.action_type === action && action !== 'call') {
+        throw new Error('Нельзя повторить то же действие');
       }
 
       switch (action) {
@@ -4290,8 +4310,12 @@ router.post('/poker/hands/:id/action', async (req: Request, res: Response) => {
           const playerBetThisRound = playerActionsThisRound.reduce((sum, a) => sum + a.amount, 0);
           actionAmount = Math.max(0, hand.current_bet - playerBetThisRound);
           
+          if (hand.current_bet === 0) {
+            throw new Error('Нет ставки для колла. Используйте "чек"');
+          }
+          
           if (actionAmount <= 0) {
-            throw new Error('Нет ставки для колла');
+            throw new Error('Вы уже уровняли ставку. Можете сделать фолд или рейз');
           }
           
           if (actionAmount > player.chips) {
@@ -4736,6 +4760,13 @@ router.post('/admin/market/reset', async (req: Request, res: Response) => {
     
     console.log('Starting market reset by admin:', adminId);
     
+    // Включаем WAL режим для предотвращения блокировок
+    await db.run('PRAGMA journal_mode = WAL');
+    await db.run('PRAGMA busy_timeout = 10000'); // 10 секунд ожидания
+    
+    // Начинаем транзакцию для атомарности операции
+    await db.run('BEGIN TRANSACTION');
+    
     // 1. Обнуляем валюту у всех персонажей
     await db.run('UPDATE Characters SET currency = 0');
     console.log('✓ Валюта всех персонажей обнулена');
@@ -4758,10 +4789,9 @@ router.post('/admin/market/reset', async (req: Request, res: Response) => {
     
     await db.run(`
       UPDATE Stocks SET 
-        price = ?, 
-        available_shares = ?, 
+        current_price = ?, 
         total_shares = ?
-    `, [basePrice, maxShares, maxShares]);
+    `, [basePrice, maxShares]);
     console.log('✓ Цены и количество акций сброшены к базовым');
     
     // 6. Очищаем историю торгов
@@ -4769,19 +4799,21 @@ router.post('/admin/market/reset', async (req: Request, res: Response) => {
     console.log('✓ История торгов очищена');
     
     // 7. Очищаем историю цен
-    await db.run('DELETE FROM PriceHistory');
+    await db.run('DELETE FROM StockPriceHistory');
     console.log('✓ История цен очищена');
     
     // Добавляем базовую запись в историю цен для каждой акции
     const stocks = await db.all('SELECT id FROM Stocks');
     for (const stock of stocks) {
       await db.run(
-        'INSERT INTO PriceHistory (stock_id, price, timestamp) VALUES (?, ?, ?)',
+        'INSERT INTO StockPriceHistory (stock_id, price, timestamp) VALUES (?, ?, ?)',
         [stock.id, basePrice, new Date().toISOString()]
       );
     }
     console.log('✓ Базовая история цен создана');
     
+    // Подтверждаем транзакцию
+    await db.run('COMMIT');
     console.log('Market reset completed successfully');
     
     res.json({ 
@@ -4798,6 +4830,13 @@ router.post('/admin/market/reset', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Market reset failed:', error);
+    try {
+      const db = await initDB();
+      await db.run('ROLLBACK');
+      console.log('Transaction rolled back');
+    } catch (rollbackError) {
+      console.error('Failed to rollback transaction:', rollbackError);
+    }
     res.status(500).json({ error: 'Ошибка при сбросе биржи' });
   }
 });

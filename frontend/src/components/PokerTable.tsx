@@ -285,7 +285,18 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
       case 'folded': return 'Сбросил';
       case 'eliminated': return 'Выбыл';
       case 'disconnected': return 'Отключен';
+      case 'active': return 'В игре';
       default: return '';
+    }
+  };
+
+  const getPlayerStatusColor = (status: string): string => {
+    switch (status) {
+      case 'active': return '#4caf50';
+      case 'folded': return '#ff9800';
+      case 'eliminated': return '#f44336';
+      case 'disconnected': return '#9e9e9e';
+      default: return '#666';
     }
   };
 
@@ -355,22 +366,98 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
         )}
       </Group>
 
-      <Group header={<Cell>Игроки ({players.length}/{room.max_players})</Cell>}>
-        {players.map(player => (
+      {currentHand && room.status === 'playing' && (
+        <Group header={<Cell>Текущая игра</Cell>}>
           <Cell
-            key={player.id}
-            before={player.id === currentPlayerId ? '👤' : getPlayerPosition(player)}
-            subtitle={`${player.chips} 💰 ${getPlayerStatusText(player)}`}
-            style={{
-              backgroundColor: isMyTurn && currentHand && currentHand.current_player_position === player.seat_position 
-                ? 'var(--vkui--color_background_accent_themed)' 
-                : 'transparent',
-              borderRadius: isMyTurn && currentHand && currentHand.current_player_position === player.seat_position ? '8px' : '0'
-            }}
+            subtitle={`Раунд: ${currentHand.round_stage} • Банк: ${currentHand.pot} 💰`}
+            style={{ backgroundColor: 'var(--vkui--color_background_accent_alpha)' }}
           >
-            {player.character_name}
+            Текущая ставка: {currentHand.current_bet} 💰
           </Cell>
-        ))}
+          
+          {currentHand.current_player_position && (
+            <Cell>
+              {(() => {
+                const currentPlayerInTurn = players.find(p => p.seat_position === currentHand.current_player_position);
+                if (currentPlayerInTurn) {
+                  return (
+                    <div style={{ 
+                      backgroundColor: currentPlayerInTurn.id === currentPlayerId ? '#e8f5e8' : '#fff3e0',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <Text weight="2" style={{ fontSize: 16 }}>
+                        {currentPlayerInTurn.id === currentPlayerId ? '🎯 ВАШ ХОД' : `⏳ Ход игрока: ${currentPlayerInTurn.character_name}`}
+                      </Text>
+                      {currentPlayerInTurn.id === currentPlayerId && (
+                        <Text style={{ fontSize: 14, color: '#666', marginTop: 4 }}>
+                          Выберите действие ниже
+                        </Text>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </Cell>
+          )}
+        </Group>
+      )}
+
+      <Group header={<Cell>Игроки ({players.length}/{room.max_players})</Cell>}>
+        {players.map(player => {
+          const isCurrentTurn = currentHand && currentHand.current_player_position === player.seat_position;
+          const isMe = player.id === currentPlayerId;
+          
+          return (
+            <Cell
+              key={player.id}
+              before={
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  fontSize: '20px',
+                  width: '30px' 
+                }}>
+                  {isCurrentTurn ? '🎯' : isMe ? '👤' : `${player.seat_position}`}
+                </div>
+              }
+              subtitle={
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span>{player.chips} 💰</span>
+                  <span style={{ 
+                    backgroundColor: getPlayerStatusColor(player.status),
+                    color: 'white',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}>
+                    {getPlayerStatusText(player)}
+                  </span>
+                  {isCurrentTurn && (
+                    <span style={{ color: '#ff6b6b', fontWeight: 'bold' }}>← ХОД</span>
+                  )}
+                </div>
+              }
+              style={{
+                backgroundColor: isCurrentTurn 
+                  ? (isMe ? '#e8f5e8' : '#fff3e0')
+                  : 'transparent',
+                borderRadius: '8px',
+                border: isCurrentTurn ? '2px solid #ff6b6b' : 'none'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: isMe ? 'bold' : 'normal' }}>
+                  {player.character_name}
+                </span>
+                {isMe && <span style={{ color: '#4caf50' }}>ВЫ</span>}
+              </div>
+            </Cell>
+          );
+        })}
       </Group>
 
       {currentHand && (
@@ -412,7 +499,14 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
           </Group>
 
           {isMyTurn && currentPlayer && currentPlayer.status === 'active' && (
-            <Group header={<Cell>Ваш ход</Cell>}>
+            <Group header={<Cell>🎯 ВАШ ХОД - Выберите действие</Cell>}>
+              <Cell
+                subtitle={`У вас: ${currentPlayer.chips} 💰 • Текущая ставка: ${currentHand.current_bet} 💰`}
+                style={{ backgroundColor: '#f8f9fa', marginBottom: '8px' }}
+              >
+                Необходимо принять решение
+              </Cell>
+              
               <Div>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                   <Button
@@ -420,8 +514,9 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
                     mode="secondary"
                     onClick={() => handleAction('fold')}
                     disabled={loading}
+                    style={{ backgroundColor: '#dc3545', color: 'white' }}
                   >
-                    Сброс
+                    🃏 Сброс
                   </Button>
                   
                   {currentHand.current_bet === 0 ? (
@@ -429,16 +524,18 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
                       size="m"
                       onClick={() => handleAction('check')}
                       disabled={loading}
+                      style={{ backgroundColor: '#28a745', color: 'white' }}
                     >
-                      Чек
+                      ✋ Чек (0 💰)
                     </Button>
                   ) : (
                     <Button
                       size="m"
                       onClick={() => handleAction('call', currentHand.current_bet)}
                       disabled={loading}
+                      style={{ backgroundColor: '#007bff', color: 'white' }}
                     >
-                      Колл ({currentHand.current_bet} 💰)
+                      📞 Колл ({currentHand.current_bet} 💰)
                     </Button>
                   )}
                   
@@ -447,8 +544,9 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
                     mode="secondary"
                     onClick={() => handleAction('all_in')}
                     disabled={loading}
+                    style={{ backgroundColor: '#ff6600', color: 'white' }}
                   >
-                    Олл-ин ({currentPlayer.chips} 💰)
+                    🚀 Олл-ин ({currentPlayer.chips} 💰)
                   </Button>
                 </div>
                 
