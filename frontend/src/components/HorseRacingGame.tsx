@@ -136,29 +136,28 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
     const updateInterval = 50; // Обновляем каждые 50мс
     const totalUpdates = raceDuration / updateInterval;
     
+    let currentHorsesState = resetHorses;
+
     for (let i = 0; i < totalUpdates; i++) {
       await new Promise(resolve => setTimeout(resolve, updateInterval));
       
-      setHorses(prevHorses => {
-        const updatedHorses = prevHorses.map(horse => {
-          // Используем raceSpeed, рассчитанную на основе статов
-          const fatigueMultiplier = 1 - (i / totalUpdates) * (1 - horse.stamina / 100); // Усталость
-          const luckBonus = (Math.random() - 0.5) * (horse.luck / 1000); // Бонус удачи
-          const speedWithModifiers = horse.raceSpeed * fatigueMultiplier + luckBonus;
-          
-          const newPosition = Math.min(horse.position + speedWithModifiers, 1);
-          return { ...horse, position: newPosition };
-        });
+      const updatedHorses = currentHorsesState.map(horse => {
+        // Используем raceSpeed, рассчитанную на основе статов
+        const fatigueMultiplier = 1 - (i / totalUpdates) * (1 - horse.stamina / 100); // Усталость
+        const luckBonus = (Math.random() - 0.5) * (horse.luck / 1000); // Бонус удачи
+        const speedWithModifiers = horse.raceSpeed * fatigueMultiplier + luckBonus;
         
-        // Обновляем прогресс для визуализации
-        setRaceProgress(updatedHorses.map(horse => horse.position));
-        
-        return updatedHorses;
+        const newPosition = Math.min(horse.position + speedWithModifiers, 1);
+        return { ...horse, position: newPosition };
       });
+      
+      currentHorsesState = updatedHorses;
+      setHorses(updatedHorses);
+      setRaceProgress(updatedHorses.map(horse => horse.position));
     }
     
-    // Определяем победителя
-    const finalHorses = horses.map(horse => ({ ...horse, position: Math.min(horse.position + horse.raceSpeed, 1) }));
+    // Определяем победителя, используя актуальное состояние
+    const finalHorses = currentHorsesState;
     const sortedHorses = [...finalHorses].sort((a, b) => b.position - a.position);
     const winner = sortedHorses[0];
     
