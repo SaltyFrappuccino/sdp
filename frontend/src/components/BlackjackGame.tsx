@@ -80,7 +80,7 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
     return value;
   };
 
-  const startNewGame = async () => {
+  const startGame = async () => {
     setLoading(true);
     setAnimating(true);
     setGameStarted(true);
@@ -284,20 +284,20 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
   if (gameState.gameStatus === 'waiting') {
     return (
       <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
-        <Div style={{ backgroundColor: '#2a2a2a', textAlign: 'center', padding: 40 }}>
+        <Div style={{ textAlign: 'center', padding: '40px 20px' }}>
           <Text weight="2" style={{ fontSize: 24, color: '#fff', marginBottom: 16 }}>
             🃏 Блэкджек
           </Text>
           <Text style={{ color: '#ccc', marginBottom: 24 }}>
             Ставка: {betAmount} 💰
           </Text>
-          <Text style={{ color: '#ccc', marginBottom: 32 }}>
-            Готовы начать игру? После начала игры ставка будет списана и вы не сможете выйти без завершения.
+          <Text style={{ color: '#ccc', marginBottom: 32, lineHeight: 1.4 }}>
+            Готовы начать игру? Ставка будет списана после подтверждения.
           </Text>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <Button
               size="l"
-              onClick={startNewGame}
+              onClick={startGame}
               disabled={loading}
               style={{ backgroundColor: '#4caf50', color: '#fff' }}
             >

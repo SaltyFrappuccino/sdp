@@ -31,12 +31,15 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameStart, onGameEnd,
   const [result, setResult] = useState<DiceResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [rollHistory, setRollHistory] = useState<DiceResult[]>([]);
+  const [gameStatus, setGameStatus] = useState<'waiting' | 'playing'>('waiting');
+
+  const startGame = () => {
+    onGameStart();
+    setGameStatus('playing');
+  };
 
   const rollDice = async () => {
     if (isRolling) return;
-    
-    // Списываем ставку в начале игры
-    onGameStart();
     
     setIsRolling(true);
     setResult(null);
@@ -118,6 +121,40 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameStart, onGameEnd,
     }
     return Math.round((count / 36) * 100);
   };
+
+  if (gameStatus === 'waiting') {
+    return (
+      <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
+        <Div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <Text weight="2" style={{ fontSize: 24, color: '#fff', marginBottom: 16 }}>
+            🎲 Кости
+          </Text>
+          <Text style={{ color: '#ccc', marginBottom: 24 }}>
+            Ставка: {betAmount} 💰
+          </Text>
+          <Text style={{ color: '#ccc', marginBottom: 32, lineHeight: 1.4 }}>
+            Готовы начать игру? Ставка будет списана после подтверждения.
+          </Text>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <Button
+              size="l"
+              onClick={startGame}
+              style={{ backgroundColor: '#4caf50', color: '#fff' }}
+            >
+              Начать игру
+            </Button>
+            <Button
+              size="l"
+              onClick={onClose}
+              style={{ backgroundColor: '#444', color: '#fff' }}
+            >
+              Отмена
+            </Button>
+          </div>
+        </Div>
+      </Card>
+    );
+  }
 
   return (
     <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
@@ -235,7 +272,7 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameStart, onGameEnd,
               height: 50,
               fontSize: 16,
               fontWeight: 'bold',
-              background: isRolling ? '#666' : 'linear-gradient(45deg, #4CAF50, #8BC34A)',
+              background: isRolling ? '#666' : 'linear-gradient(45deg, #ff6b6b, #ff8e53)',
               border: 'none',
               boxShadow: isRolling ? 'none' : '0 4px 8px rgba(0,0,0,0.3)'
             }}

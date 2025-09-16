@@ -41,6 +41,7 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
   const [displayNumber, setDisplayNumber] = useState<number>(0);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedBetType, setSelectedBetType] = useState<'number' | 'color' | 'even' | 'odd' | 'high' | 'low'>('number');
+  const [gameStatus, setGameStatus] = useState<'waiting' | 'playing'>('waiting');
 
   const getColorStyle = (color: string) => {
     switch (color) {
@@ -73,11 +74,13 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
     return bets.reduce((total, bet) => total + bet.amount, 0);
   };
 
+  const startGame = () => {
+    onGameStart();
+    setGameStatus('playing');
+  };
+
   const spin = async () => {
     if (isSpinning || bets.length === 0) return;
-    
-    const totalBet = getTotalBetAmount();
-    onGameStart();
     
     setIsSpinning(true);
     setResult(null);
@@ -215,6 +218,40 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
       </div>
     );
   };
+
+  if (gameStatus === 'waiting') {
+    return (
+      <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
+        <Div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <Text weight="2" style={{ fontSize: 24, color: '#fff', marginBottom: 16 }}>
+            🎰 Рулетка
+          </Text>
+          <Text style={{ color: '#ccc', marginBottom: 24 }}>
+            Ставка: {betAmount} 💰
+          </Text>
+          <Text style={{ color: '#ccc', marginBottom: 32, lineHeight: 1.4 }}>
+            Сделайте ставки и начните игру. Ставка будет списана после подтверждения.
+          </Text>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <Button
+              size="l"
+              onClick={startGame}
+              style={{ backgroundColor: '#4caf50', color: '#fff' }}
+            >
+              Начать игру
+            </Button>
+            <Button
+              size="l"
+              onClick={onClose}
+              style={{ backgroundColor: '#444', color: '#fff' }}
+            >
+              Отмена
+            </Button>
+          </div>
+        </Div>
+      </Card>
+    );
+  }
 
   return (
     <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>

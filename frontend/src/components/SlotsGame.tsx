@@ -23,6 +23,7 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameStart, onGameEn
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<{ type: 'win' | 'lose' | 'jackpot'; winAmount: number; message: string } | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [gameStatus, setGameStatus] = useState<'waiting' | 'playing'>('waiting');
 
   useEffect(() => {
     initializeReels();
@@ -56,11 +57,13 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameStart, onGameEn
     return SYMBOL_WEIGHTS.length - 1;
   };
 
+  const startGame = () => {
+    onGameStart();
+    setGameStatus('playing');
+  };
+
   const spin = async () => {
     if (isSpinning) return;
-    
-    // Списываем ставку в начале игры
-    onGameStart();
     
     setIsSpinning(true);
     setResult(null);
@@ -216,6 +219,40 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameStart, onGameEn
       </div>
     );
   };
+
+  if (gameStatus === 'waiting') {
+    return (
+      <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
+        <Div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <Text weight="2" style={{ fontSize: 24, color: '#fff', marginBottom: 16 }}>
+            🎰 Слоты 777
+          </Text>
+          <Text style={{ color: '#ccc', marginBottom: 24 }}>
+            Ставка: {betAmount} 💰
+          </Text>
+          <Text style={{ color: '#ccc', marginBottom: 32, lineHeight: 1.4 }}>
+            Готовы начать игру? Ставка будет списана после подтверждения.
+          </Text>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <Button
+              size="l"
+              onClick={startGame}
+              style={{ backgroundColor: '#4caf50', color: '#fff' }}
+            >
+              Начать игру
+            </Button>
+            <Button
+              size="l"
+              onClick={onClose}
+              style={{ backgroundColor: '#444', color: '#fff' }}
+            >
+              Отмена
+            </Button>
+          </div>
+        </Div>
+      </Card>
+    );
+  }
 
   return (
     <Card style={{ backgroundColor: '#2a2a2a', border: '1px solid #444' }}>
