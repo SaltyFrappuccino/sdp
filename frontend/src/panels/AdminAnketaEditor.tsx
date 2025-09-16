@@ -462,6 +462,7 @@ export const AdminAnketaEditor: FC<NavIdProps & { setModal: (modal: ReactNode | 
           onAICheck={handleAICheck}
           onShowHistory={handleShowHistory}
           snackbar={snackbar}
+          isNewCharacter={false}
         />
       ) : (
         <Div>Не удалось загрузить данные анкеты.</Div>

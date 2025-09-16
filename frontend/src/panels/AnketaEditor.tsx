@@ -167,6 +167,7 @@ export const AnketaEditor: FC<NavIdProps & {
   onAICheck?: () => void;
   onShowHistory?: () => void;
   snackbar?: ReactNode | null;
+  isNewCharacter?: boolean;
 }> = ({
   id,
   fetchedUser,
@@ -176,7 +177,8 @@ export const AnketaEditor: FC<NavIdProps & {
   onSave,
   onAICheck,
   onShowHistory,
-  snackbar
+  snackbar,
+  isNewCharacter = false
 }) => {
   const routeNavigator = useRouteNavigator();
   const [loading, setLoading] = useState(false);
@@ -362,7 +364,10 @@ export const AnketaEditor: FC<NavIdProps & {
                 name="rank"
                 value={character.rank}
                 onChange={handleChange}
-                options={[
+                options={isNewCharacter ? [
+                  { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
+                  { label: 'C', value: 'C' }, { label: 'B', value: 'B' }
+                ] : [
                   { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
                   { label: 'C', value: 'C' }, { label: 'B', value: 'B' }, { label: 'A', value: 'A' },
                   { label: 'S', value: 'S' }, { label: 'SS', value: 'SS' }, { label: 'SSS', value: 'SSS' },

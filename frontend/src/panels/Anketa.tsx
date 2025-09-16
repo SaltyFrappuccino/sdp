@@ -706,10 +706,13 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
             name="rank"
             value={formData.rank}
             onChange={handleChange}
-            options={[
+            options={isEditing ? [
               { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
               { label: 'C', value: 'C' }, { label: 'B', value: 'B' }, { label: 'A', value: 'A' },
               { label: 'S', value: 'S' }, { label: 'SS', value: 'SS' }, { label: 'SSS', value: 'SSS' },
+            ] : [
+              { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
+              { label: 'C', value: 'C' }, { label: 'B', value: 'B' }
             ]}
           />
         </FormItem>

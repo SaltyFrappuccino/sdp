@@ -122,6 +122,7 @@ export const UserAnketaEditor: React.FC<{
       onCharacterChange={(newCharacter) => setCharacter(newCharacter)}
       onSave={handleSave}
       snackbar={snackbar}
+      isNewCharacter={false}
     />
   );
 };
