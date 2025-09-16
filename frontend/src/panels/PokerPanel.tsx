@@ -3,6 +3,7 @@ import { Panel, PanelHeader, Button, Card, Div, Text, Input, Select, Snackbar, M
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
 import { Icon28GameOutline, Icon28Users3Outline, Icon28AddOutline } from '@vkontakte/icons';
+import { PokerTable } from '../components/PokerTable';
 
 interface NavIdProps {
   id: string;
@@ -38,6 +39,11 @@ export const PokerPanel: FC<PokerPanelProps> = ({ id, fetchedUser }) => {
   const [pokerRooms, setPokerRooms] = useState<PokerRoom[]>([]);
   const [snackbar, setSnackbar] = useState<React.ReactNode>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  
+  // Состояние для игрового стола
+  const [currentRoomId, setCurrentRoomId] = useState<number | null>(null);
+  const [currentPlayerId, setCurrentPlayerId] = useState<number | null>(null);
+  const [showTable, setShowTable] = useState<boolean>(false);
   
   // Состояние для создания комнаты
   const [newRoomName, setNewRoomName] = useState<string>('');
@@ -136,9 +142,20 @@ export const PokerPanel: FC<PokerPanelProps> = ({ id, fetchedUser }) => {
       if (response.ok) {
         const data = await response.json();
         showResultSnackbar('Успешно присоединились к комнате!', true);
+        
+        // Получаем ID игрока в этой комнате
+        const roomResponse = await fetch(`${API_URL}/poker/rooms/${roomId}`);
+        const roomData = await roomResponse.json();
+        const player = roomData.players.find((p: any) => p.character_id === selectedCharacter);
+        
+        if (player) {
+          setCurrentRoomId(roomId);
+          setCurrentPlayerId(player.id);
+          setShowTable(true);
+        }
+        
         await fetchCharacters();
         await fetchPokerRooms();
-        // TODO: Открыть игровой интерфейс
       } else {
         const errorData = await response.json();
         showResultSnackbar(errorData.error || 'Ошибка присоединения', false);
@@ -149,7 +166,27 @@ export const PokerPanel: FC<PokerPanelProps> = ({ id, fetchedUser }) => {
     }
   };
 
+  const leaveTable = () => {
+    setShowTable(false);
+    setCurrentRoomId(null);
+    setCurrentPlayerId(null);
+    fetchCharacters();
+    fetchPokerRooms();
+  };
+
   const selectedCharacterData = characters.find(c => c.id === selectedCharacter);
+
+  // Если показываем игровой стол
+  if (showTable && currentRoomId && currentPlayerId && selectedCharacter) {
+    return (
+      <PokerTable
+        roomId={currentRoomId}
+        currentPlayerId={currentPlayerId}
+        currentCharacterId={selectedCharacter}
+        onLeaveRoom={leaveTable}
+      />
+    );
+  }
 
   return (
     <Panel id={id}>

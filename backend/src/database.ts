@@ -616,6 +616,7 @@ export async function initDB() {
         small_blind_position INTEGER NOT NULL,
         big_blind_position INTEGER NOT NULL,
         community_cards TEXT DEFAULT '[]', -- JSON массив карт
+        deck_state TEXT DEFAULT '[]', -- JSON массив оставшихся карт в колоде
         pot INTEGER DEFAULT 0,
         current_bet INTEGER DEFAULT 0,
         current_player_position INTEGER,
@@ -655,9 +656,59 @@ export async function initDB() {
       );
     `);
 
+    // Таблица лошадей для Horse Racing
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS Horses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        emoji TEXT NOT NULL,
+        personality TEXT NOT NULL,
+        speed INTEGER NOT NULL,
+        stamina INTEGER NOT NULL,
+        luck INTEGER NOT NULL,
+        total_races INTEGER DEFAULT 0,
+        wins INTEGER DEFAULT 0,
+        second_places INTEGER DEFAULT 0,
+        third_places INTEGER DEFAULT 0,
+        total_winnings INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Таблица результатов скачек
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS HorseRaceResults (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        game_id INTEGER NOT NULL,
+        horse_id INTEGER NOT NULL,
+        position INTEGER NOT NULL,
+        final_time REAL NOT NULL,
+        distance_covered REAL NOT NULL,
+        race_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(game_id) REFERENCES CasinoGames(id) ON DELETE CASCADE,
+        FOREIGN KEY(horse_id) REFERENCES Horses(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Миграция для добавления deck_state в PokerHands
+    try {
+      const pokerHandsColumns = await db.all("PRAGMA table_info(PokerHands)");
+      const hasDeckState = pokerHandsColumns.some((col: any) => col.name === 'deck_state');
+      
+      if (!hasDeckState) {
+        console.log('Adding deck_state column to PokerHands table...');
+        await db.run('ALTER TABLE PokerHands ADD COLUMN deck_state TEXT DEFAULT "[]"');
+        console.log('deck_state column added successfully');
+      }
+    } catch (error) {
+      console.warn('Could not add deck_state column:', error);
+    }
+
     await seedStocks(db);
+    await seedHorses(db);
 
     return db;
+
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
@@ -679,4 +730,28 @@ export async function seedStocks(db: any) {
     await stmt.run(stock.name, stock.ticker_symbol, stock.description, stock.current_price, stock.exchange, stock.total_shares);
   }
   await stmt.finalize();
+}
+
+export async function seedHorses(db: any) {
+  // Проверяем, есть ли уже лошади в базе
+  const existingHorses = await db.get('SELECT COUNT(*) as count FROM Horses');
+  if (existingHorses.count > 0) {
+    console.log('Horses already exist, skipping seed');
+    return;
+  }
+
+  const { ALL_HORSES } = await import('./horseLogic.js');
+  
+  console.log('Seeding horses...');
+  const stmt = await db.prepare(`
+    INSERT INTO Horses (name, emoji, personality, speed, stamina, luck)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  
+  for (const horse of ALL_HORSES) {
+    await stmt.run(horse.name, horse.emoji, horse.description, horse.baseSpeed, horse.baseStamina, horse.baseLuck);
+  }
+  
+  await stmt.finalize();
+  console.log('Horses seeded successfully');
 }

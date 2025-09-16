@@ -144,7 +144,8 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
           result: result.result,
           winAmount: result.winAmount,
           gameData: result.gameData,
-          ...(gameType === 'dice' && { prediction: dicePrediction })
+          ...(gameType === 'dice' && { prediction: dicePrediction }),
+          ...(gameType === 'horseracing' && { raceResults: result.raceResults })
         })
       });
 
@@ -222,7 +223,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                 </Text>
               </Div>
             </Card>
-
+          
             {showHistory && gameHistory.length > 0 && (
               <Card style={{ marginTop: 16 }}>
                 <Div>

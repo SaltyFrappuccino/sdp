@@ -1,6 +1,7 @@
 import { FC, useState, useEffect } from 'react';
 import { Card, Div, Text, Button, Spinner } from '@vkontakte/vkui';
 import { Icon28GameOutline } from '@vkontakte/icons';
+import { API_URL } from '../api';
 
 interface HorseRacingGameProps {
   characterId: number;
@@ -13,10 +14,15 @@ interface HorseRacingGameProps {
 interface Horse {
   id: number;
   name: string;
+  emoji: string;
+  personality: string;
+  speed: number;
+  stamina: number;
+  luck: number;
   odds: number;
   color: string;
   position: number;
-  speed: number;
+  raceSpeed: number;
 }
 
 interface Bet {
@@ -25,13 +31,8 @@ interface Bet {
   type: 'win' | 'place' | 'show';
 }
 
-const HORSES = [
-  { id: 1, name: 'Молния', odds: 2.5, color: '#ff6b6b' },
-  { id: 2, name: 'Гром', odds: 3.2, color: '#4ecdc4' },
-  { id: 3, name: 'Ветер', odds: 4.0, color: '#45b7d1' },
-  { id: 4, name: 'Огонь', odds: 5.5, color: '#f9ca24' },
-  { id: 5, name: 'Звезда', odds: 7.0, color: '#6c5ce7' },
-  { id: 6, name: 'Мечта', odds: 8.5, color: '#a29bfe' }
+const HORSE_COLORS = [
+  '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7', '#a29bfe'
 ];
 
 export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameStart, onGameEnd, onClose }) => {
@@ -49,19 +50,33 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
   const [selectedHorse, setSelectedHorse] = useState<number | null>(null);
   const [selectedBetType, setSelectedBetType] = useState<'win' | 'place' | 'show'>('win');
   const [gameStatus, setGameStatus] = useState<'waiting' | 'playing'>('waiting');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     initializeHorses();
   }, []);
 
-  const initializeHorses = () => {
-    const initializedHorses = HORSES.map(horse => ({
-      ...horse,
-      position: 0,
-      speed: Math.random() * 0.02 + 0.01 // Случайная скорость
-    }));
-    setHorses(initializedHorses);
-    setRaceProgress(new Array(HORSES.length).fill(0));
+  const initializeHorses = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/casino/horseracing/horses`);
+      const data = await response.json();
+      
+      if (response.ok && data.horses) {
+        const initializedHorses = data.horses.map((horse: any, index: number) => ({
+          ...horse,
+          position: 0,
+          raceSpeed: Math.random() * 0.02 + 0.01, // Случайная скорость для анимации
+          color: HORSE_COLORS[index % HORSE_COLORS.length]
+        }));
+        setHorses(initializedHorses);
+        setRaceProgress(new Array(data.horses.length).fill(0));
+      }
+    } catch (error) {
+      console.error('Failed to load horses:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const addBet = (horseId: number, type: 'win' | 'place' | 'show') => {
@@ -100,12 +115,23 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
     setResult(null);
     setShowResult(false);
     
-    // Сброс позиций
-    const resetHorses = horses.map(horse => ({ ...horse, position: 0 }));
+    // Сброс позиций и расчет скоростей на основе статов
+    const resetHorses = horses.map(horse => {
+      // Расчет скорости на основе статов: скорость + выносливость + удача
+      const baseSpeed = (horse.speed + horse.stamina + horse.luck) / 300; // Нормализуем к базовой скорости
+      const randomFactor = Math.random() * 0.3 + 0.85; // Случайность от 0.85 до 1.15
+      const finalSpeed = baseSpeed * randomFactor;
+      
+      return { 
+        ...horse, 
+        position: 0,
+        raceSpeed: finalSpeed
+      };
+    });
     setHorses(resetHorses);
-    setRaceProgress(new Array(HORSES.length).fill(0));
+    setRaceProgress(new Array(horses.length).fill(0));
     
-    // Анимация гонки
+    // Анимация гонки с учетом статов
     const raceDuration = 8000; // 8 секунд
     const updateInterval = 50; // Обновляем каждые 50мс
     const totalUpdates = raceDuration / updateInterval;
@@ -115,7 +141,12 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
       
       setHorses(prevHorses => {
         const updatedHorses = prevHorses.map(horse => {
-          const newPosition = Math.min(horse.position + horse.speed + (Math.random() - 0.5) * 0.01, 1);
+          // Используем raceSpeed, рассчитанную на основе статов
+          const fatigueMultiplier = 1 - (i / totalUpdates) * (1 - horse.stamina / 100); // Усталость
+          const luckBonus = (Math.random() - 0.5) * (horse.luck / 1000); // Бонус удачи
+          const speedWithModifiers = horse.raceSpeed * fatigueMultiplier + luckBonus;
+          
+          const newPosition = Math.min(horse.position + speedWithModifiers, 1);
           return { ...horse, position: newPosition };
         });
         
@@ -127,7 +158,7 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
     }
     
     // Определяем победителя
-    const finalHorses = horses.map(horse => ({ ...horse, position: Math.min(horse.position + horse.speed, 1) }));
+    const finalHorses = horses.map(horse => ({ ...horse, position: Math.min(horse.position + horse.raceSpeed, 1) }));
     const sortedHorses = [...finalHorses].sort((a, b) => b.position - a.position);
     const winner = sortedHorses[0];
     
@@ -150,7 +181,13 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
           winner: winner.id, 
           finalPositions: sortedHorses.map(h => h.id),
           bets: bets 
-        }
+        },
+        raceResults: sortedHorses.map((horse, index) => ({
+          horse_id: horse.id,
+          position: index + 1,
+          final_time: Math.random() * 2 + 8, // Случайное время от 8 до 10 секунд
+          distance_covered: 1000 // Полная дистанция
+        }))
       });
     }, 3000);
   };
@@ -160,7 +197,7 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
     let winMessages: string[] = [];
     
     bets.forEach(bet => {
-      const horse = HORSES.find(h => h.id === bet.horseId);
+      const horse = horses.find(h => h.id === bet.horseId);
       if (!horse) return;
       
       let isWin = false;
@@ -216,26 +253,42 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
               marginBottom: 4
             }}>
               <div style={{
-                width: 20,
-                height: 20,
+                width: 24,
+                height: 24,
                 backgroundColor: horse.color,
                 borderRadius: '50%',
                 marginRight: 8,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 'bold',
                 color: '#fff'
               }}>
-                {horse.id}
+                {horse.emoji || horse.id}
               </div>
-              <Text style={{ fontSize: 12, color: '#fff', marginRight: 8 }}>
-                {horse.name}
-              </Text>
-              <Text style={{ fontSize: 10, color: '#ccc' }}>
-                {horse.odds}:1
-              </Text>
+              <div style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, color: '#fff', fontWeight: 'bold' }}>
+                  {horse.name}
+                </Text>
+                <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                  <Text style={{ fontSize: 9, color: '#ffd700' }}>
+                    🏃 {horse.speed}
+                  </Text>
+                  <Text style={{ fontSize: 9, color: '#00bcd4' }}>
+                    💪 {horse.stamina}
+                  </Text>
+                  <Text style={{ fontSize: 9, color: '#4caf50' }}>
+                    🍀 {horse.luck}
+                  </Text>
+                  <Text style={{ fontSize: 9, color: '#ccc' }}>
+                    {horse.odds}:1
+                  </Text>
+                </div>
+                <Text style={{ fontSize: 8, color: '#999', marginTop: 1 }}>
+                  {horse.personality}
+                </Text>
+              </div>
             </div>
             
             <div style={{
@@ -278,25 +331,37 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
           <Text style={{ color: '#ccc', marginBottom: 24 }}>
             Ставка: {betAmount} 💰
           </Text>
-          <Text style={{ color: '#ccc', marginBottom: 32, lineHeight: 1.4 }}>
-            Сделайте ставки и начните гонку. Ставка будет списана после подтверждения.
-          </Text>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <Button
-              size="l"
-              onClick={startGame}
-              style={{ backgroundColor: '#4caf50', color: '#fff' }}
-            >
-              Начать игру
-            </Button>
-            <Button
-              size="l"
-              onClick={onClose}
-              style={{ backgroundColor: '#444', color: '#fff' }}
-            >
-              Отмена
-            </Button>
-          </div>
+          {loading ? (
+            <div>
+              <Spinner size="m" style={{ marginBottom: 16 }} />
+              <Text style={{ color: '#ccc' }}>
+                Подготовка лошадей к гонке...
+              </Text>
+            </div>
+          ) : (
+            <div>
+              <Text style={{ color: '#ccc', marginBottom: 32, lineHeight: 1.4 }}>
+                В скачках участвуют случайно выбранные лошади с уникальными характеристиками. 
+                Сделайте ставки и начните гонку.
+              </Text>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <Button
+                  size="l"
+                  onClick={startGame}
+                  style={{ backgroundColor: '#4caf50', color: '#fff' }}
+                >
+                  Начать игру
+                </Button>
+                <Button
+                  size="l"
+                  onClick={onClose}
+                  style={{ backgroundColor: '#444', color: '#fff' }}
+                >
+                  Отмена
+                </Button>
+              </div>
+            </div>
+          )}
         </Div>
       </Card>
     );
@@ -362,7 +427,7 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
               borderRadius: 6
             }}>
               {bets.map((bet, index) => {
-                const horse = HORSES.find(h => h.id === bet.horseId);
+                const horse = horses.find((h: Horse) => h.id === bet.horseId);
                 return (
                   <div key={index} style={{ 
                     display: 'flex', 
@@ -392,7 +457,7 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
         <div style={{ marginBottom: 20 }}>
           <Text weight="2" style={{ marginBottom: 8, fontSize: 14, color: '#fff' }}>Сделать ставку:</Text>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {HORSES.map(horse => (
+            {horses.map((horse: Horse) => (
               <div key={horse.id} style={{
                 display: 'flex',
                 alignItems: 'center',
