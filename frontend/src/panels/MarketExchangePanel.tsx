@@ -328,7 +328,6 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
     return <Panel id={id}><PanelHeader>Биржа</PanelHeader><Spinner/></Panel>;
   }
 
-  const hoveredCharacter = hoveredCharacterId ? leaderboard.find(c => c.character_id === hoveredCharacterId) : null;
 
   return (
     <Panel id={id}>
@@ -487,17 +486,24 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
               key={entry.character_id}
               shown={hoveredCharacterId === entry.character_id}
               placement="right"
-              content={hoveredCharacter ? (() => {
-                const assets = hoveredCharacter.assets || [];
+              content={(() => {
+                const character = leaderboard.find(c => c.character_id === hoveredCharacterId);
+                if (!character) return "";
+                
+                const assets = character.assets || [];
                 const totalGainLoss = assets.reduce((sum, asset) => {
                   const currentValue = asset.value;
                   const costBasis = asset.quantity * asset.average_purchase_price;
                   return sum + (currentValue - costBasis);
                 }, 0);
-                const gainLossPercent = hoveredCharacter.total_value > 0 ? 
-                  ((totalGainLoss / (hoveredCharacter.total_value - totalGainLoss)) * 100) : 0;
                 
-                let tooltipText = `${hoveredCharacter.character_name}\n💰 Наличные: ${hoveredCharacter.cash_balance?.toLocaleString('ru-RU')} ₭\n📊 Общая стоимость: ${hoveredCharacter.total_value?.toLocaleString('ru-RU')} ₭\n`;
+                const totalInvested = assets.reduce((sum, asset) => {
+                  return sum + (asset.quantity * asset.average_purchase_price);
+                }, 0);
+                
+                const gainLossPercent = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
+                
+                let tooltipText = `${character.character_name}\n💰 Наличные: ${character.cash_balance?.toLocaleString('ru-RU')} ₭\n📊 Общая стоимость: ${character.total_value?.toLocaleString('ru-RU')} ₭\n`;
                 
                 if (totalGainLoss !== 0) {
                   const sign = totalGainLoss > 0 ? '+' : '';
@@ -519,7 +525,7 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
                 }
                 
                 return tooltipText;
-              })() : ""}
+              })()}
             >
               <div
                 onMouseEnter={() => setHoveredCharacterId(entry.character_id)}
