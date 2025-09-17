@@ -552,14 +552,24 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
                       ✋ Чек (0 💰)
                     </Button>
                   ) : (
-                    <Button
-                      size="m"
-                      onClick={() => handleAction('call', currentHand.current_bet)}
-                      disabled={loading}
-                      style={{ backgroundColor: '#007bff', color: 'white' }}
-                    >
-                      📞 Колл ({currentHand.current_bet} 💰)
-                    </Button>
+                    <>
+                      <Button
+                        size="m"
+                        onClick={() => handleAction('check')}
+                        disabled={loading}
+                        style={{ backgroundColor: '#28a745', color: 'white', marginRight: '8px' }}
+                      >
+                        ✋ Чек (0 💰)
+                      </Button>
+                      <Button
+                        size="m"
+                        onClick={() => handleAction('call', currentHand.current_bet)}
+                        disabled={loading}
+                        style={{ backgroundColor: '#007bff', color: 'white' }}
+                      >
+                        📞 Колл ({currentHand.current_bet} 💰)
+                      </Button>
+                    </>
                   )}
                   
                   <Button
@@ -610,7 +620,7 @@ export const PokerTable: FC<PokerTableProps> = ({ roomId, currentPlayerId, curre
           stretched
           mode="secondary"
           onClick={handleLeaveRoom}
-          disabled={loading && room?.status === 'waiting'}
+          disabled={loading}
         >
           Покинуть комнату
         </Button>

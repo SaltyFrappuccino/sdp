@@ -81,17 +81,25 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
   };
 
   const addBet = (horseId: number, type: 'win' | 'place' | 'show') => {
-    const existingBet = bets.find(bet => bet.horseId === horseId && bet.type === type);
-    
+    // Разрешаем только одну ставку на одну лошадь
+    const existingBet = bets.find(bet => bet.horseId === horseId);
     if (existingBet) {
+      // Если ставка на эту лошадь уже есть, можно изменить тип, но не добавить новую
       setBets(bets.map(bet => 
-        bet.horseId === horseId && bet.type === type
-          ? { ...bet, amount: bet.amount + betAmount }
+        bet.horseId === horseId
+          ? { ...bet, type, amount: betAmount } // Обновляем тип и сумму ставки
           : bet
       ));
-    } else {
-      setBets([...bets, { horseId, type, amount: betAmount }]);
+      return;
     }
+
+    // Ограничиваем количество ставок до одной
+    if (bets.length >= 1) {
+      alert('Можно сделать только одну ставку за забег.');
+      return;
+    }
+
+    setBets([...bets, { horseId, type, amount: betAmount }]);
   };
 
   const removeBet = (horseId: number, type: 'win' | 'place' | 'show') => {

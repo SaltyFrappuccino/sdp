@@ -4905,25 +4905,28 @@ router.post('/poker/hands/:id/simple-action', async (req: Request, res: Response
       await db.run('UPDATE PokerPlayers SET status = ? WHERE id = ?', [newPlayerStatus, player_id]);
     }
 
-    // Определяем следующего игрока
-    const roomPlayers = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? AND status IN (?, ?)', [hand.room_id, 'active', 'all_in']);
-    const { getNextActivePlayer } = await import('./pokerLogic.js');
-    const nextPlayer = getNextActivePlayer(roomPlayers, player.seat_position);
-    
-    if (nextPlayer) {
-      // Устанавливаем таймаут на ход (60 секунд)
-      const timeoutAt = new Date(Date.now() + 60000).toISOString();
-      await db.run('UPDATE PokerHands SET current_player_position = ?, turn_timeout_at = ? WHERE id = ?', 
-        [nextPlayer.seat_position, timeoutAt, hand_id]);
-    }
-
     // Проверяем, закончился ли раунд торгов
     const activePlayers = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? AND status IN (?, ?)', [hand.room_id, 'active', 'all_in']);
     const allPlayersActed = await checkIfAllPlayersActed(db, parseInt(hand_id), hand.round_stage, activePlayers);
     
+    let nextPlayer = null;
+    
     if (allPlayersActed || activePlayers.filter(p => p.status === 'active').length === 0) {
       // Переходим к следующей стадии или завершаем
       await advanceToNextStage(db, parseInt(hand_id), hand.round_stage);
+    } else {
+      // Определяем следующего игрока для продолжения текущего раунда
+      // Берем только активных игроков (которые могут делать ходы)
+      const activePlayersOnly = await db.all('SELECT * FROM PokerPlayers WHERE room_id = ? AND status = ?', [hand.room_id, 'active']);
+      const { getNextActivePlayer } = await import('./pokerLogic.js');
+      nextPlayer = getNextActivePlayer(activePlayersOnly, player.seat_position);
+      
+      if (nextPlayer) {
+        // Устанавливаем таймаут на ход (60 секунд)
+        const timeoutAt = new Date(Date.now() + 60000).toISOString();
+        await db.run('UPDATE PokerHands SET current_player_position = ?, turn_timeout_at = ? WHERE id = ?', 
+          [nextPlayer.seat_position, timeoutAt, hand_id]);
+      }
     }
 
     await db.run('COMMIT');
