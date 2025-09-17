@@ -168,19 +168,19 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
           multiplier = 2; // 2:1 для цвета
           break;
         case 'even':
-          isWin = winningNumber.number !== 0 && winningNumber.number % 2 === 0;
+          isWin = bet.value === 'even' && winningNumber.number !== 0 && winningNumber.number % 2 === 0;
           multiplier = 2; // 2:1 для четных
           break;
         case 'odd':
-          isWin = winningNumber.number !== 0 && winningNumber.number % 2 === 1;
+          isWin = bet.value === 'odd' && winningNumber.number !== 0 && winningNumber.number % 2 === 1;
           multiplier = 2; // 2:1 для нечетных
           break;
         case 'high':
-          isWin = winningNumber.number >= 19 && winningNumber.number <= 36;
+          isWin = bet.value === 'high' && winningNumber.number >= 19 && winningNumber.number <= 36;
           multiplier = 2; // 2:1 для высоких (19-36)
           break;
         case 'low':
-          isWin = winningNumber.number >= 1 && winningNumber.number <= 18;
+          isWin = bet.value === 'low' && winningNumber.number >= 1 && winningNumber.number <= 18;
           multiplier = 2; // 2:1 для низких (1-18)
           break;
       }
