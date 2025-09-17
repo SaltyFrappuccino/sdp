@@ -106,8 +106,8 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
     setActiveModal('horseracing');
   };
 
-  const handleGameStart = async (gameType: string, customBetAmount?: number) => {
-    if (!selectedCharacter) return;
+  const handleGameStart = async (gameType: string, customBetAmount?: number): Promise<boolean> => {
+    if (!selectedCharacter) return false;
     try {
       // Для рулетки используем общую сумму ставок, для остальных игр - базовую ставку
       const actualBetAmount = customBetAmount || parseInt(betAmount);
@@ -126,13 +126,16 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
       if (response.ok) {
         await fetchCharacters(); // Обновляем валюту
         showResultSnackbar(`Ставка ${actualBetAmount} 💰 списана. Игра началась!`, true);
+        return true;
       } else {
         const errorData = await response.json();
         showResultSnackbar(errorData.error || 'Ошибка начала игры', false);
+        return false;
       }
     } catch (error) {
       console.error('Game start error:', error);
       showResultSnackbar('Ошибка при начале игры', false);
+      return false;
     }
   };
 

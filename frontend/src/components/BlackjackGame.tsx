@@ -5,7 +5,7 @@ import { Icon28AddOutline, Icon28ChecksOutline } from '@vkontakte/icons';
 interface BlackjackGameProps {
   characterId: number;
   betAmount: number;
-  onGameStart: () => void;
+  onGameStart: () => Promise<boolean>;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -83,10 +83,17 @@ export const BlackjackGame: FC<BlackjackGameProps> = ({ betAmount, onGameStart, 
   const startGame = async () => {
     setLoading(true);
     setAnimating(true);
-    setGameStarted(true);
     
     // Уведомляем родительский компонент о начале игры (для списания ставки)
-    onGameStart();
+    const success = await onGameStart();
+
+    if (!success) {
+      setLoading(false);
+      setAnimating(false);
+      return; // Прерываем, если ставка не удалась
+    }
+
+    setGameStarted(true);
     
     // Создаем колоду и раздаем карты
     const deck = createDeck();

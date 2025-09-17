@@ -6,7 +6,7 @@ import { API_URL } from '../api';
 interface HorseRacingGameProps {
   characterId: number;
   betAmount: number;
-  onGameStart: () => void;
+  onGameStart: () => Promise<boolean>;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -110,9 +110,11 @@ export const HorseRacingGame: FC<HorseRacingGameProps> = ({ betAmount, onGameSta
     return bets.reduce((total, bet) => total + bet.amount, 0);
   };
 
-  const startGame = () => {
-    onGameStart();
-    setGameStatus('playing');
+  const startGame = async () => {
+    const success = await onGameStart();
+    if (success) {
+      setGameStatus('playing');
+    }
   };
 
   const startRace = async () => {

@@ -5,7 +5,7 @@ import { Icon28GameOutline } from '@vkontakte/icons';
 interface RouletteGameProps {
   characterId: number;
   betAmount: number;
-  onGameStart: (totalBetAmount?: number) => void;
+  onGameStart: (totalBetAmount?: number) => Promise<boolean>;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -106,9 +106,15 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
     
     // Вызываем onGameStart для списания общей суммы ставок
     const totalBets = getTotalBetAmount();
-    onGameStart(totalBets);
     
     setIsSpinning(true);
+    const success = await onGameStart(totalBets);
+
+    if (!success) {
+      setIsSpinning(false);
+      return; // Прерываем игру, если ставка не прошла
+    }
+
     setResult(null);
     setShowResult(false);
     

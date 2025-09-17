@@ -5,7 +5,7 @@ import { Icon28Dice1Outline } from '@vkontakte/icons';
 interface DiceGameProps {
   characterId: number;
   betAmount: number;
-  onGameStart: () => void;
+  onGameStart: () => Promise<boolean>;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -33,9 +33,11 @@ export const DiceGame: FC<DiceGameProps> = ({ betAmount, onGameStart, onGameEnd,
   const [rollHistory, setRollHistory] = useState<DiceResult[]>([]);
   const [gameStatus, setGameStatus] = useState<'waiting' | 'playing'>('waiting');
 
-  const startGame = () => {
-    onGameStart();
-    setGameStatus('playing');
+  const startGame = async () => {
+    const success = await onGameStart();
+    if (success) {
+      setGameStatus('playing');
+    }
   };
 
   const rollDice = async () => {

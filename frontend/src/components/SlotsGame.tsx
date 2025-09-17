@@ -5,7 +5,7 @@ import { Icon28GameOutline } from '@vkontakte/icons';
 interface SlotsGameProps {
   characterId: number;
   betAmount: number;
-  onGameStart: () => void;
+  onGameStart: () => Promise<boolean>;
   onGameEnd: (result: any) => void;
   onClose: () => void;
 }
@@ -57,9 +57,11 @@ export const SlotsGame: FC<SlotsGameProps> = ({ betAmount, onGameStart, onGameEn
     return SYMBOL_WEIGHTS.length - 1;
   };
 
-  const startGame = () => {
-    onGameStart();
-    setGameStatus('playing');
+  const startGame = async () => {
+    const success = await onGameStart();
+    if (success) {
+      setGameStatus('playing');
+    }
   };
 
   const spin = async () => {
