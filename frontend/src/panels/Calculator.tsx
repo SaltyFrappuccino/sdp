@@ -82,10 +82,44 @@ export const Calculator: FC<NavIdProps> = ({ id }) => {
       }
     });
 
-    navigator.clipboard.writeText(result)
-      .then(() => alert('Данные скопированы в буфер обмена!'))
-      .catch(err => alert('Ошибка при копировании: ' + err));
+    if (!navigator.clipboard) {
+      fallbackCopyToClipboard(result);
+      return;
+    }
+    navigator.clipboard.writeText(result).then(function() {
+      alert('Данные скопированы в буфер обмена!');
+    }, function(err) {
+      alert('Ошибка при копировании. Попробуйте другой метод.');
+      fallbackCopyToClipboard(result);
+    });
   };
+
+  const fallbackCopyToClipboard = (text: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // Avoid scrolling to bottom
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+  
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+  
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        alert('Данные скопированы в буфер обмена!');
+      } else {
+        alert('Не удалось скопировать данные.');
+      }
+    } catch (err) {
+      alert('Ошибка при копировании: ' + err);
+    }
+  
+    document.body.removeChild(textArea);
+  }
 
 
   return (
