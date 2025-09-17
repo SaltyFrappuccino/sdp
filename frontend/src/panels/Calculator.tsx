@@ -63,6 +63,31 @@ export const Calculator: FC<NavIdProps> = ({ id }) => {
     setAbilities(newAbilities);
   };
 
+  const copyToClipboard = () => {
+    let result = `**Ранг Персонажа:** ${rank}\n\n`;
+
+    result += `**Атрибуты (Всего очков: ${totalAttributePoints}):**\n`;
+    for (const [attr, value] of Object.entries(attributes)) {
+      result += `- ${attr}: ${value}\n`;
+    }
+
+    result += '\n**Способности:**\n';
+    abilities.forEach((ability, index) => {
+      result += `\n**${index + 1}. ${ability.name}**\n`;
+      result += `- **Тип/Стоимость:** ${ability.cell_type} / ${ability.cell_cost}\n`;
+      result += `- **Описание:** ${ability.description}\n`;
+      result += '- **Теги:**\n';
+      for (const [tag, tagRank] of Object.entries(ability.tags)) {
+        result += `  - ${tag}: ${tagRank}\n`;
+      }
+    });
+
+    navigator.clipboard.writeText(result)
+      .then(() => alert('Данные скопированы в буфер обмена!'))
+      .catch(err => alert('Ошибка при копировании: ' + err));
+  };
+
+
   return (
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>Калькулятор Персонажа</PanelHeader>
@@ -168,6 +193,14 @@ export const Calculator: FC<NavIdProps> = ({ id }) => {
           currentRank={rank}
           contracts={[]} // В калькуляторе контракты не учитываются
         />
+      </Group>
+      
+      <Group>
+        <Div>
+          <Button size="l" stretched onClick={copyToClipboard}>
+            Копировать в буфер обмена
+          </Button>
+        </Div>
       </Group>
     </Panel>
   );
