@@ -64,34 +64,25 @@ export const Calculator: FC<NavIdProps> = ({ id }) => {
   };
 
   const copyToClipboard = () => {
-    let result = `**Ранг Персонажа:** ${rank}\n\n`;
+    let result = `Ранг Персонажа: ${rank}\n\n`;
 
-    result += `**Атрибуты (Всего очков: ${totalAttributePoints}):**\n`;
+    result += `Атрибуты (Всего очков: ${totalAttributePoints}):\n`;
     for (const [attr, value] of Object.entries(attributes)) {
       result += `- ${attr}: ${value}\n`;
     }
 
-    result += '\n**Способности:**\n';
+    result += '\nСпособности:\n';
     abilities.forEach((ability, index) => {
-      result += `\n**${index + 1}. ${ability.name}**\n`;
-      result += `- **Тип/Стоимость:** ${ability.cell_type} / ${ability.cell_cost}\n`;
-      result += `- **Описание:** ${ability.description}\n`;
-      result += '- **Теги:**\n';
+      result += `\n${index + 1}. ${ability.name}\n`;
+      result += `- Тип/Стоимость: ${ability.cell_type} / ${ability.cell_cost}\n`;
+      result += `- Описание: ${ability.description}\n`;
+      result += '- Теги:\n';
       for (const [tag, tagRank] of Object.entries(ability.tags)) {
         result += `  - ${tag}: ${tagRank}\n`;
       }
     });
 
-    if (!navigator.clipboard) {
-      fallbackCopyToClipboard(result);
-      return;
-    }
-    navigator.clipboard.writeText(result).then(function() {
-      alert('Данные скопированы в буфер обмена!');
-    }, function(err) {
-      alert('Ошибка при копировании. Попробуйте другой метод.');
-      fallbackCopyToClipboard(result);
-    });
+    fallbackCopyToClipboard(result);
   };
 
   const fallbackCopyToClipboard = (text: string) => {
