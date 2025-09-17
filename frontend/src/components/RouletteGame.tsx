@@ -84,7 +84,6 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
   };
 
   const startGame = () => {
-    onGameStart();
     setGameStatus('playing');
   };
 
@@ -107,6 +106,7 @@ export const RouletteGame: FC<RouletteGameProps> = ({ betAmount, onGameStart, on
     
     // Вызываем onGameStart для списания общей суммы ставок
     const totalBets = getTotalBetAmount();
+    onGameStart(totalBets);
     
     setIsSpinning(true);
     setResult(null);
