@@ -372,7 +372,7 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                   <Button
                     size="l"
                     onClick={playHorseRacing}
-                    disabled={!betAmount || parseInt(betAmount) > selectedCharacterData.currency}
+                    disabled={true}
                   >
                     🐎 Скачки
                   </Button>
