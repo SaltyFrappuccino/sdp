@@ -52,11 +52,11 @@ const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank, manualAuraCell
     { rank: 'E', small: 4, significant: 0, ultimate: 0 },
     { rank: 'D', small: 8, significant: 2, ultimate: 0 },
     { rank: 'C', small: 16, significant: 4, ultimate: 0 },
-    { rank: 'B', small: 32, significant: 8, ultimate: 1 },
-    { rank: 'A', small: Infinity, significant: 16, ultimate: 2 },
-    { rank: 'S', small: Infinity, significant: Infinity, ultimate: 4 },
-    { rank: 'SS', small: Infinity, significant: Infinity, ultimate: 8 },
-    { rank: 'SSS', small: Infinity, significant: Infinity, ultimate: 16 },
+    { rank: 'B', small: 24, significant: 8, ultimate: 1 },
+    { rank: 'A', small: 32, significant: 16, ultimate: 2 },
+    { rank: 'S', small: Infinity, significant: 24, ultimate: 4 },
+    { rank: 'SS', small: Infinity, significant: 32, ultimate: 8 },
+    { rank: 'SSS', small: Infinity, significant: 64, ultimate: 16 },
   ];
 
   const totalSynchronization = contracts.reduce((acc, contract) => acc + (contract.sync_level || 0), 0);
