@@ -1,0 +1,33 @@
+.container {
+  margin: 24px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.placeholder {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  color: white;
+  box-shadow: var(--shadow-md);
+  max-width: 400px;
+  width: 100%;
+}
+
+.icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.text {
+  margin: 0;
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.alt {
+  margin: 8px 0 0 0;
+  font-size: 14px;
+  opacity: 0.9;
+}

@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
+:root {
+  --font-family-main: 'Inter', sans-serif;
+
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #5c5c5c;
+  --color-background: #ffffff;
+  --color-surface: #f7f7f7;
+  --color-border: #e0e0e0;
+  --color-primary: #451ecf;
+  --color-primary-hover: #943ac9;
+  --gradient-primary: linear-gradient(135deg, #451ecf 0%, #943ac9 100%);
+  --gradient-accent: linear-gradient(135deg, #451ecf 0%, #943ac9 100%);
+
+  --shadow-sm: 0 1px 2px 0 rgba(69, 30, 207, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(69, 30, 207, 0.1), 0 2px 4px -1px rgba(69, 30, 207, 0.06);
+}
+
+[data-theme='dark'] {
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a0a0a0;
+  --color-background: #0d1117;
+  --color-surface: #161b22;
+  --color-border: #30363d;
+  --color-primary: #a98cff;
+  --color-primary-hover: #c7b3ff;
+  --gradient-primary: linear-gradient(135deg, #451ecf 0%, #943ac9 100%);
+  --gradient-accent: linear-gradient(135deg, #451ecf 0%, #943ac9 100%);
+  --shadow-lg: 0 8px 32px rgba(69, 30, 207, 0.2);
+  --text-glow: 0 0 8px rgba(169, 140, 255, 0.4);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family-main);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}

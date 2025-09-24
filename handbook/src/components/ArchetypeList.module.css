@@ -1,0 +1,93 @@
+.container {
+  margin: 24px 0;
+}
+
+.title {
+  margin: 0 0 24px 0;
+  color: var(--color-primary);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.categorySection {
+  margin-bottom: 32px;
+}
+
+.categoryTitle {
+  margin: 0 0 16px 0;
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.archetypeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.archetypeCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.archetypeCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-accent);
+}
+
+.archetypeCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary);
+}
+
+.archetypeName {
+  margin: 8px 0 8px 0;
+  color: var(--color-primary);
+  font-size: 16px;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+
+.archetypeDescription {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  font-size: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .archetypeGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .archetypeCard {
+    padding: 12px;
+  }
+  
+  .archetypeName {
+    font-size: 15px;
+  }
+  
+  .archetypeDescription {
+    font-size: 13px;
+  }
+}
+
