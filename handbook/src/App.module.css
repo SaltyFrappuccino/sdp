@@ -5,6 +5,97 @@
   overflow: hidden;
 }
 
+.bookSelector {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 10px;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  align-items: center;
+}
+
+.bookButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.bookButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.bookButton.active {
+  background: #007acc;
+  box-shadow: 0 4px 12px rgba(0, 122, 204, 0.3);
+}
+
+.bookmarksButton {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+}
+
+.bookmarksButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.contentWrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 80px 20px 20px 20px;
+  margin-left: 300px;
+}
+
+@media (max-width: 768px) {
+  .bookSelector {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    transform: none;
+    justify-content: center;
+  }
+  
+  .bookButton {
+    flex: 1;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  
+  .bookmarksButton {
+    min-width: 36px;
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+  
+  .contentWrapper {
+    margin-left: 0;
+    padding: 60px 10px 10px 10px;
+  }
+}
+
 @media (max-width: 768px) {
   .app {
     flex-direction: column;

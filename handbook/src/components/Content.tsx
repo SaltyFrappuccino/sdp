@@ -14,12 +14,14 @@ import InPageSearch from '@/components/InPageSearch';
 import RankTable from '@/components/RankTable';
 import ArchetypeList from '@/components/ArchetypeList';
 import SynkiTypes from '@/components/SynkiTypes';
+import BookmarkButton from '@/components/BookmarkButton';
 
 interface ContentProps {
   chapter: Chapter;
+  bookType?: 'lore' | 'character' | 'combat';
 }
 
-const Content: React.FC<ContentProps> = ({ chapter }) => {
+const Content: React.FC<ContentProps> = ({ chapter, bookType = 'combat' }) => {
   const [, setSearchQuery] = React.useState('');
   const [searchResults, setSearchResults] = React.useState(0);
 
@@ -86,9 +88,29 @@ const Content: React.FC<ContentProps> = ({ chapter }) => {
         }
         return <p key={index}>{item.text}</p>;
       case 'heading':
-        return <h2 key={index} id={`heading-${index}`} className={styles.heading}>{item.text}</h2>;
+        return (
+          <div key={index} className={styles.headingContainer}>
+            <h2 id={`heading-${index}`} className={styles.heading}>{item.text}</h2>
+            <BookmarkButton
+              bookType={bookType}
+              chapterId={chapter.id}
+              headingId={`heading-${index}`}
+              title={item.text}
+            />
+          </div>
+        );
       case 'subheading':
-        return <h3 key={index} id={`subheading-${index}`} className={styles.subheading}>{item.text}</h3>;
+        return (
+          <div key={index} className={styles.subheadingContainer}>
+            <h3 id={`subheading-${index}`} className={styles.subheading}>{item.text}</h3>
+            <BookmarkButton
+              bookType={bookType}
+              chapterId={chapter.id}
+              headingId={`subheading-${index}`}
+              title={item.text}
+            />
+          </div>
+        );
       case 'list':
         return (
           <ul key={index} className={styles.list}>
