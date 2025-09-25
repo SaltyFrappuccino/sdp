@@ -13,14 +13,14 @@
 }
 
 .panel {
-  background: var(--bg-primary);
+  background: var(--color-background);
   border-radius: 12px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   width: 100%;
   max-width: 500px;
   max-height: 80vh;
   overflow: hidden;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--color-border);
 }
 
 .header {
@@ -29,7 +29,7 @@
   justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);
-  background: var(--bg-secondary);
+  background: var(--color-surface);
 }
 
 .title {
@@ -39,7 +39,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .icon {
@@ -53,13 +53,14 @@
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   transition: all 0.2s ease;
 }
 
 .closeButton:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--color-surface);
+  opacity: 0.8;
+  color: var(--color-text-primary);
 }
 
 .content {
@@ -71,7 +72,7 @@
 .empty {
   text-align: center;
   padding: 40px 20px;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .emptyIcon {
@@ -101,14 +102,14 @@
 }
 
 .count {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
 .clearButton {
   background: none;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 12px;
@@ -117,8 +118,9 @@
 }
 
 .clearButton:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--color-surface);
+  opacity: 0.8;
+  color: var(--color-text-primary);
 }
 
 .bookmarksList {
@@ -132,15 +134,16 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: var(--bg-secondary);
+  background: var(--color-surface);
   transition: all 0.2s ease;
 }
 
 .bookmarkItem:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent-color);
+  background: var(--color-surface);
+  opacity: 0.8;
+  border-color: var(--color-primary);
 }
 
 .bookmarkContent {
@@ -156,8 +159,8 @@
 }
 
 .bookName {
-  background: var(--accent-color);
-  color: var(--accent-text);
+  background: var(--color-primary);
+  color: white;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
@@ -166,12 +169,12 @@
 }
 
 .timestamp {
-  color: var(--text-tertiary);
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 
 .bookmarkTitle {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   font-size: 14px;
   font-weight: 500;
   line-height: 1.4;
@@ -184,14 +187,15 @@
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   transition: all 0.2s ease;
   opacity: 0.7;
 }
 
 .removeButton:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--color-surface);
+  opacity: 0.8;
+  color: var(--color-text-primary);
   opacity: 1;
 }
 
@@ -201,23 +205,24 @@
 }
 
 [data-theme="dark"] .panel {
-  background: var(--bg-primary);
+  background: var(--color-background);
   border-color: var(--border-color);
 }
 
 [data-theme="dark"] .header {
-  background: var(--bg-secondary);
+  background: var(--color-surface);
   border-color: var(--border-color);
 }
 
 [data-theme="dark"] .bookmarkItem {
-  background: var(--bg-secondary);
+  background: var(--color-surface);
   border-color: var(--border-color);
 }
 
 [data-theme="dark"] .bookmarkItem:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent-color);
+  background: var(--color-surface);
+  opacity: 0.8;
+  border-color: var(--color-primary);
 }
 
 /* Мобильная адаптация */

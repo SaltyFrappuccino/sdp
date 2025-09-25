@@ -15,6 +15,11 @@ import RankTable from '@/components/RankTable';
 import ArchetypeList from '@/components/ArchetypeList';
 import SynkiTypes from '@/components/SynkiTypes';
 import BookmarkButton from '@/components/BookmarkButton';
+import AttributeDisplay from '@/components/AttributeDisplay';
+import ArchetypeDisplay from '@/components/ArchetypeDisplay';
+import ResourceDisplay from '@/components/ResourceDisplay';
+import GiftDisplay from '@/components/GiftDisplay';
+import TagDisplay from '@/components/TagDisplay';
 
 interface ContentProps {
   chapter: Chapter;
@@ -147,6 +152,16 @@ const Content: React.FC<ContentProps> = ({ chapter, bookType = 'combat' }) => {
         return <ArchetypeList key={index} items={item.items} title={item.title} />;
       case 'synkiTypes':
         return <SynkiTypes key={index} items={item.items} />;
+      case 'attributeDisplay':
+        return <AttributeDisplay key={index} attributes={item.items} title={item.title} />;
+      case 'archetypeDisplay':
+        return <ArchetypeDisplay key={index} archetypes={item.items} title={item.title} />;
+      case 'resourceDisplay':
+        return <ResourceDisplay key={index} resources={item.items} title={item.title} />;
+      case 'giftDisplay':
+        return <GiftDisplay key={index} gifts={item.items} title={item.title} />;
+      case 'tagDisplay':
+        return <TagDisplay key={index} tags={item.items} title={item.title} />;
       default:
         return <p key={index}>{JSON.stringify(item)}</p>;
     }
