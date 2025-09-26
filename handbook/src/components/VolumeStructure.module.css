@@ -4,18 +4,20 @@
   background: var(--color-background);
 }
 
-.sidebar {
-  width: 350px;
+.navigationPanel {
+  width: 320px;
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
-  padding: 24px;
+  padding: 16px;
   overflow-y: auto;
   position: fixed;
+  top: 0;
+  left: 0;
   height: 100vh;
   z-index: 10;
 }
 
-.sidebarTitle {
+.navigationTitle {
   font-size: 20px;
   font-weight: 700;
   color: var(--color-primary);
@@ -135,12 +137,67 @@
   transform: translateX(4px);
 }
 
+.sectionButton,
+.subsectionButton {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.sectionButton:hover,
+.subsectionButton:hover {
+  background: var(--color-border);
+  color: var(--color-primary-hover, var(--color-primary));
+}
+
+.sectionLink,
+.subsectionLink {
+  margin: 8px 0;
+  list-style: none;
+}
+
+.sectionsList,
+.subsectionsList {
+  padding-left: 20px;
+  margin: 16px 0;
+}
+
+.subsectionsContainer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.backButton {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 16px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.backButton:hover {
+  background: var(--color-border);
+  transform: translateY(-1px);
+}
+
 .content {
   flex: 1;
-  margin-left: 350px;
-  padding: 32px;
-  max-width: calc(100vw - 350px);
+  margin-left: 320px;
+  padding: 24px;
   overflow-x: hidden;
+  background: var(--color-background);
+  min-height: 100vh;
 }
 
 .contentSection {
@@ -201,7 +258,7 @@
 }
 
 /* Темная тема */
-[data-theme="dark"] .sidebar {
+[data-theme="dark"] .navigationPanel {
   background: var(--color-surface);
   border-color: var(--color-border);
 }
@@ -228,20 +285,39 @@
   background: var(--color-border);
 }
 
+[data-theme="dark"] .sectionButton,
+[data-theme="dark"] .subsectionButton {
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .sectionButton:hover,
+[data-theme="dark"] .subsectionButton:hover {
+  background: var(--color-border);
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .backButton {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .backButton:hover {
+  background: var(--color-border);
+}
+
 [data-theme="dark"] .contentHeader {
   border-color: var(--color-border);
 }
 
 /* Мобильная адаптация */
 @media (max-width: 1024px) {
-  .sidebar {
-    width: 300px;
+  .navigationPanel {
+    width: 280px;
   }
-  
+
   .content {
-    margin-left: 300px;
-    max-width: calc(100vw - 300px);
-    padding: 24px;
+    margin-left: 280px;
+    padding: 20px;
   }
 }
 
@@ -249,8 +325,8 @@
   .container {
     flex-direction: column;
   }
-  
-  .sidebar {
+
+  .navigationPanel {
     position: static;
     width: 100%;
     height: auto;
@@ -258,14 +334,13 @@
     border-right: none;
     border-bottom: 1px solid var(--color-border);
   }
-  
+
   .content {
     margin-left: 0;
-    max-width: 100%;
     padding: 20px;
   }
   
-  .sidebarTitle {
+  .navigationTitle {
     font-size: 18px;
     margin-bottom: 16px;
   }
@@ -335,5 +410,16 @@
   
   .paragraph {
     font-size: 13px;
+  }
+
+  .sectionButton,
+  .subsectionButton {
+    font-size: 13px;
+    padding: 2px 6px;
+  }
+
+  .backButton {
+    font-size: 12px;
+    padding: 6px 12px;
   }
 }
