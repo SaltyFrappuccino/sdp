@@ -5208,7 +5208,7 @@ router.post('/collections', async (req: Request, res: Response) => {
 router.post('/collections/purchase', async (req: Request, res: Response) => {
   try {
     const { character_id, collection_id, price } = req.body;
-    
+
     if (!character_id || !collection_id || !price) {
       return res.status(400).json({ error: 'Неверные параметры' });
     }
