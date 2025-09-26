@@ -5480,4 +5480,201 @@ router.post('/blockchain/transfer', async (req: Request, res: Response) => {
   }
 });
 
+// Токены блокчейна (по образцу биржи)
+router.get('/blockchain/tokens', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const tokens = await db.all('SELECT * FROM BlockchainTokens ORDER BY market_cap DESC');
+    res.json(tokens);
+  } catch (error) {
+    console.error('Failed to fetch tokens:', error);
+    res.status(500).json({ error: 'Не удалось загрузить токены' });
+  }
+});
+
+router.post('/blockchain/tokens', async (req: Request, res: Response) => {
+  const { name, symbol, description, initialPrice, totalSupply, circulatingSupply } = req.body;
+
+  if (!name || !symbol || !initialPrice || !totalSupply || !circulatingSupply) {
+    return res.status(400).json({ error: 'Неверные параметры' });
+  }
+
+  try {
+    const db = await initDB();
+    
+    // Проверяем, что символ уникален
+    const existingToken = await db.get('SELECT id FROM BlockchainTokens WHERE symbol = ?', [symbol]);
+    if (existingToken) {
+      return res.status(400).json({ error: 'Токен с таким символом уже существует' });
+    }
+
+    const result = await db.run(`
+      INSERT INTO BlockchainTokens 
+      (name, symbol, description, current_price, total_supply, circulating_supply, market_cap) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, name, symbol, description || '', initialPrice, totalSupply, circulatingSupply, initialPrice * circulatingSupply);
+
+    // Записываем начальную цену в историю
+    const preciseTimestamp = new Date().toISOString();
+    await db.run(
+      'INSERT INTO TokenPriceHistory (token_id, price, timestamp) VALUES (?, ?, ?)',
+      result.lastID,
+      initialPrice,
+      preciseTimestamp
+    );
+
+    res.json({ id: result.lastID, message: 'Токен создан успешно' });
+  } catch (error) {
+    console.error('Failed to create token:', error);
+    res.status(500).json({ error: 'Не удалось создать токен' });
+  }
+});
+
+router.get('/blockchain/tokens/:id/history', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { limit = 30 } = req.query;
+
+  try {
+    const db = await initDB();
+    const history = await db.all(`
+      SELECT * FROM TokenPriceHistory 
+      WHERE token_id = ? 
+      ORDER BY timestamp DESC 
+      LIMIT ?
+    `, [id, limit]);
+    
+    res.json(history);
+  } catch (error) {
+    console.error('Failed to fetch token history:', error);
+    res.status(500).json({ error: 'Не удалось загрузить историю токена' });
+  }
+});
+
+// Портфолио токенов
+router.get('/blockchain/portfolio/:character_id', async (req: Request, res: Response) => {
+  const { character_id } = req.params;
+
+  try {
+    const db = await initDB();
+    
+    // Получаем или создаем портфолио
+    let portfolio = await db.get('SELECT * FROM TokenPortfolios WHERE character_id = ?', [character_id]);
+    
+    if (!portfolio) {
+      const result = await db.run('INSERT INTO TokenPortfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, 0]);
+      portfolio = await db.get('SELECT * FROM TokenPortfolios WHERE id = ?', [result.lastID]);
+    }
+
+    // Получаем активы портфолио
+    const assets = await db.all(`
+      SELECT 
+        tpa.*,
+        bt.name as token_name,
+        bt.symbol as token_symbol,
+        bt.current_price,
+        (tpa.quantity * bt.current_price) as current_value,
+        ((bt.current_price - tpa.average_purchase_price) / tpa.average_purchase_price * 100) as profit_loss_percent
+      FROM TokenPortfolioAssets tpa
+      JOIN BlockchainTokens bt ON tpa.token_id = bt.id
+      WHERE tpa.portfolio_id = ?
+    `, [portfolio.id]);
+
+    res.json({
+      portfolio,
+      assets,
+      totalValue: assets.reduce((sum, asset) => sum + asset.current_value, 0) + portfolio.cash_balance
+    });
+  } catch (error) {
+    console.error('Failed to fetch portfolio:', error);
+    res.status(500).json({ error: 'Не удалось загрузить портфолио' });
+  }
+});
+
+// Торговля токенами
+router.post('/blockchain/trade', async (req: Request, res: Response) => {
+  const { character_id, token_id, action, quantity } = req.body; // action: 'buy' or 'sell'
+
+  if (!character_id || !token_id || !action || !quantity) {
+    return res.status(400).json({ error: 'Неверные параметры' });
+  }
+
+  const db = await initDB();
+  try {
+    await db.run('BEGIN TRANSACTION');
+
+    // Получаем данные о токене
+    const token = await db.get('SELECT * FROM BlockchainTokens WHERE id = ?', [token_id]);
+    if (!token) {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Токен не найден' });
+    }
+
+    // Получаем или создаем портфолио
+    let portfolio = await db.get('SELECT * FROM TokenPortfolios WHERE character_id = ?', [character_id]);
+    if (!portfolio) {
+      const result = await db.run('INSERT INTO TokenPortfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, 0]);
+      portfolio = await db.get('SELECT * FROM TokenPortfolios WHERE id = ?', [result.lastID]);
+    }
+
+    const totalCost = quantity * token.current_price;
+
+    if (action === 'buy') {
+      // Проверяем достаточность средств
+      if (portfolio.cash_balance < totalCost) {
+        await db.run('ROLLBACK');
+        return res.status(400).json({ error: 'Недостаточно средств' });
+      }
+
+      // Списываем деньги
+      await db.run('UPDATE TokenPortfolios SET cash_balance = cash_balance - ? WHERE id = ?', [totalCost, portfolio.id]);
+
+      // Добавляем или обновляем актив
+      const existingAsset = await db.get('SELECT * FROM TokenPortfolioAssets WHERE portfolio_id = ? AND token_id = ?', [portfolio.id, token_id]);
+      
+      if (existingAsset) {
+        const newQuantity = existingAsset.quantity + quantity;
+        const newAveragePrice = ((existingAsset.quantity * existingAsset.average_purchase_price) + totalCost) / newQuantity;
+        
+        await db.run(`
+          UPDATE TokenPortfolioAssets 
+          SET quantity = ?, average_purchase_price = ? 
+          WHERE portfolio_id = ? AND token_id = ?
+        `, [newQuantity, newAveragePrice, portfolio.id, token_id]);
+      } else {
+        await db.run(`
+          INSERT INTO TokenPortfolioAssets (portfolio_id, token_id, quantity, average_purchase_price)
+          VALUES (?, ?, ?, ?)
+        `, [portfolio.id, token_id, quantity, token.current_price]);
+      }
+
+    } else if (action === 'sell') {
+      // Проверяем наличие токенов
+      const existingAsset = await db.get('SELECT * FROM TokenPortfolioAssets WHERE portfolio_id = ? AND token_id = ?', [portfolio.id, token_id]);
+      
+      if (!existingAsset || existingAsset.quantity < quantity) {
+        await db.run('ROLLBACK');
+        return res.status(400).json({ error: 'Недостаточно токенов для продажи' });
+      }
+
+      // Зачисляем деньги
+      await db.run('UPDATE TokenPortfolios SET cash_balance = cash_balance + ? WHERE id = ?', [totalCost, portfolio.id]);
+
+      // Уменьшаем количество токенов
+      const newQuantity = existingAsset.quantity - quantity;
+      if (newQuantity === 0) {
+        await db.run('DELETE FROM TokenPortfolioAssets WHERE portfolio_id = ? AND token_id = ?', [portfolio.id, token_id]);
+      } else {
+        await db.run('UPDATE TokenPortfolioAssets SET quantity = ? WHERE portfolio_id = ? AND token_id = ?', [newQuantity, portfolio.id, token_id]);
+      }
+    }
+
+    await db.run('COMMIT');
+    res.json({ message: 'Торговая операция выполнена успешно' });
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Failed to execute trade:', error);
+    res.status(500).json({ error: 'Не удалось выполнить торговую операцию' });
+  }
+});
+
 export default router;

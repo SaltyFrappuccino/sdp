@@ -499,6 +499,57 @@ export async function initDB() {
       );
     `);
 
+    // Токены блокчейна (по образцу биржи)
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS BlockchainTokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        symbol TEXT UNIQUE NOT NULL,
+        description TEXT,
+        current_price REAL NOT NULL DEFAULT 1.0,
+        market_cap REAL DEFAULT 0,
+        volume INTEGER DEFAULT 0,
+        exchange TEXT DEFAULT 'BLOCKCHAIN',
+        base_trend REAL DEFAULT 0.0,
+        total_supply REAL NOT NULL DEFAULT 1000000,
+        circulating_supply REAL NOT NULL DEFAULT 1000000,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS TokenPriceHistory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token_id INTEGER NOT NULL,
+        price REAL NOT NULL,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY (token_id) REFERENCES BlockchainTokens(id) ON DELETE CASCADE
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS TokenPortfolios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        cash_balance REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS TokenPortfolioAssets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        portfolio_id INTEGER NOT NULL,
+        token_id INTEGER NOT NULL,
+        quantity REAL NOT NULL DEFAULT 0,
+        average_purchase_price REAL NOT NULL DEFAULT 0,
+        FOREIGN KEY (portfolio_id) REFERENCES TokenPortfolios(id) ON DELETE CASCADE,
+        FOREIGN KEY (token_id) REFERENCES BlockchainTokens(id) ON DELETE CASCADE
+      );
+    `);
+
     // Принудительная миграция для CasinoGames - добавляем новые типы игр
     try {
       await db.exec('PRAGMA foreign_keys=off;');
