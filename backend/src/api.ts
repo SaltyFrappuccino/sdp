@@ -5557,12 +5557,24 @@ router.get('/blockchain/portfolio/:character_id', async (req: Request, res: Resp
   try {
     const db = await initDB();
     
+    // Получаем валюту персонажа
+    const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+    
     // Получаем или создаем портфолио
     let portfolio = await db.get('SELECT * FROM TokenPortfolios WHERE character_id = ?', [character_id]);
     
     if (!portfolio) {
-      const result = await db.run('INSERT INTO TokenPortfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, 0]);
+      const result = await db.run('INSERT INTO TokenPortfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, character.currency || 0]);
       portfolio = await db.get('SELECT * FROM TokenPortfolios WHERE id = ?', [result.lastID]);
+    } else {
+      // Синхронизируем валюту с персонажем
+      if (portfolio.cash_balance !== character.currency) {
+        await db.run('UPDATE TokenPortfolios SET cash_balance = ? WHERE id = ?', [character.currency || 0, portfolio.id]);
+        portfolio.cash_balance = character.currency || 0;
+      }
     }
 
     // Получаем активы портфолио
@@ -5609,11 +5621,24 @@ router.post('/blockchain/trade', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Токен не найден' });
     }
 
+    // Получаем валюту персонажа
+    const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Персонаж не найден' });
+    }
+
     // Получаем или создаем портфолио
     let portfolio = await db.get('SELECT * FROM TokenPortfolios WHERE character_id = ?', [character_id]);
     if (!portfolio) {
-      const result = await db.run('INSERT INTO TokenPortfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, 0]);
+      const result = await db.run('INSERT INTO TokenPortfolios (character_id, cash_balance) VALUES (?, ?)', [character_id, character.currency || 0]);
       portfolio = await db.get('SELECT * FROM TokenPortfolios WHERE id = ?', [result.lastID]);
+    } else {
+      // Синхронизируем валюту с персонажем
+      if (portfolio.cash_balance !== character.currency) {
+        await db.run('UPDATE TokenPortfolios SET cash_balance = ? WHERE id = ?', [character.currency || 0, portfolio.id]);
+        portfolio.cash_balance = character.currency || 0;
+      }
     }
 
     const totalCost = quantity * token.current_price;
@@ -5627,6 +5652,7 @@ router.post('/blockchain/trade', async (req: Request, res: Response) => {
 
       // Списываем деньги
       await db.run('UPDATE TokenPortfolios SET cash_balance = cash_balance - ? WHERE id = ?', [totalCost, portfolio.id]);
+      await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [totalCost, character_id]);
 
       // Добавляем или обновляем актив
       const existingAsset = await db.get('SELECT * FROM TokenPortfolioAssets WHERE portfolio_id = ? AND token_id = ?', [portfolio.id, token_id]);
@@ -5658,6 +5684,7 @@ router.post('/blockchain/trade', async (req: Request, res: Response) => {
 
       // Зачисляем деньги
       await db.run('UPDATE TokenPortfolios SET cash_balance = cash_balance + ? WHERE id = ?', [totalCost, portfolio.id]);
+      await db.run('UPDATE Characters SET currency = currency + ? WHERE id = ?', [totalCost, character_id]);
 
       // Уменьшаем количество токенов
       const newQuantity = existingAsset.quantity - quantity;
@@ -5674,6 +5701,65 @@ router.post('/blockchain/trade', async (req: Request, res: Response) => {
     await db.run('ROLLBACK');
     console.error('Failed to execute trade:', error);
     res.status(500).json({ error: 'Не удалось выполнить торговую операцию' });
+  }
+});
+
+// Таблица лидеров блокчейна
+router.get('/blockchain/leaderboard', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    
+    const leaderboardData = await db.all(`
+      SELECT 
+        c.id,
+        c.character_name,
+        c.currency,
+        COALESCE(tp.cash_balance, 0) as portfolio_cash,
+        COALESCE(
+          (
+            SELECT JSON_GROUP_ARRAY(
+              JSON_OBJECT(
+                'token_name', bt.name,
+                'token_symbol', bt.symbol,
+                'quantity', tpa.quantity,
+                'current_price', bt.current_price,
+                'current_value', tpa.quantity * bt.current_price
+              )
+            )
+            FROM TokenPortfolioAssets tpa_inner
+            JOIN BlockchainTokens bt ON tpa_inner.token_id = bt.id
+            WHERE tpa_inner.portfolio_id = tp.id
+          ), 
+          '[]'
+        ) as assets,
+        (
+          COALESCE(tp.cash_balance, 0) + 
+          COALESCE(
+            (
+              SELECT SUM(tpa_inner.quantity * bt_inner.current_price)
+              FROM TokenPortfolioAssets tpa_inner
+              JOIN BlockchainTokens bt_inner ON tpa_inner.token_id = bt_inner.id
+              WHERE tpa_inner.portfolio_id = tp.id
+            ), 0
+          )
+        ) as total_value
+      FROM Characters c
+      LEFT JOIN TokenPortfolios tp ON c.id = tp.character_id
+      WHERE c.status = 'Принято'
+      GROUP BY c.id, c.character_name, c.currency, tp.cash_balance
+      ORDER BY total_value DESC
+      LIMIT 20
+    `);
+
+    const leaderboard = leaderboardData.map(entry => ({
+      ...entry,
+      assets: entry.assets ? JSON.parse(entry.assets) : []
+    }));
+
+    res.json(leaderboard);
+  } catch (error) {
+    console.error('Failed to fetch blockchain leaderboard:', error);
+    res.status(500).json({ error: 'Не удалось загрузить таблицу лидеров' });
   }
 });
 
