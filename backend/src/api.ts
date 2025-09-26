@@ -5332,14 +5332,14 @@ router.post('/purchases/items', async (req: Request, res: Response) => {
 
 // POST /api/purchases/buy - Купить предмет
 router.post('/purchases/buy', async (req: Request, res: Response) => {
-  try {
-    const { character_id, item_id } = req.body;
-    
-    if (!character_id || !item_id) {
-      return res.status(400).json({ error: 'Неверные параметры' });
-    }
+  const { character_id, item_id } = req.body;
 
-    const db = await initDB();
+  if (!character_id || !item_id) {
+    return res.status(400).json({ error: 'Неверные параметры' });
+  }
+
+  const db = await initDB();
+  try {
     await db.run('BEGIN TRANSACTION');
 
     // Получаем информацию о предмете
