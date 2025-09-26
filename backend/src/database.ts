@@ -388,6 +388,117 @@ export async function initDB() {
       );
     `);
 
+    // Система кастомных фракций
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS CustomFactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        leader_character_id INTEGER,
+        hierarchy TEXT DEFAULT '{}',
+        rules TEXT DEFAULT '{}',
+        color TEXT DEFAULT '#0077FF',
+        icon_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (leader_character_id) REFERENCES Characters(id) ON DELETE SET NULL
+      );
+    `);
+
+    // Система коллекций
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS Collections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        category TEXT NOT NULL,
+        rarity TEXT DEFAULT 'common' CHECK (rarity IN ('common', 'uncommon', 'rare', 'epic', 'legendary')),
+        image_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS CharacterCollections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        collection_id INTEGER NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        obtained_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        obtained_method TEXT DEFAULT 'purchase',
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY (collection_id) REFERENCES Collections(id) ON DELETE CASCADE,
+        UNIQUE(character_id, collection_id)
+      );
+    `);
+
+    // Система покупок (недвижимость, машины и т.д.)
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS PurchaseCategories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        icon_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS PurchaseItems (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        price REAL NOT NULL,
+        rarity TEXT DEFAULT 'common' CHECK (rarity IN ('common', 'uncommon', 'rare', 'epic', 'legendary')),
+        image_url TEXT,
+        properties TEXT DEFAULT '{}',
+        is_available BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (category_id) REFERENCES PurchaseCategories(id) ON DELETE CASCADE
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS CharacterPurchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        purchase_price REAL NOT NULL,
+        purchased_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY (item_id) REFERENCES PurchaseItems(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Блокчейн система (на основе биржи)
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS BlockchainTransactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_hash TEXT NOT NULL UNIQUE,
+        from_character_id INTEGER,
+        to_character_id INTEGER,
+        amount REAL NOT NULL,
+        transaction_type TEXT NOT NULL CHECK (transaction_type IN ('transfer', 'purchase', 'reward', 'collection')),
+        description TEXT,
+        block_number INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (from_character_id) REFERENCES Characters(id) ON DELETE SET NULL,
+        FOREIGN KEY (to_character_id) REFERENCES Characters(id) ON DELETE SET NULL
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS BlockchainBlocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        block_number INTEGER NOT NULL UNIQUE,
+        previous_hash TEXT,
+        block_hash TEXT NOT NULL UNIQUE,
+        transactions_count INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Принудительная миграция для CasinoGames - добавляем новые типы игр
     try {
       await db.exec('PRAGMA foreign_keys=off;');

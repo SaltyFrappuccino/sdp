@@ -322,6 +322,31 @@ router.get('/characters', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось получить персонажей', details: errorMessage });
   }
 });
+
+// GET /api/characters/factions - Получить список всех фракций для создания персонажа
+router.get('/characters/factions', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    
+    // Получаем стандартные фракции
+    const standardFactions = [
+      { name: 'Порядок', description: 'Законники, бюрократы, следователи' },
+      { name: 'Чёрная Лилия', description: 'Мафия, преступники, убийцы' },
+      { name: 'Отражённый Свет Солнца', description: 'Религиозная фракция, бизнес-сеть' },
+      { name: 'Независимый', description: 'Не принадлежит ни к одной фракции' }
+    ];
+    
+    // Получаем кастомные фракции
+    const customFactions = await db.all('SELECT name, description FROM CustomFactions ORDER BY name');
+    
+    const allFactions = [...standardFactions, ...customFactions];
+    res.json(allFactions);
+  } catch (error) {
+    console.error('Failed to fetch factions for character creation:', error);
+    res.status(500).json({ error: 'Не удалось загрузить фракции' });
+  }
+});
+
 router.get('/characters/by-vk/:vk_id', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
@@ -5039,5 +5064,420 @@ async function finishHand(db: any, hand_id: number) {
     await db.run('UPDATE PokerPlayers SET chips = chips + ? WHERE id = ?', [winner.pot, winner.id]);
   }
 }
+
+// ===============================
+// CUSTOM FACTIONS API ENDPOINTS
+// ===============================
+
+// GET /api/factions - Получить все фракции
+router.get('/factions', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const factions = await db.all(`
+      SELECT cf.*, c.character_name as leader_name 
+      FROM CustomFactions cf 
+      LEFT JOIN Characters c ON cf.leader_character_id = c.id 
+      ORDER BY cf.created_at DESC
+    `);
+    res.json(factions);
+  } catch (error) {
+    console.error('Failed to fetch factions:', error);
+    res.status(500).json({ error: 'Не удалось загрузить фракции' });
+  }
+});
+
+// POST /api/factions - Создать новую фракцию
+router.post('/factions', async (req: Request, res: Response) => {
+  try {
+    const { name, description, leader_character_id, hierarchy, rules, color, icon_url } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Название фракции обязательно' });
+    }
+
+    const db = await initDB();
+    const result = await db.run(`
+      INSERT INTO CustomFactions (name, description, leader_character_id, hierarchy, rules, color, icon_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [name, description, leader_character_id, JSON.stringify(hierarchy || {}), JSON.stringify(rules || {}), color, icon_url]);
+
+    res.json({ id: result.lastID, message: 'Фракция создана успешно' });
+  } catch (error) {
+    console.error('Failed to create faction:', error);
+    res.status(500).json({ error: 'Не удалось создать фракцию' });
+  }
+});
+
+// PUT /api/factions/:id - Обновить фракцию
+router.put('/factions/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, description, leader_character_id, hierarchy, rules, color, icon_url } = req.body;
+    
+    const db = await initDB();
+    await db.run(`
+      UPDATE CustomFactions 
+      SET name = ?, description = ?, leader_character_id = ?, hierarchy = ?, rules = ?, color = ?, icon_url = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [name, description, leader_character_id, JSON.stringify(hierarchy || {}), JSON.stringify(rules || {}), color, icon_url, id]);
+
+    res.json({ message: 'Фракция обновлена успешно' });
+  } catch (error) {
+    console.error('Failed to update faction:', error);
+    res.status(500).json({ error: 'Не удалось обновить фракцию' });
+  }
+});
+
+// DELETE /api/factions/:id - Удалить фракцию
+router.delete('/factions/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const db = await initDB();
+    
+    // Обновляем персонажей, которые были в этой фракции
+    await db.run('UPDATE Characters SET faction = "Независимый" WHERE faction = (SELECT name FROM CustomFactions WHERE id = ?)', [id]);
+    
+    await db.run('DELETE FROM CustomFactions WHERE id = ?', [id]);
+    res.json({ message: 'Фракция удалена успешно' });
+  } catch (error) {
+    console.error('Failed to delete faction:', error);
+    res.status(500).json({ error: 'Не удалось удалить фракцию' });
+  }
+});
+
+// ===============================
+// COLLECTIONS API ENDPOINTS
+// ===============================
+
+// GET /api/collections - Получить все коллекции
+router.get('/collections', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const collections = await db.all('SELECT * FROM Collections ORDER BY created_at DESC');
+    res.json(collections);
+  } catch (error) {
+    console.error('Failed to fetch collections:', error);
+    res.status(500).json({ error: 'Не удалось загрузить коллекции' });
+  }
+});
+
+// GET /api/collections/character/:character_id - Получить коллекции персонажа
+router.get('/collections/character/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const collections = await db.all(`
+      SELECT c.*, cc.quantity, cc.obtained_at, cc.obtained_method
+      FROM Collections c
+      JOIN CharacterCollections cc ON c.id = cc.collection_id
+      WHERE cc.character_id = ?
+      ORDER BY cc.obtained_at DESC
+    `, [character_id]);
+    
+    res.json(collections);
+  } catch (error) {
+    console.error('Failed to fetch character collections:', error);
+    res.status(500).json({ error: 'Не удалось загрузить коллекции персонажа' });
+  }
+});
+
+// POST /api/collections - Создать новую коллекцию
+router.post('/collections', async (req: Request, res: Response) => {
+  try {
+    const { name, description, category, rarity, image_url } = req.body;
+    
+    if (!name || !category) {
+      return res.status(400).json({ error: 'Название и категория обязательны' });
+    }
+
+    const db = await initDB();
+    const result = await db.run(`
+      INSERT INTO Collections (name, description, category, rarity, image_url)
+      VALUES (?, ?, ?, ?, ?)
+    `, [name, description, category, rarity, image_url]);
+
+    res.json({ id: result.lastID, message: 'Коллекция создана успешно' });
+  } catch (error) {
+    console.error('Failed to create collection:', error);
+    res.status(500).json({ error: 'Не удалось создать коллекцию' });
+  }
+});
+
+// POST /api/collections/purchase - Купить коллекцию
+router.post('/collections/purchase', async (req: Request, res: Response) => {
+  try {
+    const { character_id, collection_id, price } = req.body;
+    
+    if (!character_id || !collection_id || !price) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const db = await initDB();
+    await db.run('BEGIN TRANSACTION');
+
+    // Проверяем баланс персонажа
+    const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+    if (!character || character.currency < price) {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Списываем деньги
+    await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [price, character_id]);
+
+    // Добавляем коллекцию персонажу
+    await db.run(`
+      INSERT OR REPLACE INTO CharacterCollections (character_id, collection_id, quantity, obtained_method)
+      VALUES (?, ?, COALESCE((SELECT quantity FROM CharacterCollections WHERE character_id = ? AND collection_id = ?), 0) + 1, 'purchase')
+    `, [character_id, collection_id, character_id, collection_id]);
+
+    await db.run('COMMIT');
+    res.json({ message: 'Коллекция приобретена успешно' });
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Failed to purchase collection:', error);
+    res.status(500).json({ error: 'Не удалось приобрести коллекцию' });
+  }
+});
+
+// ===============================
+// PURCHASE SYSTEM API ENDPOINTS
+// ===============================
+
+// GET /api/purchases/categories - Получить категории покупок
+router.get('/purchases/categories', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const categories = await db.all('SELECT * FROM PurchaseCategories ORDER BY name');
+    res.json(categories);
+  } catch (error) {
+    console.error('Failed to fetch purchase categories:', error);
+    res.status(500).json({ error: 'Не удалось загрузить категории' });
+  }
+});
+
+// GET /api/purchases/items - Получить предметы для покупки
+router.get('/purchases/items', async (req: Request, res: Response) => {
+  try {
+    const { category_id } = req.query;
+    const db = await initDB();
+    
+    let query = `
+      SELECT pi.*, pc.name as category_name 
+      FROM PurchaseItems pi 
+      JOIN PurchaseCategories pc ON pi.category_id = pc.id 
+      WHERE pi.is_available = 1
+    `;
+    let params: any[] = [];
+    
+    if (category_id) {
+      query += ' AND pi.category_id = ?';
+      params.push(category_id);
+    }
+    
+    query += ' ORDER BY pi.price ASC';
+    
+    const items = await db.all(query, params);
+    res.json(items);
+  } catch (error) {
+    console.error('Failed to fetch purchase items:', error);
+    res.status(500).json({ error: 'Не удалось загрузить предметы' });
+  }
+});
+
+// POST /api/purchases/categories - Создать категорию покупок
+router.post('/purchases/categories', async (req: Request, res: Response) => {
+  try {
+    const { name, description, icon_url } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Название категории обязательно' });
+    }
+
+    const db = await initDB();
+    const result = await db.run(`
+      INSERT INTO PurchaseCategories (name, description, icon_url)
+      VALUES (?, ?, ?)
+    `, [name, description, icon_url]);
+
+    res.json({ id: result.lastID, message: 'Категория создана успешно' });
+  } catch (error) {
+    console.error('Failed to create purchase category:', error);
+    res.status(500).json({ error: 'Не удалось создать категорию' });
+  }
+});
+
+// POST /api/purchases/items - Создать предмет для покупки
+router.post('/purchases/items', async (req: Request, res: Response) => {
+  try {
+    const { category_id, name, description, price, rarity, image_url, properties } = req.body;
+    
+    if (!category_id || !name || !price) {
+      return res.status(400).json({ error: 'Категория, название и цена обязательны' });
+    }
+
+    const db = await initDB();
+    const result = await db.run(`
+      INSERT INTO PurchaseItems (category_id, name, description, price, rarity, image_url, properties)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [category_id, name, description, price, rarity, image_url, JSON.stringify(properties || {})]);
+
+    res.json({ id: result.lastID, message: 'Предмет создан успешно' });
+  } catch (error) {
+    console.error('Failed to create purchase item:', error);
+    res.status(500).json({ error: 'Не удалось создать предмет' });
+  }
+});
+
+// POST /api/purchases/buy - Купить предмет
+router.post('/purchases/buy', async (req: Request, res: Response) => {
+  try {
+    const { character_id, item_id } = req.body;
+    
+    if (!character_id || !item_id) {
+      return res.status(400).json({ error: 'Неверные параметры' });
+    }
+
+    const db = await initDB();
+    await db.run('BEGIN TRANSACTION');
+
+    // Получаем информацию о предмете
+    const item = await db.get('SELECT * FROM PurchaseItems WHERE id = ? AND is_available = 1', [item_id]);
+    if (!item) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Предмет не найден или недоступен' });
+    }
+
+    // Проверяем баланс персонажа
+    const character = await db.get('SELECT currency FROM Characters WHERE id = ?', [character_id]);
+    if (!character || character.currency < item.price) {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Недостаточно средств' });
+    }
+
+    // Списываем деньги
+    await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [item.price, character_id]);
+
+    // Записываем покупку
+    await db.run(`
+      INSERT INTO CharacterPurchases (character_id, item_id, purchase_price)
+      VALUES (?, ?, ?)
+    `, [character_id, item_id, item.price]);
+
+    await db.run('COMMIT');
+    res.json({ message: 'Предмет приобретен успешно', item });
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Failed to purchase item:', error);
+    res.status(500).json({ error: 'Не удалось приобрести предмет' });
+  }
+});
+
+// GET /api/purchases/character/:character_id - Получить покупки персонажа
+router.get('/purchases/character/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const purchases = await db.all(`
+      SELECT cp.*, pi.name, pi.description, pi.image_url, pi.properties, pc.name as category_name
+      FROM CharacterPurchases cp
+      JOIN PurchaseItems pi ON cp.item_id = pi.id
+      JOIN PurchaseCategories pc ON pi.category_id = pc.id
+      WHERE cp.character_id = ?
+      ORDER BY cp.purchased_at DESC
+    `, [character_id]);
+    
+    res.json(purchases);
+  } catch (error) {
+    console.error('Failed to fetch character purchases:', error);
+    res.status(500).json({ error: 'Не удалось загрузить покупки персонажа' });
+  }
+});
+
+// ===============================
+// BLOCKCHAIN API ENDPOINTS
+// ===============================
+
+// GET /api/blockchain/transactions - Получить транзакции блокчейна
+router.get('/blockchain/transactions', async (req: Request, res: Response) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+    const db = await initDB();
+    
+    const transactions = await db.all(`
+      SELECT bt.*, 
+             c1.character_name as from_character_name,
+             c2.character_name as to_character_name
+      FROM BlockchainTransactions bt
+      LEFT JOIN Characters c1 ON bt.from_character_id = c1.id
+      LEFT JOIN Characters c2 ON bt.to_character_id = c2.id
+      ORDER BY bt.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+    
+    res.json(transactions);
+  } catch (error) {
+    console.error('Failed to fetch blockchain transactions:', error);
+    res.status(500).json({ error: 'Не удалось загрузить транзакции' });
+  }
+});
+
+// POST /api/blockchain/transfer - Перевести средства между персонажами
+router.post('/blockchain/transfer', async (req: Request, res: Response) => {
+  try {
+    const { from_character_id, to_character_id, amount, description } = req.body;
+    
+    if (!from_character_id || !to_character_id || !amount || amount <= 0) {
+      return res.status(400).json({ error: 'Неверные параметры перевода' });
+    }
+
+    if (from_character_id === to_character_id) {
+      return res.status(400).json({ error: 'Нельзя переводить самому себе' });
+    }
+
+    const db = await initDB();
+    await db.run('BEGIN TRANSACTION');
+
+    // Проверяем баланс отправителя
+    const fromCharacter = await db.get('SELECT currency FROM Characters WHERE id = ?', [from_character_id]);
+    if (!fromCharacter || fromCharacter.currency < amount) {
+      await db.run('ROLLBACK');
+      return res.status(400).json({ error: 'Недостаточно средств для перевода' });
+    }
+
+    // Проверяем существование получателя
+    const toCharacter = await db.get('SELECT id FROM Characters WHERE id = ?', [to_character_id]);
+    if (!toCharacter) {
+      await db.run('ROLLBACK');
+      return res.status(404).json({ error: 'Получатель не найден' });
+    }
+
+    // Выполняем перевод
+    await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [amount, from_character_id]);
+    await db.run('UPDATE Characters SET currency = currency + ? WHERE id = ?', [amount, to_character_id]);
+
+    // Создаем транзакцию в блокчейне
+    const transactionHash = `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const blockNumber = await db.get('SELECT COALESCE(MAX(block_number), 0) + 1 as next_block FROM BlockchainBlocks');
+    
+    await db.run(`
+      INSERT INTO BlockchainTransactions (transaction_hash, from_character_id, to_character_id, amount, transaction_type, description, block_number)
+      VALUES (?, ?, ?, ?, 'transfer', ?, ?)
+    `, [transactionHash, from_character_id, to_character_id, amount, description, blockNumber.next_block]);
+
+    await db.run('COMMIT');
+    res.json({ 
+      message: 'Перевод выполнен успешно', 
+      transaction_hash: transactionHash,
+      amount 
+    });
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Failed to transfer funds:', error);
+    res.status(500).json({ error: 'Не удалось выполнить перевод' });
+  }
+});
 
 export default router;
