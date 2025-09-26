@@ -5206,14 +5206,14 @@ router.post('/collections', async (req: Request, res: Response) => {
 
 // POST /api/collections/purchase - Купить коллекцию
 router.post('/collections/purchase', async (req: Request, res: Response) => {
+  const { character_id, collection_id, price } = req.body;
+
+  if (!character_id || !collection_id || !price) {
+    return res.status(400).json({ error: 'Неверные параметры' });
+  }
+
+  const db = await initDB();
   try {
-    const { character_id, collection_id, price } = req.body;
-
-    if (!character_id || !collection_id || !price) {
-      return res.status(400).json({ error: 'Неверные параметры' });
-    }
-
-    const db = await initDB();
     await db.run('BEGIN TRANSACTION');
 
     // Проверяем баланс персонажа
@@ -5426,18 +5426,18 @@ router.get('/blockchain/transactions', async (req: Request, res: Response) => {
 
 // POST /api/blockchain/transfer - Перевести средства между персонажами
 router.post('/blockchain/transfer', async (req: Request, res: Response) => {
+  const { from_character_id, to_character_id, amount, description } = req.body;
+
+  if (!from_character_id || !to_character_id || !amount || amount <= 0) {
+    return res.status(400).json({ error: 'Неверные параметры перевода' });
+  }
+
+  if (from_character_id === to_character_id) {
+    return res.status(400).json({ error: 'Нельзя переводить самому себе' });
+  }
+
+  const db = await initDB();
   try {
-    const { from_character_id, to_character_id, amount, description } = req.body;
-    
-    if (!from_character_id || !to_character_id || !amount || amount <= 0) {
-      return res.status(400).json({ error: 'Неверные параметры перевода' });
-    }
-
-    if (from_character_id === to_character_id) {
-      return res.status(400).json({ error: 'Нельзя переводить самому себе' });
-    }
-
-    const db = await initDB();
     await db.run('BEGIN TRANSACTION');
 
     // Проверяем баланс отправителя
