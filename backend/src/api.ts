@@ -5704,6 +5704,121 @@ router.post('/blockchain/trade', async (req: Request, res: Response) => {
   }
 });
 
+// Создание базовых токенов при инициализации
+router.post('/blockchain/init-tokens', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    
+    // Проверяем, есть ли уже токены
+    const existingTokens = await db.get('SELECT COUNT(*) as count FROM BlockchainTokens');
+    if (existingTokens.count > 0) {
+      return res.json({ message: 'Токены уже инициализированы' });
+    }
+
+    // Создаем только прикольные токены
+    const tokens = [
+      {
+        name: 'Фусигурович',
+        symbol: 'FUSIGUROVICH',
+        description: 'Децентрализованный токен для анонимных транзакций',
+        current_price: 420.0,
+        total_supply: 21000000,
+        circulating_supply: 19000000,
+        base_trend: 0.08
+      },
+      {
+        name: 'Гоголь',
+        symbol: 'GOGOL',
+        description: 'Токен для цифрового искусства и NFT',
+        current_price: 69.0,
+        total_supply: 100000000,
+        circulating_supply: 85000000,
+        base_trend: 0.12
+      },
+      {
+        name: 'ZOV',
+        symbol: 'ZOV',
+        description: 'Экспериментальный токен с нестабильной экономикой',
+        current_price: 1337.0,
+        total_supply: 1000000,
+        circulating_supply: 750000,
+        base_trend: -0.05
+      },
+      {
+        name: 'Аутизма',
+        symbol: 'AUTISM',
+        description: 'Мем-токен с высокой волатильностью',
+        current_price: 0.0001,
+        total_supply: 10000000000000,
+        circulating_supply: 8000000000000,
+        base_trend: 0.25
+      },
+      {
+        name: 'Казахстан',
+        symbol: 'KZ',
+        description: 'Региональный токен для торговли в Центральной Азии',
+        current_price: 0.001,
+        total_supply: 1000000000000,
+        circulating_supply: 500000000000,
+        base_trend: 0.02
+      },
+      {
+        name: 'Fuck Cats',
+        symbol: 'FUCKCATS',
+        description: 'Токен против кошек и за собак',
+        current_price: 0.5,
+        total_supply: 1000000000,
+        circulating_supply: 600000000,
+        base_trend: 0.15
+      },
+      {
+        name: 'I Love Dogs',
+        symbol: 'ILOVEDOGS',
+        description: 'Токен для любителей собак',
+        current_price: 1.0,
+        total_supply: 500000000,
+        circulating_supply: 300000000,
+        base_trend: 0.2
+      },
+      {
+        name: 'Рандом',
+        symbol: 'RANDOM',
+        description: 'Полностью случайный токен с непредсказуемым поведением',
+        current_price: 0.000001,
+        total_supply: 1000000000000000,
+        circulating_supply: 500000000000000,
+        base_trend: 0.0
+      }
+    ];
+
+    // Вставляем токены в базу данных
+    for (const token of tokens) {
+      await db.run(`
+        INSERT INTO BlockchainTokens (
+          name, symbol, description, current_price, total_supply, 
+          circulating_supply, base_trend, market_cap, volume, exchange
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        token.name,
+        token.symbol,
+        token.description,
+        token.current_price,
+        token.total_supply,
+        token.circulating_supply,
+        token.base_trend,
+        token.current_price * token.circulating_supply,
+        0,
+        'BLOCKCHAIN'
+      ]);
+    }
+
+    res.json({ message: 'Токены успешно инициализированы', count: tokens.length });
+  } catch (error) {
+    console.error('Failed to initialize tokens:', error);
+    res.status(500).json({ error: 'Не удалось инициализировать токены' });
+  }
+});
+
 // Таблица лидеров блокчейна
 router.get('/blockchain/leaderboard', async (req: Request, res: Response) => {
   try {
