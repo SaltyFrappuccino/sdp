@@ -6,8 +6,8 @@ interface Archetype {
   description: string;
   icon: string;
   role: string;
-  tactics: string[];
-  examples: string[];
+  tactics?: string[];
+  examples?: string[];
 }
 
 interface ArchetypeDisplayProps {
@@ -16,6 +16,10 @@ interface ArchetypeDisplayProps {
 }
 
 const ArchetypeDisplay: React.FC<ArchetypeDisplayProps> = ({ archetypes, title }) => {
+  if (!archetypes || !Array.isArray(archetypes)) {
+    return <div className={styles.container}>Нет данных об архетипах</div>;
+  }
+
   return (
     <div className={styles.container}>
       {title && <h3 className={styles.title}>{title}</h3>}
@@ -34,23 +38,27 @@ const ArchetypeDisplay: React.FC<ArchetypeDisplayProps> = ({ archetypes, title }
               {archetype.description}
             </div>
             
-            <div className={styles.tactics}>
-              <h4 className={styles.tacticsTitle}>Тактика:</h4>
-              <ul className={styles.tacticsList}>
-                {archetype.tactics.map((tactic, i) => (
-                  <li key={i} className={styles.tacticItem}>{tactic}</li>
-                ))}
-              </ul>
-            </div>
+            {archetype.tactics && archetype.tactics.length > 0 && (
+              <div className={styles.tactics}>
+                <h4 className={styles.tacticsTitle}>Тактика:</h4>
+                <ul className={styles.tacticsList}>
+                  {archetype.tactics.map((tactic, i) => (
+                    <li key={i} className={styles.tacticItem}>{tactic}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             
-            <div className={styles.examples}>
-              <h4 className={styles.examplesTitle}>Примеры:</h4>
-              <ul className={styles.examplesList}>
-                {archetype.examples.map((example, i) => (
-                  <li key={i} className={styles.exampleItem}>{example}</li>
-                ))}
-              </ul>
-            </div>
+            {archetype.examples && archetype.examples.length > 0 && (
+              <div className={styles.examples}>
+                <h4 className={styles.examplesTitle}>Примеры:</h4>
+                <ul className={styles.examplesList}>
+                  {archetype.examples.map((example, i) => (
+                    <li key={i} className={styles.exampleItem}>{example}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         ))}
       </div>

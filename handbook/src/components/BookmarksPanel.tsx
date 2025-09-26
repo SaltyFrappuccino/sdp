@@ -1,71 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import styles from './BookmarksPanel.module.css';
-
-interface Bookmark {
-  id: string;
-  bookType: 'lore' | 'character' | 'combat';
-  chapterId: string;
-  headingId?: string;
-  title: string;
-  timestamp: number;
-}
+import { useBookmarks, type Bookmark } from '../hooks/useBookmarks';
 
 interface BookmarksPanelProps {
   isVisible: boolean;
   onClose: () => void;
-  onBookmarkClick: (bookType: 'lore' | 'character' | 'combat', chapterId: string, headingId?: string) => void;
+  onBookmarkClick: (section: string) => void;
 }
 
-const bookNames = {
-  lore: 'Лор и Мир',
-  character: 'Основы Персонажа',
-  combat: 'Боевая Система'
-};
+const BookmarksPanel: React.FC<BookmarksPanelProps> = ({ 
+  isVisible, 
+  onClose, 
+  onBookmarkClick 
+}) => {
+  const { bookmarks, removeBookmark, clearAllBookmarks } = useBookmarks();
 
-const BookmarksPanel: React.FC<BookmarksPanelProps> = ({ isVisible, onClose, onBookmarkClick }) => {
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-
-  useEffect(() => {
-    if (isVisible) {
-      loadBookmarks();
-    }
-  }, [isVisible]);
-
-  const loadBookmarks = () => {
-    const stored = localStorage.getItem('handbook-bookmarks');
-    const bookmarks = stored ? JSON.parse(stored) : [];
-    setBookmarks(bookmarks.sort((a: Bookmark, b: Bookmark) => b.timestamp - a.timestamp));
+  const handleBookmarkClick = (bookmark: Bookmark) => {
+    onBookmarkClick(bookmark.section);
+    onClose();
   };
 
-  const removeBookmark = (bookmarkId: string) => {
-    const updatedBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
-    setBookmarks(updatedBookmarks);
-    localStorage.setItem('handbook-bookmarks', JSON.stringify(updatedBookmarks));
-  };
-
-  const clearAllBookmarks = () => {
-    if (window.confirm('Удалить все закладки?')) {
-      setBookmarks([]);
-      localStorage.removeItem('handbook-bookmarks');
-    }
-  };
-
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    
-    if (diff < 60000) return 'только что';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} мин назад`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} ч назад`;
-    if (diff < 604800000) return `${Math.floor(diff / 86400000)} дн назад`;
-    
-    return date.toLocaleDateString('ru-RU', { 
-      day: 'numeric', 
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const handleRemoveBookmark = (e: React.MouseEvent, bookmarkId: string) => {
+    e.stopPropagation();
+    removeBookmark(bookmarkId);
   };
 
   if (!isVisible) return null;
@@ -74,30 +31,24 @@ const BookmarksPanel: React.FC<BookmarksPanelProps> = ({ isVisible, onClose, onB
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2 className={styles.title}>
-            <span className={styles.icon}>🔖</span>
-            Закладки
-          </h2>
-          <button className={styles.closeButton} onClick={onClose} aria-label="Закрыть">
+          <h3 className={styles.title}>Закладки</h3>
+          <button className={styles.closeButton} onClick={onClose}>
             ✕
           </button>
         </div>
-
+        
         <div className={styles.content}>
           {bookmarks.length === 0 ? (
-            <div className={styles.empty}>
-              <div className={styles.emptyIcon}>📌</div>
-              <p>Пока нет закладок</p>
-              <small>Добавляйте закладки к важным разделам, нажимая на кнопку закладки</small>
+            <div className={styles.emptyState}>
+              <p>У вас пока нет закладок</p>
+              <p className={styles.hint}>Нажмите на ⭐ рядом с заголовком, чтобы добавить закладку</p>
             </div>
           ) : (
             <>
               <div className={styles.actions}>
-                <span className={styles.count}>{bookmarks.length} закладок</span>
                 <button 
                   className={styles.clearButton}
                   onClick={clearAllBookmarks}
-                  title="Удалить все закладки"
                 >
                   Очистить все
                 </button>
@@ -105,32 +56,20 @@ const BookmarksPanel: React.FC<BookmarksPanelProps> = ({ isVisible, onClose, onB
               
               <div className={styles.bookmarksList}>
                 {bookmarks.map((bookmark) => (
-                  <div key={bookmark.id} className={styles.bookmarkItem}>
-                    <div 
-                      className={styles.bookmarkContent}
-                      onClick={() => {
-                        onBookmarkClick(bookmark.bookType, bookmark.chapterId, bookmark.headingId);
-                        onClose();
-                      }}
-                    >
-                      <div className={styles.bookmarkHeader}>
-                        <span className={styles.bookName}>
-                          {bookNames[bookmark.bookType]}
-                        </span>
-                        <span className={styles.timestamp}>
-                          {formatDate(bookmark.timestamp)}
-                        </span>
-                      </div>
-                      <div className={styles.bookmarkTitle}>
-                        {bookmark.title}
-                      </div>
+                  <div 
+                    key={bookmark.id}
+                    className={styles.bookmarkItem}
+                    onClick={() => handleBookmarkClick(bookmark)}
+                  >
+                    <div className={styles.bookmarkContent}>
+                      <div className={styles.bookmarkTitle}>{bookmark.title}</div>
+                      <div className={styles.bookmarkSection}>{bookmark.section}</div>
                     </div>
-                    <button
+                    <button 
                       className={styles.removeButton}
-                      onClick={() => removeBookmark(bookmark.id)}
-                      title="Удалить закладку"
+                      onClick={(e) => handleRemoveBookmark(e, bookmark.id)}
                     >
-                      🗑️
+                      ✕
                     </button>
                   </div>
                 ))}

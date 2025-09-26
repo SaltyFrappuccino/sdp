@@ -20,6 +20,8 @@ import ArchetypeDisplay from '@/components/ArchetypeDisplay';
 import ResourceDisplay from '@/components/ResourceDisplay';
 import GiftDisplay from '@/components/GiftDisplay';
 import TagDisplay from '@/components/TagDisplay';
+import Spoiler from '@/components/Spoiler';
+import Table from '@/components/Table';
 
 interface ContentProps {
   chapter: Chapter;
@@ -162,6 +164,10 @@ const Content: React.FC<ContentProps> = ({ chapter, bookType = 'combat' }) => {
         return <GiftDisplay key={index} gifts={item.items} title={item.title} />;
       case 'tagDisplay':
         return <TagDisplay key={index} tags={item.items} title={item.title} />;
+      case 'spoiler':
+        return <Spoiler key={index} title={item.title} content={item.content} />;
+      case 'table':
+        return <Table key={index} title={item.title} headers={item.headers} rows={item.rows} />;
       default:
         return <p key={index}>{JSON.stringify(item)}</p>;
     }

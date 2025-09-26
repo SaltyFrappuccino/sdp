@@ -26,7 +26,7 @@ const TagDescriptionCard: React.FC<TagDescriptionCardProps> = ({ tag }) => {
     <div className={styles.card}>
       <h3 className={styles.name}>{tag.name}</h3>
       <ul className={styles.rankList}>
-        {tag.ranks.map(r => (
+        {tag.ranks.map((r: any) => (
           <li key={r.rank} className={styles.rankItem}>
             <span 
               className={styles.rankLabel} 

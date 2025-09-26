@@ -1,0 +1,389 @@
+.worldGuide {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-background);
+}
+
+.sidebar {
+  width: 200px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: 16px;
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 16px 0;
+  text-shadow: var(--text-glow);
+  background: var(--gradient-primary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.2;
+}
+
+.navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.navButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.navButton:hover {
+  background: var(--color-background);
+  border-color: var(--color-border);
+  transform: translateX(4px);
+}
+
+.navButton.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.navButton.active:hover {
+  transform: translateX(0);
+}
+
+.navIcon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.navTitle {
+  font-weight: 600;
+}
+
+.bookmarksButton {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.bookmarksButton:hover {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.topPagination {
+  margin-bottom: 24px;
+}
+
+.bottomPagination {
+  margin-top: 24px;
+}
+
+.content {
+  flex: 1;
+  margin-left: 200px;
+  padding: 20px;
+  max-width: calc(100vw - 200px);
+  overflow-x: hidden;
+}
+
+.section {
+  max-width: none;
+  margin: 0;
+  width: 100%;
+}
+
+.sectionTitle {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 16px 0;
+  text-shadow: var(--text-glow);
+  background: var(--gradient-primary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sectionDescription {
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0 0 32px 0;
+  max-width: 800px;
+}
+
+.factionsGrid,
+.synkiGrid,
+.mechanicsGrid,
+.loreGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 1200px) {
+  .factionsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+}
+
+.islandsList {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.placeholder {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.placeholder h3 {
+  color: var(--color-primary);
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.placeholder p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Темная тема */
+[data-theme="dark"] .worldGuide {
+  background: var(--color-background);
+}
+
+[data-theme="dark"] .sidebar {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .navButton {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .navButton:hover {
+  background: var(--color-background);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .navButton.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+[data-theme="dark"] .placeholder {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+/* Мобильная адаптация */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 180px;
+  }
+  
+  .content {
+    margin-left: 180px;
+    max-width: calc(100vw - 180px);
+    padding: 16px;
+  }
+  
+  .title {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  
+  .navButton {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
+  .navIcon {
+    font-size: 14px;
+  }
+  
+  .sectionTitle {
+    font-size: 24px;
+  }
+  
+  .sectionDescription {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .worldGuide {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    padding: 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  
+  .content {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: 100%;
+    padding: 16px;
+  }
+  
+  .title {
+    font-size: 18px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  
+  .navigation {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  
+  .navButton {
+    flex: 1;
+    min-width: 120px;
+    padding: 8px 10px;
+    font-size: 12px;
+    justify-content: center;
+  }
+  
+  .navButton:hover {
+    transform: translateY(-2px);
+  }
+  
+  .navButton.active:hover {
+    transform: translateY(0);
+  }
+  
+  .navIcon {
+    font-size: 14px;
+  }
+  
+  .sectionTitle {
+    font-size: 24px;
+  }
+  
+  .sectionDescription {
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  
+  .factionsGrid,
+  .synkiGrid,
+  .mechanicsGrid,
+  .islandsList {
+    gap: 16px;
+  }
+  
+  .placeholder {
+    padding: 24px;
+  }
+  
+  .placeholder h3 {
+    font-size: 16px;
+  }
+  
+  .placeholder p {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    padding: 12px;
+  }
+  
+  .content {
+    padding: 16px;
+  }
+  
+  .title {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  
+  .navigation {
+    gap: 4px;
+  }
+  
+  .navButton {
+    min-width: 100px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  
+  .navIcon {
+    font-size: 12px;
+  }
+  
+  .sectionTitle {
+    font-size: 20px;
+  }
+  
+  .sectionDescription {
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  
+  .factionsGrid,
+  .synkiGrid,
+  .mechanicsGrid,
+  .islandsList {
+    gap: 12px;
+  }
+  
+  .placeholder {
+    padding: 20px;
+  }
+  
+  .placeholder h3 {
+    font-size: 15px;
+  }
+  
+  .placeholder p {
+    font-size: 12px;
+  }
+}

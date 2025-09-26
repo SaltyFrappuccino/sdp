@@ -1,0 +1,317 @@
+.islandCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 32px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.islandCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+}
+
+.islandCard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary);
+}
+
+.islandHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.icon {
+  font-size: 32px;
+  color: var(--color-primary);
+  text-shadow: var(--text-glow);
+  flex-shrink: 0;
+}
+
+.islandInfo {
+  flex: 1;
+}
+
+.islandName {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-shadow: var(--text-glow);
+  background: var(--gradient-primary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 8px 0;
+}
+
+.islandStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stat {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.atmosphere,
+.districts,
+.economy,
+.pillars {
+  margin-bottom: 20px;
+}
+
+.atmosphere h4,
+.districts h4,
+.economy h4,
+.pillars h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin: 0 0 8px 0;
+  text-shadow: var(--text-glow);
+}
+
+.atmosphere p,
+.economy p {
+  color: var(--color-text-primary);
+  line-height: 1.6;
+  font-size: 14px;
+  margin: 0;
+}
+
+.districtsList,
+.pillarsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.district,
+.pillar {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.districtName,
+.pillarName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin: 0 0 6px 0;
+}
+
+.districtDescription,
+.pillarDescription {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.districtFeatures {
+  margin: 8px 0 0 0;
+  padding-left: 16px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.districtFeatures li {
+  margin-bottom: 4px;
+}
+
+/* Темная тема */
+[data-theme="dark"] .islandCard {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .islandCard:hover {
+  border-color: var(--color-primary);
+}
+
+[data-theme="dark"] .islandHeader {
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .stat {
+  background: var(--color-background);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .district,
+[data-theme="dark"] .pillar {
+  background: var(--color-background);
+  border-color: var(--color-border);
+}
+
+/* Мобильная адаптация */
+@media (max-width: 768px) {
+  .islandCard {
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  
+  .islandHeader {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .icon {
+    font-size: 28px;
+  }
+  
+  .islandName {
+    font-size: 20px;
+  }
+  
+  .islandStats {
+    gap: 8px;
+  }
+  
+  .stat {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  
+  .atmosphere,
+  .districts,
+  .economy,
+  .pillars {
+    margin-bottom: 16px;
+  }
+  
+  .atmosphere h4,
+  .districts h4,
+  .economy h4,
+  .pillars h4 {
+    font-size: 15px;
+  }
+  
+  .atmosphere p,
+  .economy p {
+    font-size: 13px;
+  }
+  
+  .districtsList,
+  .pillarsList {
+    gap: 10px;
+  }
+  
+  .district,
+  .pillar {
+    padding: 10px;
+  }
+  
+  .districtName,
+  .pillarName {
+    font-size: 13px;
+  }
+  
+  .districtDescription,
+  .pillarDescription {
+    font-size: 12px;
+  }
+  
+  .districtFeatures {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .islandCard {
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  
+  .islandHeader {
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  
+  .icon {
+    font-size: 24px;
+    align-self: center;
+  }
+  
+  .islandName {
+    font-size: 18px;
+    text-align: center;
+  }
+  
+  .islandStats {
+    justify-content: center;
+    gap: 6px;
+  }
+  
+  .stat {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+  
+  .atmosphere,
+  .districts,
+  .economy,
+  .pillars {
+    margin-bottom: 14px;
+  }
+  
+  .atmosphere h4,
+  .districts h4,
+  .economy h4,
+  .pillars h4 {
+    font-size: 14px;
+  }
+  
+  .atmosphere p,
+  .economy p {
+    font-size: 12px;
+  }
+  
+  .districtsList,
+  .pillarsList {
+    gap: 8px;
+  }
+  
+  .district,
+  .pillar {
+    padding: 8px;
+  }
+  
+  .districtName,
+  .pillarName {
+    font-size: 12px;
+  }
+  
+  .districtDescription,
+  .pillarDescription {
+    font-size: 11px;
+  }
+  
+  .districtFeatures {
+    font-size: 10px;
+    padding-left: 12px;
+  }
+}
