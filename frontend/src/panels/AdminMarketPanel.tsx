@@ -172,7 +172,7 @@ export const AdminMarketPanel: FC<AdminMarketPanelProps> = ({ id }) => {
                   placeholder="Выберите акцию"
                   value={newEvent.impacted_stock_id || ''}
                   onChange={e => setNewEvent(p => ({ ...p, impacted_stock_id: Number(e.target.value) }))}
-                  options={stocks.map(s => ({ label: s.name, value: s.id }))}
+                  options={stocks && stocks.length > 0 ? stocks.map(s => ({ label: s.name, value: s.id })) : []}
                 />
               </FormItem>
               <FormItem top="Сила влияния (e.g., 0.05 for +5%, -0.02 for -2%)">

@@ -371,7 +371,7 @@ export const MarketExchangePanel: FC<MarketExchangePanelProps> = ({ id, fetchedU
               placeholder="Выберите персонажа"
               value={selectedCharacter?.id}
               onChange={(e) => handleCharacterSelect(Number(e.target.value))}
-              options={characters.map(c => ({ label: `${c.character_name} (${c.currency.toLocaleString('ru-RU')} ₭)`, value: c.id }))}
+              options={characters && characters.length > 0 ? characters.map(c => ({ label: `${c.character_name} (${c.currency.toLocaleString('ru-RU')} ₭)`, value: c.id })) : []}
             />
           ) : (
             <Text>У вас нет принятых персонажей для торговли на бирже.</Text>

@@ -276,10 +276,10 @@ export const MarketPanel: FC<MarketPanelProps> = ({ id, fetchedUser }) => {
                placeholder="Выберите предмет для продажи"
                value={String(itemToSell?.index)}
                onChange={(e) => setItemToSell({ index: Number(e.target.value), price: 0 })}
-               options={selectedCharacter.inventory.map((item, index) => ({
+               options={selectedCharacter && selectedCharacter.inventory && selectedCharacter.inventory.length > 0 ? selectedCharacter.inventory.map((item, index) => ({
                  label: item.name,
                  value: index,
-               }))}
+               })) : []}
              />
            </FormItem>
            <FormItem top="Цена">

@@ -1,5 +1,5 @@
 import {
-  createHashRouter,
+  createBrowserRouter,
   createPanel,
   createRoot,
   createView,
@@ -34,6 +34,9 @@ export const DEFAULT_VIEW_PANELS = {
   EVENTS: 'events',
   ADMIN_EVENTS: 'admin_events',
   BULK_CHARACTERS: 'bulk_characters',
+  COLLECTIONS: 'collections',
+  PURCHASES: 'purchases',
+  BLOCKCHAIN: 'blockchain',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -62,8 +65,11 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.EVENTS, `/${DEFAULT_VIEW_PANELS.EVENTS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_EVENTS, `/${DEFAULT_VIEW_PANELS.ADMIN_EVENTS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.BULK_CHARACTERS, `/${DEFAULT_VIEW_PANELS.BULK_CHARACTERS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.COLLECTIONS, `/${DEFAULT_VIEW_PANELS.COLLECTIONS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.PURCHASES, `/${DEFAULT_VIEW_PANELS.PURCHASES}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.BLOCKCHAIN, `/${DEFAULT_VIEW_PANELS.BLOCKCHAIN}`, []),
     ]),
   ]),
 ]);
 
-export const router = createHashRouter(routes.getRoutes());
+export const router = createBrowserRouter(routes.getRoutes());

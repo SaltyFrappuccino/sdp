@@ -85,6 +85,30 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
           </ButtonGroup>
         </Div>
         <Div>
+          <ButtonGroup stretched mode="horizontal">
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('collections')}>
+              Коллекции
+            </Button>
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('purchases')}>
+              Покупки
+            </Button>
+          </ButtonGroup>
+        </Div>
+        <Div>
+          <ButtonGroup stretched mode="horizontal">
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('blockchain')}>
+              Блокчейн Биржа
+            </Button>
+          </ButtonGroup>
+        </Div>
+        <Div>
+          <ButtonGroup stretched mode="horizontal">
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('poker')}>
+              Покер
+            </Button>
+          </ButtonGroup>
+        </Div>
+        <Div>
           <Button stretched size="l" mode="tertiary" onClick={() => routeNavigator.push('admin_login')}>
             Админ-панель
           </Button>

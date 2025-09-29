@@ -389,6 +389,10 @@ export const AnketaEditor: FC<NavIdProps & {
                 options={[
                   { label: 'Отражённый Свет Солнца', value: 'Отражённый Свет Солнца' },
                   { label: 'Чёрная Лилия', value: 'Чёрная Лилия' },
+                  ...(factions || []).map(faction => ({
+                    label: faction.name,
+                    value: faction.name
+                  })),
                   { label: 'Порядок', value: 'Порядок' },
                   { label: 'Нейтрал', value: 'Нейтрал' },
                 ]}

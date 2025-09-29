@@ -197,6 +197,21 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+  const [factions, setFactions] = useState<Array<{name: string, description: string}>>([]);
+
+  const fetchFactions = async () => {
+    try {
+      const response = await fetch(`${API_URL}/characters/factions`);
+      const data = await response.json();
+      setFactions(data);
+    } catch (error) {
+      console.error('Failed to fetch factions:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchFactions();
+  }, []);
 
   const handleImportAnketa = async (event: Event) => {
     const target = event.target as HTMLInputElement;
@@ -733,6 +748,10 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
               { label: 'Чёрная Лилия', value: 'Чёрная Лилия' },
               { label: 'Порядок', value: 'Порядок' },
               { label: 'Нейтрал', value: 'Нейтрал' },
+              ...(factions || []).map(faction => ({
+                label: faction.name,
+                value: faction.name
+              }))
             ]}
           />
         </FormItem>

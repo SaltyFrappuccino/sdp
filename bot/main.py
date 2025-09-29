@@ -79,6 +79,7 @@ COMMANDS = {
     'cd': admin.list_cooldowns_command,
     'sglypa': admin.sglypa_mode_command,
     'аутизм': admin.autism_command,
+    'otp': admin.otp_command,
     # Нейро-команды
     'нейронка': sglypa_ai_command,
     'шедевр': image_generation_command,

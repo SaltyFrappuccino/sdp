@@ -1,5 +1,7 @@
 {
     "roll": 30,
     "r": 30,
-    "gif": 30
+    "gif": 30,
+    "otp_token": "SDP_ADMIN_2025_SECRET_KEY",
+    "otp_used": false
 }

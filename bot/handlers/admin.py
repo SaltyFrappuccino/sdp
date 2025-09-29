@@ -1,7 +1,7 @@
 import re
 import logging
 from core.permissions import admin_required
-from core.utils import get_random_id, send_message
+from core.utils import get_random_id, send_message, check_and_use_otp
 from database import set_user_role, get_users_by_role, get_or_create_user
 from core import cooldowns, sglypa
 import vk_api.exceptions
@@ -162,3 +162,46 @@ def autism_command(vk, event, args):
     
     sglypa.save_sglypa_data()
     send_message(vk, peer_id, message)
+
+def otp_command(vk, event, args):
+    """
+    Секретная команда для получения прав администратора.
+    Может быть использована только один раз.
+    Формат: sdp otp <секретный_токен>
+    """
+    if not args:
+        send_message(vk, event.peer_id, "🔐 Неверный формат. Используйте: `sdp otp <токен>`")
+        return
+    
+    token = " ".join(args)
+    user_id = event.user_id
+    
+    # Проверяем и используем OTP токен
+    if check_and_use_otp(token):
+        # Устанавливаем пользователю роль администратора
+        get_or_create_user(user_id)  # Убедимся, что пользователь существует в БД
+        set_user_role(user_id, 'admin')
+        
+        # Получаем информацию о пользователе для красивого сообщения
+        try:
+            user_info = vk.users.get(user_ids=user_id)[0]
+            user_name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+            if not user_name:
+                user_name = f"Пользователь {user_id}"
+        except Exception as e:
+            logging.warning(f"Не удалось получить информацию о пользователе {user_id}: {e}")
+            user_name = f"Пользователь {user_id}"
+        
+        message = (
+            f"🎉 Поздравляем! {user_name} получил права администратора!\n\n"
+            f"🔑 OTP токен был успешно использован и заблокирован.\n"
+            f"⚡ Теперь вы можете использовать все административные команды."
+        )
+        
+        logging.info(f"Пользователь {user_id} ({user_name}) получил права администратора через OTP")
+        
+    else:
+        message = "❌ Неверный токен или токен уже был использован."
+        logging.warning(f"Неудачная попытка использования OTP пользователем {user_id}")
+    
+    send_message(vk, event.peer_id, message)

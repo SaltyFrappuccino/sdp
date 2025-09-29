@@ -202,10 +202,10 @@ export const CasinoPanel: FC<CasinoPanelProps> = ({ id, fetchedUser }) => {
                   fetchGameHistory(charId);
                 }
               }}
-              options={characters.map(char => ({
+              options={characters && characters.length > 0 ? characters.map(char => ({
                 label: `${char.character_name} (${char.currency} 💰)`,
                 value: char.id.toString()
-              }))}
+              })) : []}
             />
           </Div>
         </Card>

@@ -403,10 +403,10 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
             placeholder="Выберите персонажа"
             value={selectedCharacter}
             onChange={(e) => setSelectedCharacter(Number(e.target.value))}
-            options={characters.map(char => ({
+            options={characters && characters.length > 0 ? characters.map(char => ({
               label: `${char.character_name || 'Неизвестно'} (${char.rank || 'Нет ранга'}) - ${char.faction || 'Нет фракции'}`,
               value: char.id
-            }))}
+            })) : []}
             style={{ marginBottom: '16px' }}
           />
         )}
@@ -573,10 +573,10 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
                   <Select
                     value={selectedCharacter?.toString() || ''}
                     onChange={(e) => setSelectedCharacter(parseInt(e.target.value))}
-                    options={characters.map(char => ({
+                    options={characters && characters.length > 0 ? characters.map(char => ({
                       label: `${char.character_name || 'Неизвестно'} (${char.rank || 'Нет ранга'}) - ${char.faction || 'Нет фракции'}`,
                       value: char.id.toString()
-                    }))}
+                    })) : []}
                   />
                 </FormItem>
 
@@ -832,10 +832,10 @@ export const NewEventsPanel: FC<NewEventsPanelProps> = ({ id, fetchedUser }) => 
                   <Select
                     value={selectedCharacter?.toString() || ''}
                     onChange={(e) => setSelectedCharacter(parseInt(e.target.value))}
-                    options={characters.map(char => ({
+                    options={characters && characters.length > 0 ? characters.map(char => ({
                       label: `${char.character_name || 'Неизвестно'} - ${char.currency || 0} 💰`,
                       value: char.id.toString()
-                    }))}
+                    })) : []}
                   />
                 </FormItem>
 

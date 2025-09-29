@@ -1,9 +1,12 @@
 import random
 import vk_api
 import logging
+import json
+import os
 from vk_api.vk_api import VkApiMethod
 
 MAX_MESSAGE_LENGTH = 4000 # Немного меньше лимита VK (4096) для надежности
+SETTINGS_FILE = "settings.json"
 
 def get_random_id():
     """Генерирует случайный ID для сообщения VK."""
@@ -53,3 +56,37 @@ def send_message(vk: VkApiMethod, peer_id: int, message: str, **kwargs):
         logging.error(f"Ошибка VK API при отправке сообщения в чат {peer_id}: {e}")
     except Exception as e:
         logging.error(f"Неизвестная ошибка при отправке сообщения в чат {peer_id}: {e}")
+
+def load_settings():
+    """Загружает настройки из файла settings.json."""
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_settings(settings):
+    """Сохраняет настройки в файл settings.json."""
+    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=4, ensure_ascii=False)
+
+def check_and_use_otp(token: str) -> bool:
+    """
+    Проверяет OTP токен и помечает его как использованный, если он верный.
+    Возвращает True, если токен верный и еще не использовался, иначе False.
+    """
+    settings = load_settings()
+    
+    # Проверяем, что OTP еще не использовался
+    if settings.get('otp_used', False):
+        return False
+    
+    # Проверяем токен
+    if settings.get('otp_token') != token:
+        return False
+    
+    # Помечаем OTP как использованный
+    settings['otp_used'] = True
+    save_settings(settings)
+    
+    logging.info(f"OTP токен успешно использован и заблокирован")
+    return True

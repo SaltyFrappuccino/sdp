@@ -6,13 +6,13 @@ import {
   CardGrid,
   Card,
   Header,
-  Spinner,
   Div,
   Button,
   PanelHeaderBack,
   ButtonGroup,
   Link,
   Snackbar,
+  Placeholder,
   Alert,
   ModalRoot,
   ModalPage,
@@ -32,6 +32,10 @@ import { FC, useState, useEffect, ReactNode } from 'react';
 import { API_URL } from '../api';
 import { exportAnketaToJson, downloadJsonFile } from '../utils/anketaExport';
 import { Icon24CheckCircleOutline, Icon24ErrorCircle, Icon24Add } from '@vkontakte/icons';
+import { AdminFactionsPanel } from './AdminFactionsPanel';
+import { AdminCollectionsPanel } from './AdminCollectionsPanel';
+import { AdminPurchasesPanel } from './AdminPurchasesPanel';
+import { AdminBlockchainPanel } from './AdminBlockchainPanel';
 
 interface Character {
   id: number;
@@ -78,7 +82,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const [editingItem, setEditingItem] = useState<Partial<MarketItem> | null>(null);
   const [characterSearch, setCharacterSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'characters' | 'market' | 'updates' | 'bulk'>('characters');
+  const [activeTab, setActiveTab] = useState<'characters' | 'market' | 'updates' | 'bulk' | 'factions' | 'collections' | 'purchases' | 'blockchain'>('characters');
 
   const fetchCharacters = async () => {
     try {
@@ -413,13 +417,37 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         >
           ⚡ Массовые
         </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'factions'} 
+          onClick={() => setActiveTab('factions')}
+        >
+          🏛️ Фракции
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'collections'} 
+          onClick={() => setActiveTab('collections')}
+        >
+          🎨 Коллекции
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'purchases'} 
+          onClick={() => setActiveTab('purchases')}
+        >
+          🛍️ Покупки
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'blockchain'} 
+          onClick={() => setActiveTab('blockchain')}
+        >
+          ⛓️ Блокчейн
+        </TabsItem>
       </Tabs>
 
       {activeTab === 'characters' && (
         <Group>
         <Header>Реестр анкет</Header>
         <Search value={characterSearch} onChange={(e) => setCharacterSearch(e.target.value)} />
-        {loading.characters ? <Spinner /> : (
+        {loading.characters ? <Placeholder>Загрузка...</Placeholder> : (
           <CardGrid size="l">
             {characters.filter(c => c.character_name.toLowerCase().includes(characterSearch.toLowerCase())).map((char) => (
               <Card key={char.id}>
@@ -465,7 +493,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
       {activeTab === 'updates' && (
         <Group>
        <Header>Ожидающие проверки изменения</Header>
-       {loading.updates ? <Spinner /> : (
+       {loading.updates ? <Placeholder>Загрузка...</Placeholder> : (
          updates.filter(u => u.status === 'pending').map(update => (
            <Cell key={update.id} hasActive hasHover onClick={() => routeNavigator.push(`/update_viewer/${update.id}`)}>
              Запрос на обновление для {update.character_name} (ID: {update.character_id})
@@ -482,9 +510,9 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           <Button before={<Icon24Add />} onClick={() => openMarketItemModal(null)}>Добавить товар</Button>
         </Div>
         <Search value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} />
-        {loading.items ? <Spinner /> : (
+        {loading.items ? <Placeholder>Загрузка...</Placeholder> : (
           <CardGrid size="l">
-            {marketItems.filter(i => i.name.toLowerCase().includes(itemSearch.toLowerCase())).map((item) => (
+            {marketItems && marketItems.filter(i => i.name.toLowerCase().includes(itemSearch.toLowerCase())).map((item) => (
               <Card key={item.id}>
                 <Header>{item.name}</Header>
                 <Div>
@@ -557,6 +585,22 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           </Button>
         </Div>
       </Group>
+      )}
+
+      {activeTab === 'factions' && (
+        <AdminFactionsPanel id="admin_factions" />
+      )}
+
+      {activeTab === 'collections' && (
+        <AdminCollectionsPanel id="admin_collections" />
+      )}
+
+      {activeTab === 'purchases' && (
+        <AdminPurchasesPanel id="admin_purchases" />
+      )}
+
+      {activeTab === 'blockchain' && (
+        <AdminBlockchainPanel id="admin_blockchain" />
       )}
       
       {snackbar}
