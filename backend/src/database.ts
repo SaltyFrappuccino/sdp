@@ -890,6 +890,70 @@ export async function initDB() {
     await seedStocks(db);
     await seedHorses(db);
 
+    // TOG TABLES
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS tog_characters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vk_id INTEGER NOT NULL,
+        character_name TEXT NOT NULL,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        
+        -- Points
+        ability_points INTEGER DEFAULT 20,
+        position_points INTEGER DEFAULT 20,
+        baang_points INTEGER DEFAULT 20,
+        individuality_points INTEGER DEFAULT 0,
+
+        -- Positions
+        fisherman INTEGER DEFAULT -99,
+        spear_bearer INTEGER DEFAULT -99,
+        light_bearer INTEGER DEFAULT -99,
+        wave_controller INTEGER DEFAULT -99,
+        scout INTEGER DEFAULT -99,
+        special_positions TEXT DEFAULT '{}',
+
+        -- Stats
+        body_reinforcement TEXT DEFAULT '1E',
+        shinsu_resistance TEXT DEFAULT '1E',
+        weapon_mastery TEXT DEFAULT '1E',
+        physical_combat TEXT DEFAULT '1E',
+        shinsu_materialization TEXT DEFAULT '1E',
+        bang_control TEXT DEFAULT '1E',
+        shinsu_processing TEXT DEFAULT '{}',
+        intelligence TEXT DEFAULT '1E',
+        weapon_handling TEXT DEFAULT '1E',
+        willpower TEXT DEFAULT '1E',
+
+        shinsu_tendency TEXT,
+        shinsu_quality TEXT,
+        
+        inventory TEXT DEFAULT '[]',
+        currency INTEGER DEFAULT 100000,
+        
+        overall_power TEXT DEFAULT '1E',
+        inventory_score TEXT DEFAULT '1E',
+
+        admin_note TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS tog_market_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        price INTEGER NOT NULL,
+        item_type TEXT NOT NULL,
+        rank TEXT,
+        image_url TEXT,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        is_available BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
     return db;
 
   } catch (error) {

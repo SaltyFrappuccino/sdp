@@ -1,7 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { initDB } from './database.js';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
 
 const getAttributePointsForRank = (rank: string): number => {
   switch (rank) {
@@ -5875,6 +5877,243 @@ router.get('/blockchain/leaderboard', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to fetch blockchain leaderboard:', error);
     res.status(500).json({ error: 'Не удалось загрузить таблицу лидеров' });
+  }
+});
+
+// ===============================================
+// Tower of God API
+// ===============================================
+
+// Admin Login
+router.post('/tog/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password === 'БашняБогахуета') {
+    // In a real app, you'd issue a token (e.g., JWT)
+    res.json({ success: true, message: 'Login successful' });
+  } else {
+    res.status(401).json({ success: false, message: 'Invalid password' });
+  }
+});
+
+// Middleware to check for admin access (simple password check for now)
+const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  const { authorization } = req.headers;
+  if (authorization === 'БашняБогахуета') {
+    next();
+  } else {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+};
+
+
+// Character Anketa routes
+router.post('/tog/characters', async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const { vk_id, character_name, ...otherData } = req.body;
+    const sql = `INSERT INTO tog_characters (vk_id, character_name, shinsu_processing, special_positions, inventory) VALUES (?, ?, ?, ?, ?)`;
+    const result = await db.run(sql, [
+      vk_id, 
+      character_name, 
+      JSON.stringify(otherData.shinsu_processing || {}),
+      JSON.stringify(otherData.special_positions || {}),
+      JSON.stringify(otherData.inventory || [])
+    ]);
+    res.status(201).json({ id: result.lastID });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create character' });
+  }
+});
+
+router.get('/tog/characters', async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const characters = await db.all('SELECT * FROM tog_characters WHERE status = ?', ['approved']);
+    res.json(characters);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch characters' });
+  }
+});
+
+router.get('/tog/characters/all', requireAdmin, async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const characters = await db.all('SELECT * FROM tog_characters');
+    res.json(characters);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch characters' });
+  }
+});
+
+router.get('/tog/characters/:id', async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const character = await db.get('SELECT * FROM tog_characters WHERE id = ?', [req.params.id]);
+    if (character) {
+      res.json(character);
+    } else {
+      res.status(404).json({ error: 'Character not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch character' });
+  }
+});
+
+router.put('/tog/characters/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const { id } = req.params;
+    const fields = req.body;
+    const keys = Object.keys(fields);
+    const values = Object.values(fields);
+
+    const setClause = keys.map(key => `${key} = ?`).join(', ');
+    
+    const sql = `UPDATE tog_characters SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    
+    await db.run(sql, [...values, id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update character' });
+  }
+});
+
+router.delete('/tog/characters/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    await db.run('DELETE FROM tog_characters WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete character' });
+  }
+});
+
+router.post('/tog/characters/:id/status', requireAdmin, async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const { status } = req.body;
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    await db.run('UPDATE tog_characters SET status = ? WHERE id = ?', [status, req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update character status' });
+  }
+});
+
+
+// Market routes
+router.get('/tog/market/items', async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const items = await db.all('SELECT * FROM tog_market_items WHERE is_available = 1');
+    res.json(items);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch market items' });
+  }
+});
+
+router.post('/tog/market/items', requireAdmin, async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const { name, description, price, item_type, rank, image_url, quantity } = req.body;
+    const sql = `INSERT INTO tog_market_items (name, description, price, item_type, rank, image_url, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    const result = await db.run(sql, [name, description, price, item_type, rank, image_url, quantity]);
+    res.status(201).json({ id: result.lastID });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create market item' });
+  }
+});
+
+router.put('/tog/market/items/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    const { id } = req.params;
+    const fields = req.body;
+    const keys = Object.keys(fields);
+    const values = Object.values(fields);
+  
+    const setClause = keys.map(key => `${key} = ?`).join(', ');
+    
+    const sql = `UPDATE tog_market_items SET ${setClause} WHERE id = ?`;
+    
+    await db.run(sql, [...values, id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update market item' });
+  }
+});
+
+router.delete('/tog/market/items/:id', requireAdmin, async (req, res) => {
+  try {
+    const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+    await db.run('DELETE FROM tog_market_items WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete market item' });
+  }
+});
+
+router.post('/tog/characters/:characterId/inventory/buy', async (req, res) => {
+  const db = await open({ filename: './anketi.db', driver: sqlite3.Database });
+  try {
+    const { characterId } = req.params;
+    const { itemId, quantity } = req.body;
+
+    await db.exec('BEGIN TRANSACTION');
+
+    const character = await db.get('SELECT * FROM tog_characters WHERE id = ?', [characterId]);
+    const item = await db.get('SELECT * FROM tog_market_items WHERE id = ?', [itemId]);
+
+    if (!character || !item) {
+      await db.exec('ROLLBACK');
+      return res.status(404).json({ error: 'Character or item not found' });
+    }
+
+    const totalCost = item.price * quantity;
+
+    if (character.currency < totalCost) {
+      await db.exec('ROLLBACK');
+      return res.status(400).json({ error: 'Not enough currency' });
+    }
+
+    if (item.quantity < quantity) {
+      await db.exec('ROLLBACK');
+      return res.status(400).json({ error: 'Not enough items in stock' });
+    }
+
+    const newCurrency = character.currency - totalCost;
+    const inventory = JSON.parse(character.inventory);
+    
+    const existingItem = inventory.find((i: any) => i.id === itemId);
+    if (existingItem) {
+      existingItem.quantity += quantity;
+    } else {
+      inventory.push({ id: itemId, quantity });
+    }
+
+    await db.run('UPDATE tog_characters SET currency = ?, inventory = ? WHERE id = ?', [newCurrency, JSON.stringify(inventory), characterId]);
+    await db.run('UPDATE tog_market_items SET quantity = quantity - ? WHERE id = ?', [quantity, itemId]);
+
+    await db.exec('COMMIT');
+    res.json({ success: true, newCurrency, newInventory: inventory });
+
+  } catch (error) {
+    await db.exec('ROLLBACK');
+    console.error(error);
+    res.status(500).json({ error: 'Failed to buy item' });
   }
 });
 

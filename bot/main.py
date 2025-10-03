@@ -80,6 +80,15 @@ COMMANDS = {
     'sglypa': admin.sglypa_mode_command,
     'аутизм': admin.autism_command,
     'otp': admin.otp_command,
+    # Команды модерации
+    'мут': admin.mute_command,
+    'размут': admin.unmute_command,
+    'кик': admin.kick_command,
+    'бан': admin.ban_command,
+    'разбан': admin.unban_command,
+    'варн': admin.warn_command,
+    'очистить': admin.clear_command,
+    'инфо': admin.info_command,
     # Нейро-команды
     'нейронка': sglypa_ai_command,
     'шедевр': image_generation_command,

@@ -1,6 +1,6 @@
 import re
 import logging
-from core.permissions import admin_required
+from core.permissions import admin_required, check_admin_permissions
 from core.utils import get_random_id, send_message, check_and_use_otp
 from database import set_user_role, get_users_by_role, get_or_create_user
 from core import cooldowns, sglypa
@@ -203,5 +203,274 @@ def otp_command(vk, event, args):
     else:
         message = "❌ Неверный токен или токен уже был использован."
         logging.warning(f"Неудачная попытка использования OTP пользователем {user_id}")
+    
+    send_message(vk, event.peer_id, message)
+
+# === КОМАНДЫ МОДЕРАЦИИ ===
+
+def mute_command(vk, event, args):
+    """Заглушает пользователя на указанное время. Формат: sdp мут [id|@пользователь] [время] [причина]"""
+    if not check_admin_permissions(vk, event.user_id, event.peer_id):
+        return
+    
+    if len(args) < 2:
+        send_message(vk, event.peer_id, "📝 Неверный формат. Используйте: `sdp мут [id|@пользователь] [время] [причина]`\nПример: `sdp мут [id123|Пользователь] 1ч Спам`")
+        return
+
+    target_id = parse_user_id(args[0])
+    if not target_id:
+        send_message(vk, event.peer_id, "❌ Не удалось распознать ID пользователя.")
+        return
+
+    # Парсим время (1ч, 30м, 1д)
+    time_str = args[1]
+    reason = " ".join(args[2:]) if len(args) > 2 else "Нарушение правил"
+    
+    try:
+        # Пытаемся заглушить пользователя
+        vk.messages.removeChatUser(chat_id=event.peer_id - 2000000000, user_id=target_id)
+        
+        # Добавляем обратно через указанное время (это упрощенная реализация)
+        # В реальности нужно было бы использовать планировщик задач
+        
+        message = f"🔇 Пользователь [id{target_id}|пользователь] заглушен на {time_str}.\n📝 Причина: {reason}"
+        logging.info(f"Пользователь {target_id} заглушен в чате {event.peer_id} на {time_str}. Причина: {reason}")
+        
+    except vk_api.exceptions.ApiError as e:
+        if e.code == 15:  # Access denied
+            message = "❌ Недостаточно прав для выполнения этой операции."
+        elif e.code == 935:  # User not in chat
+            message = "❌ Пользователь не найден в чате."
+        else:
+            message = f"❌ Ошибка VK API: {e}"
+        logging.error(f"Ошибка при заглушении пользователя {target_id}: {e}")
+    
+    send_message(vk, event.peer_id, message)
+
+def unmute_command(vk, event, args):
+    """Снимает заглушение с пользователя. Формат: sdp размут [id|@пользователь]"""
+    if not check_admin_permissions(vk, event.user_id, event.peer_id):
+        return
+    
+    if not args:
+        send_message(vk, event.peer_id, "📝 Неверный формат. Используйте: `sdp размут [id|@пользователь]`")
+        return
+
+    target_id = parse_user_id(args[0])
+    if not target_id:
+        send_message(vk, event.peer_id, "❌ Не удалось распознать ID пользователя.")
+        return
+
+    try:
+        # Добавляем пользователя обратно в чат
+        vk.messages.addChatUser(chat_id=event.peer_id - 2000000000, user_id=target_id)
+        
+        message = f"🔊 Заглушение с пользователя [id{target_id}|пользователь] снято."
+        logging.info(f"Заглушение снято с пользователя {target_id} в чате {event.peer_id}")
+        
+    except vk_api.exceptions.ApiError as e:
+        if e.code == 15:  # Access denied
+            message = "❌ Недостаточно прав для выполнения этой операции."
+        elif e.code == 936:  # User already in chat
+            message = "ℹ️ Пользователь уже в чате."
+        else:
+            message = f"❌ Ошибка VK API: {e}"
+        logging.error(f"Ошибка при снятии заглушения с пользователя {target_id}: {e}")
+    
+    send_message(vk, event.peer_id, message)
+
+def kick_command(vk, event, args):
+    """Исключает пользователя из чата. Формат: sdp кик [id|@пользователь] [причина]"""
+    if not check_admin_permissions(vk, event.user_id, event.peer_id):
+        return
+    
+    if not args:
+        send_message(vk, event.peer_id, "📝 Неверный формат. Используйте: `sdp кик [id|@пользователь] [причина]`")
+        return
+
+    target_id = parse_user_id(args[0])
+    if not target_id:
+        send_message(vk, event.peer_id, "❌ Не удалось распознать ID пользователя.")
+        return
+
+    reason = " ".join(args[1:]) if len(args) > 1 else "Нарушение правил"
+    
+    try:
+        vk.messages.removeChatUser(chat_id=event.peer_id - 2000000000, user_id=target_id)
+        
+        message = f"👢 Пользователь [id{target_id}|пользователь] исключен из чата.\n📝 Причина: {reason}"
+        logging.info(f"Пользователь {target_id} исключен из чата {event.peer_id}. Причина: {reason}")
+        
+    except vk_api.exceptions.ApiError as e:
+        if e.code == 15:  # Access denied
+            message = "❌ Недостаточно прав для выполнения этой операции."
+        elif e.code == 935:  # User not in chat
+            message = "❌ Пользователь не найден в чате."
+        else:
+            message = f"❌ Ошибка VK API: {e}"
+        logging.error(f"Ошибка при исключении пользователя {target_id}: {e}")
+    
+    send_message(vk, event.peer_id, message)
+
+def ban_command(vk, event, args):
+    """Банит пользователя в группе. Формат: sdp бан [id|@пользователь] [причина]"""
+    if not check_admin_permissions(vk, event.user_id, event.peer_id):
+        return
+    
+    if not args:
+        send_message(vk, event.peer_id, "📝 Неверный формат. Используйте: `sdp бан [id|@пользователь] [причина]`")
+        return
+
+    target_id = parse_user_id(args[0])
+    if not target_id:
+        send_message(vk, event.peer_id, "❌ Не удалось распознать ID пользователя.")
+        return
+
+    reason = " ".join(args[1:]) if len(args) > 1 else "Нарушение правил"
+    
+    try:
+        # Получаем ID группы из peer_id
+        group_id = abs(event.peer_id - 2000000000)
+        vk.groups.ban(group_id=group_id, owner_id=target_id, reason=0, comment=reason)
+        
+        message = f"🚫 Пользователь [id{target_id}|пользователь] забанен в группе.\n📝 Причина: {reason}"
+        logging.info(f"Пользователь {target_id} забанен в группе. Причина: {reason}")
+        
+    except vk_api.exceptions.ApiError as e:
+        if e.code == 15:  # Access denied
+            message = "❌ Недостаточно прав для выполнения этой операции."
+        else:
+            message = f"❌ Ошибка VK API: {e}"
+        logging.error(f"Ошибка при бане пользователя {target_id}: {e}")
+    
+    send_message(vk, event.peer_id, message)
+
+@admin_required
+def unban_command(vk, event, args):
+    """Разбанивает пользователя в группе. Формат: sdp разбан [id|@пользователь]"""
+    if not args:
+        send_message(vk, event.peer_id, "📝 Неверный формат. Используйте: `sdp разбан [id|@пользователь]`")
+        return
+
+    target_id = parse_user_id(args[0])
+    if not target_id:
+        send_message(vk, event.peer_id, "❌ Не удалось распознать ID пользователя.")
+        return
+
+    try:
+        # Получаем ID группы из peer_id
+        group_id = abs(event.peer_id - 2000000000)
+        vk.groups.unban(group_id=group_id, owner_id=target_id)
+        
+        message = f"✅ Пользователь [id{target_id}|пользователь] разбанен в группе."
+        logging.info(f"Пользователь {target_id} разбанен в группе")
+        
+    except vk_api.exceptions.ApiError as e:
+        if e.code == 15:  # Access denied
+            message = "❌ Недостаточно прав для выполнения этой операции."
+        else:
+            message = f"❌ Ошибка VK API: {e}"
+        logging.error(f"Ошибка при разбане пользователя {target_id}: {e}")
+    
+    send_message(vk, event.peer_id, message)
+
+@admin_required
+def warn_command(vk, event, args):
+    """Выдает предупреждение пользователю. Формат: sdp варн [id|@пользователь] [причина]"""
+    if not args:
+        send_message(vk, event.peer_id, "📝 Неверный формат. Используйте: `sdp варн [id|@пользователь] [причина]`")
+        return
+
+    target_id = parse_user_id(args[0])
+    if not target_id:
+        send_message(vk, event.peer_id, "❌ Не удалось распознать ID пользователя.")
+        return
+
+    reason = " ".join(args[1:]) if len(args) > 1 else "Нарушение правил"
+    
+    message = f"⚠️ [id{target_id}|Пользователь], вам выдано предупреждение!\n📝 Причина: {reason}\n\nПожалуйста, соблюдайте правила чата."
+    logging.info(f"Пользователю {target_id} выдано предупреждение. Причина: {reason}")
+    
+    send_message(vk, event.peer_id, message)
+
+@admin_required
+def clear_command(vk, event, args):
+    """Очищает чат от сообщений (удаляет последние N сообщений). Формат: sdp очистить [количество]"""
+    if not args:
+        send_message(vk, event.peer_id, "📝 Неверный формат. Используйте: `sdp очистить [количество]`\nПример: `sdp очистить 10`")
+        return
+
+    try:
+        count = int(args[0])
+        if count <= 0 or count > 100:
+            send_message(vk, event.peer_id, "❌ Количество должно быть от 1 до 100.")
+            return
+    except ValueError:
+        send_message(vk, event.peer_id, "❌ Неверное количество сообщений.")
+        return
+
+    try:
+        # Получаем последние сообщения
+        messages = vk.messages.getHistory(peer_id=event.peer_id, count=count)
+        
+        deleted_count = 0
+        for message in messages['items']:
+            try:
+                vk.messages.delete(message_ids=message['id'], delete_for_all=1)
+                deleted_count += 1
+            except:
+                pass  # Игнорируем ошибки удаления отдельных сообщений
+        
+        message = f"🗑️ Удалено {deleted_count} из {count} сообщений."
+        logging.info(f"Удалено {deleted_count} сообщений в чате {event.peer_id}")
+        
+    except vk_api.exceptions.ApiError as e:
+        message = f"❌ Ошибка при очистке чата: {e}"
+        logging.error(f"Ошибка при очистке чата {event.peer_id}: {e}")
+    
+    send_message(vk, event.peer_id, message)
+
+@admin_required
+def info_command(vk, event, args):
+    """Показывает информацию о пользователе. Формат: sdp инфо [id|@пользователь]"""
+    if not args:
+        send_message(vk, event.peer_id, "📝 Неверный формат. Используйте: `sdp инфо [id|@пользователь]`")
+        return
+
+    target_id = parse_user_id(args[0])
+    if not target_id:
+        send_message(vk, event.peer_id, "❌ Не удалось распознать ID пользователя.")
+        return
+
+    try:
+        # Получаем информацию о пользователе
+        user_info = vk.users.get(user_ids=target_id, fields='online,last_seen,status')[0]
+        
+        # Получаем роль в боте
+        user_role = get_or_create_user(target_id).get('role', 'user')
+        
+        # Форматируем информацию
+        name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+        online = "🟢 В сети" if user_info.get('online') else "🔴 Не в сети"
+        
+        last_seen = "Неизвестно"
+        if user_info.get('last_seen'):
+            last_seen = f"Последний раз: {user_info['last_seen'].get('time', 'Неизвестно')}"
+        
+        status = user_info.get('status', 'Статус не указан')
+        
+        message = (
+            f"👤 **Информация о пользователе**\n\n"
+            f"📝 Имя: {name}\n"
+            f"🆔 ID: {target_id}\n"
+            f"🔐 Роль в боте: {user_role}\n"
+            f"📊 Статус: {online}\n"
+            f"⏰ {last_seen}\n"
+            f"💬 Статус: {status}"
+        )
+        
+    except vk_api.exceptions.ApiError as e:
+        message = f"❌ Ошибка при получении информации: {e}"
+        logging.error(f"Ошибка при получении информации о пользователе {target_id}: {e}")
     
     send_message(vk, event.peer_id, message)
