@@ -18,6 +18,9 @@ import {
   CardGrid,
   Tabs,
   TabsItem,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Icon28DoneOutline, Icon28ErrorCircleOutline } from '@vkontakte/icons';
@@ -101,6 +104,7 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
   });
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<any>(null);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -429,13 +433,13 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
                               )}
                               {item.rank_required && (
                                 <span style={{
-                                  padding: '2px 6px',
+                                  padding: '2px 8px',
                                   borderRadius: 4,
-                                  fontSize: 10,
-                                  backgroundColor: 'var(--vkui--color_background_tertiary)',
-                                  color: 'var(--vkui--color_text_secondary)'
+                                  fontSize: 12,
+                                  backgroundColor: 'var(--vkui--color_background_accent)',
+                                  color: 'white'
                                 }}>
-                                  {item.rank_required}+
+                                  Ранг {item.rank_required}+
                                 </span>
                               )}
                             </div>
@@ -452,7 +456,10 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
                           mode="primary"
                           stretched
                           style={{ marginTop: 12 }}
-                          onClick={() => setSelectedItem(item)}
+                          onClick={() => {
+                            setSelectedItem(item);
+                            setActiveModal('purchase');
+                          }}
                           disabled={!selectedCharacter}
                         >
                           Купить
@@ -473,53 +480,6 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
                 </Group>
               )}
             </>
-          )}
-
-          {/* Модальное окно подтверждения покупки */}
-          {selectedItem && (
-            <Group header={<Header>Подтверждение покупки</Header>}>
-              <Card mode="shadow">
-                <Div>
-                  <Text weight="2" style={{ fontSize: 20, marginBottom: 8 }}>
-                    {selectedItem.name}
-                  </Text>
-                  <Text style={{ fontSize: 14, marginBottom: 12 }}>
-                    {selectedItem.description}
-                  </Text>
-                  <div style={{ marginBottom: 12 }}>
-                    <Text style={{ fontSize: 16 }}>
-                      Цена: <span style={{ fontWeight: 'bold', color: 'var(--vkui--color_text_accent)' }}>
-                        {formatPrice(selectedItem.base_price)}
-                      </span>
-                    </Text>
-                    {selectedCharacter && (
-                      <Text style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)', marginTop: 4 }}>
-                        У вас: {formatPrice(selectedCharacter.currency)}
-                      </Text>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <Button
-                      size="l"
-                      mode="primary"
-                      stretched
-                      onClick={() => handlePurchase(selectedItem)}
-                      disabled={loading || !selectedCharacter || (selectedCharacter.currency < selectedItem.base_price)}
-                    >
-                      Подтвердить покупку
-                    </Button>
-                    <Button
-                      size="l"
-                      mode="secondary"
-                      stretched
-                      onClick={() => setSelectedItem(null)}
-                    >
-                      Отмена
-                    </Button>
-                  </div>
-                </Div>
-              </Card>
-            </Group>
           )}
         </>
       )}
@@ -660,6 +620,102 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
           )}
         </>
       )}
+
+      {/* Модальное окно подтверждения покупки */}
+      <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
+        <ModalPage
+          id="purchase"
+          onClose={() => {
+            setActiveModal(null);
+            setSelectedItem(null);
+          }}
+          header={
+            <ModalPageHeader>
+              Подтверждение покупки
+            </ModalPageHeader>
+          }
+        >
+          {selectedItem && (
+            <Group>
+              <Div>
+                <Text weight="2" style={{ fontSize: 20, marginBottom: 8 }}>
+                  {selectedItem.name}
+                </Text>
+                
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    <span style={{
+                      padding: '4px 12px',
+                      borderRadius: 4,
+                      fontSize: 12,
+                      backgroundColor: rarityColors[selectedItem.rarity],
+                      color: 'white'
+                    }}>
+                      {getRarityLabel(selectedItem.rarity)}
+                    </span>
+                    {selectedItem.island && (
+                      <span style={{
+                        padding: '4px 12px',
+                        borderRadius: 4,
+                        fontSize: 12,
+                        backgroundColor: 'var(--vkui--color_background_secondary)',
+                      }}>
+                        {selectedItem.island}
+                      </span>
+                    )}
+                    {selectedItem.rank_required && (
+                      <span style={{
+                        padding: '4px 12px',
+                        borderRadius: 4,
+                        fontSize: 12,
+                        backgroundColor: 'var(--vkui--color_background_accent)',
+                        color: 'white'
+                      }}>
+                        Ранг {selectedItem.rank_required}+
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <Text style={{ fontSize: 14, marginBottom: 16, lineHeight: 1.4 }}>
+                  {selectedItem.description}
+                </Text>
+
+                <FormItem top="Цена">
+                  <div style={{ fontSize: 24, fontWeight: 'bold', color: 'var(--vkui--color_text_accent)' }}>
+                    {formatPrice(selectedItem.base_price)}
+                  </div>
+                </FormItem>
+
+                {selectedCharacter && (
+                  <FormItem top="Доступно средств">
+                    <Text style={{ fontSize: 16 }}>
+                      {formatPrice(selectedCharacter.currency)}
+                    </Text>
+                  </FormItem>
+                )}
+
+                <FormItem>
+                  <Button
+                    size="l"
+                    mode="primary"
+                    stretched
+                    onClick={async () => {
+                      await handlePurchase(selectedItem);
+                      setActiveModal(null);
+                      setSelectedItem(null);
+                    }}
+                    disabled={loading || !selectedCharacter || (selectedCharacter.currency < selectedItem.base_price)}
+                    loading={loading}
+                  >
+                    Подтвердить покупку
+                  </Button>
+                </FormItem>
+              </Div>
+            </Group>
+          )}
+        </ModalPage>
+      </ModalRoot>
 
       {snackbar}
     </Panel>

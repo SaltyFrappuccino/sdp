@@ -248,6 +248,10 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
         // Открываем пак
         const openResponse = await fetch(`${API_URL}/collections/open-pack/${result.purchase_id}`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            character_id: selectedCharacter.id,
+          }),
         });
 
         if (openResponse.ok) {
@@ -361,56 +365,6 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
       {/* Вкладка "Паки" */}
       {activeTab === 'packs' && (
         <>
-          {/* Серии */}
-          <Group header={<Header>Серии коллекций</Header>}>
-            {series.map((s) => {
-              const progress = getCollectionProgress(s.id);
-              return (
-                <Card key={s.id} mode="outline" style={{ marginBottom: 8 }}>
-                  <Div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <Text weight="2" style={{ fontSize: 18 }}>
-                          {s.name}
-                        </Text>
-                        {s.season && (
-                          <Text style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>
-                            Сезон {s.season}
-                          </Text>
-                        )}
-                      </div>
-                      <Counter mode="primary">{progress.collected}/{progress.total}</Counter>
-                    </div>
-                    <Text style={{ fontSize: 14, marginBottom: 12 }}>
-                      {s.description}
-                    </Text>
-                    {selectedCharacter && (
-                      <>
-                        <Progress value={progress.percentage} />
-                        <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)', marginTop: 4 }}>
-                          Собрано: {progress.percentage}%
-                        </Text>
-                      </>
-                    )}
-                    <Button
-                      size="m"
-                      mode="secondary"
-                      stretched
-                      style={{ marginTop: 8 }}
-                      onClick={() => {
-                        setSelectedSeries(s);
-                        fetchSeriesDetails(s.id);
-                        setActiveModal('series');
-                      }}
-                    >
-                      Просмотреть предметы
-                    </Button>
-                  </Div>
-                </Card>
-              );
-            })}
-          </Group>
-
           {/* Доступные паки */}
           <Group header={<Header>Доступные паки</Header>}>
             <CardGrid size="l">
@@ -512,6 +466,56 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
       {/* Вкладка "Моя коллекция" */}
       {activeTab === 'collection' && (
         <>
+          {/* Серии коллекций */}
+          <Group header={<Header>Серии</Header>}>
+            {series.map((s) => {
+              const progress = getCollectionProgress(s.id);
+              return (
+                <Card key={s.id} mode="outline" style={{ marginBottom: 8 }}>
+                  <Div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <Text weight="2" style={{ fontSize: 18 }}>
+                          {s.name}
+                        </Text>
+                        {s.season && (
+                          <Text style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>
+                            Сезон {s.season}
+                          </Text>
+                        )}
+                      </div>
+                      <Counter mode="primary">{progress.collected}/{progress.total}</Counter>
+                    </div>
+                    <Text style={{ fontSize: 14, marginBottom: 12 }}>
+                      {s.description}
+                    </Text>
+                    {selectedCharacter && (
+                      <>
+                        <Progress value={progress.percentage} />
+                        <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)', marginTop: 4 }}>
+                          Собрано: {progress.percentage}%
+                        </Text>
+                      </>
+                    )}
+                    <Button
+                      size="m"
+                      mode="secondary"
+                      stretched
+                      style={{ marginTop: 8 }}
+                      onClick={() => {
+                        setSelectedSeries(s);
+                        fetchSeriesDetails(s.id);
+                        setActiveModal('series');
+                      }}
+                    >
+                      Просмотреть предметы
+                    </Button>
+                  </Div>
+                </Card>
+              );
+            })}
+          </Group>
+
           {selectedCharacter && collection.length > 0 ? (
             <>
               {/* Статистика */}
