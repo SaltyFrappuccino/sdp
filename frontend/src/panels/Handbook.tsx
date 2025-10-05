@@ -84,7 +84,7 @@ export const Handbook = () => {
 
 
   const menu = (
-    <SplitCol width="100%" maxWidth="350px" spaced={platform !== Platform.VKCOM}>
+    <SplitCol width="100%" maxWidth="350px">
       <Panel id="menu">
         <PanelHeader>Справочник</PanelHeader>
         <Search value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
@@ -108,7 +108,7 @@ export const Handbook = () => {
   );
 
   const content = (
-    <SplitCol spaced>
+    <SplitCol>
       <View activePanel="content">
         <Panel id="content">
           <PanelHeader
@@ -119,17 +119,17 @@ export const Handbook = () => {
             }
           >
             {activeSection?.title || 'Справочник'}
-          </PanelHeader>
-          <Group>
+      </PanelHeader>
+      <Group>
             {activeSection ? (
               <div style={{ padding: '12px' }}>
                 <Markdown>{activeSection.content}</Markdown>
-              </div>
-            ) : (
+            </div>
+          ) : (
               <Text style={{ padding: '12px' }}>Выберите раздел для чтения.</Text>
             )}
-          </Group>
-        </Panel>
+      </Group>
+    </Panel>
       </View>
     </SplitCol>
   );

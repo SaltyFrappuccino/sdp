@@ -79,7 +79,7 @@ export const App = () => {
             <MyAnketasPanel id="my_anketas" fetchedUser={fetchedUser} />
             <ActivityRequestsPanel id="activity_requests" fetchedUser={fetchedUser} isAdmin={false} />
             <AdminActivityRequestsPanel id="admin_activity_requests" />
-            <Handbook id="handbook" />
+            <Handbook />
             <MarketExchangePanel id="market_exchange" fetchedUser={fetchedUser} />
             <AdminMarketPanel id="admin_market" />
             <CasinoPanel id="casino" fetchedUser={fetchedUser} />
