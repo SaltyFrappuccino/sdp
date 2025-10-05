@@ -5957,8 +5957,13 @@ router.post('/collections/buy-pack', async (req, res) => {
     // Списываем кредиты
     await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [pack.price, character_id]);
 
+    // Возвращаем pack_id для последующего открытия
     await db.close();
-    res.json({ success: true, message: 'Pack purchased successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Pack purchased successfully',
+      purchase_id: pack_id // Используем pack_id как purchase_id для открытия
+    });
   } catch (error) {
     console.error('Error buying pack:', error);
     res.status(500).json({ error: 'Failed to buy pack' });
@@ -5969,7 +5974,12 @@ router.post('/collections/buy-pack', async (req, res) => {
 router.post('/collections/open-pack/:pack_id', async (req, res) => {
   try {
     const { pack_id } = req.params;
-    const { character_id } = req.body;
+    let { character_id } = req.body;
+
+    // Поддержка передачи character_id в query параметрах для совместимости
+    if (!character_id && req.query.character_id) {
+      character_id = req.query.character_id;
+    }
 
     if (!character_id) {
       return res.status(400).json({ error: 'Character ID required' });
