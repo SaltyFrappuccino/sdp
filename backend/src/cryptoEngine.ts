@@ -1,7 +1,7 @@
 import { initDB } from './database.js';
 
-// Получаем соединение с базой данных
-let db: any = null;
+// База данных
+let dbInstance: any = null;
 
 interface CryptoCurrency {
   id: number;
@@ -28,10 +28,9 @@ const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 минут
  */
 async function updateCryptoPrices() {
   try {
-    if (!db) {
-      db = await initDB();
-    }
     console.log('[CryptoEngine] Начало обновления цен криптовалют...');
+    
+    const db = dbInstance || await initDB();
 
     // Получаем все активные криптовалюты
     const cryptocurrencies = db.prepare(`
@@ -126,9 +125,7 @@ async function updateCryptoPrices() {
  */
 async function cleanupExpiredEvents() {
   try {
-    if (!db) {
-      db = await initDB();
-    }
+    const db = dbInstance || await initDB();
     const result = db.prepare(`
       DELETE FROM CryptoEvents
       WHERE datetime(end_time) < datetime('now')
@@ -150,7 +147,7 @@ export async function startCryptoEngine() {
   console.log(`[CryptoEngine] Интервал обновления: ${UPDATE_INTERVAL / 1000} секунд`);
 
   // Инициализируем базу данных
-  db = await initDB();
+  dbInstance = await initDB();
 
   // Первое обновление сразу при запуске
   await updateCryptoPrices();
