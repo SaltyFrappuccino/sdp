@@ -25,13 +25,21 @@ import {
   Search,
   Cell,
   Tabs,
-  TabsItem
+  TabsItem,
+  SimpleCell,
+  Text,
+  Subhead,
+  Counter,
+  Badge,
+  RichCell,
+  Avatar,
+  Separator
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect, ReactNode } from 'react';
 import { API_URL } from '../api';
 import { exportAnketaToJson, downloadJsonFile } from '../utils/anketaExport';
-import { Icon24CheckCircleOutline, Icon24ErrorCircle, Icon24Add } from '@vkontakte/icons';
+import { Icon24CheckCircleOutline, Icon24ErrorCircle, Icon24Add, Icon24Download, Icon24Settings, Icon24Users, Icon24MoneyCircle, Icon24Gift } from '@vkontakte/icons';
 
 interface Character {
   id: number;
@@ -78,7 +86,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const [editingItem, setEditingItem] = useState<Partial<MarketItem> | null>(null);
   const [characterSearch, setCharacterSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'characters' | 'market' | 'updates' | 'bulk'>('characters');
+  const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'market' | 'crypto' | 'purchases' | 'collections' | 'updates' | 'bulk'>('overview');
 
   const handleBackup = async () => {
     try {
@@ -149,254 +157,446 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
      setUpdates(data);
    } catch (error) {
      console.error('Failed to fetch updates:', error);
-     showResultSnackbar('Не удалось загрузить обновления', false);
+      showResultSnackbar('Не удалось загрузить изменения', false);
    } finally {
      setLoading(prev => ({ ...prev, updates: false }));
    }
   };
 
   useEffect(() => {
-    const adminId = localStorage.getItem('adminId');
-    if (!adminId) {
-      routeNavigator.replace('admin_login');
-      return;
-    }
     fetchCharacters();
     fetchMarketItems();
     fetchUpdates();
-  }, [routeNavigator]);
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminId');
-    routeNavigator.replace('/');
-  };
-
-  const showResultSnackbar = (message: string, isSuccess: boolean) => {
+  const showResultSnackbar = (text: string, isSuccess: boolean) => {
     setSnackbar(
       <Snackbar
         onClose={() => setSnackbar(null)}
         before={isSuccess ? <Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" /> : <Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
       >
-        {message}
+        {text}
       </Snackbar>
     );
   };
 
-  const handleExportAnketa = async (characterId: number) => {
-    try {
-      const response = await fetch(`${API_URL}/characters/${characterId}`);
-      const character = await response.json();
-      
-      const jsonString = exportAnketaToJson(character, { first_name: 'Admin' });
-      const filename = `anketa_${character.character_name}_${new Date().toISOString().split('T')[0]}.json`;
-      downloadJsonFile(jsonString, filename);
-      
-      showResultSnackbar('Анкета успешно экспортирована!', true);
-    } catch (error) {
-      showResultSnackbar('Ошибка при экспорте анкеты', false);
-    }
-  };
-
-  const handleMarketReset = async () => {
-    const adminId = localStorage.getItem('adminId');
-    
-    // Подтверждение действия
-    const confirmed = confirm(
-      '⚠️ ВНИМАНИЕ! Это действие:\n\n' +
-      '1. Обнулит валюту у всех персонажей\n' +
-      '2. Удалит все акции, шорты и ордера\n' +
-      '3. Сбросит цены акций к базовым значениям\n' +
-      '4. Восстановит максимальное количество акций\n\n' +
-      'Это действие НЕОБРАТИМО!\n\n' +
-      'Продолжить?'
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-      const response = await fetch(`${API_URL}/admin/market/reset`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-admin-id': adminId || '' 
-        }
-      });
-
-      if (response.ok) {
-        showResultSnackbar('✅ Биржа полностью сброшена к базовым значениям!', true);
-      } else {
-        const errorData = await response.json();
-        showResultSnackbar(errorData.error || 'Ошибка при сбросе биржи', false);
-      }
-    } catch (error) {
-      console.error('Market reset error:', error);
-      showResultSnackbar('Ошибка соединения при сбросе биржи', false);
-    }
-  };
-  
-  const handleStatusChange = async (characterId: number, status: 'Принято' | 'Отклонено') => {
-    const adminId = localStorage.getItem('adminId');
-    try {
-      const response = await fetch(`${API_URL}/characters/${characterId}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-id': adminId || '' },
-        body: JSON.stringify({ status }),
-      });
-      if (response.ok) {
-        showResultSnackbar(`Статус анкеты #${characterId} обновлен на "${status}"`, true);
-        fetchCharacters();
-      } else {
-        const result = await response.json();
-        throw new Error(result.error || 'Не удалось обновить статус');
-      }
-    } catch (error) {
-       const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
-       showResultSnackbar(message, false);
-    }
-  };
-
-  const handleDeleteCharacter = async (characterId: number) => {
-     setPopout(
-      <Alert
-        actions={[{ title: 'Отмена', mode: 'cancel' }, { title: 'Удалить', mode: 'destructive', action: async () => {
-          const adminId = localStorage.getItem('adminId');
-           try {
-              const response = await fetch(`${API_URL}/characters/${characterId}`, {
-                method: 'DELETE',
-                headers: { 'x-admin-id': adminId || '' }
-              });
-              if (response.ok) {
-                showResultSnackbar(`Анкета #${characterId} удалена`, true);
-                fetchCharacters();
-              } else {
-                const result = await response.json();
-                throw new Error(result.error || 'Не удалось удалить анкету');
-              }
-            } catch (error) {
-              const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
-              showResultSnackbar(message, false);
-            }
-        }}]}
-        actionsLayout="vertical"
-        onClose={() => setPopout(null)}
-      >
-        <p>Подтверждение удаления</p>
-        <p>{`Вы уверены, что хотите удалить анкету ID ${characterId}? Это действие необратимо.`}</p>
-      </Alert>
-    );
-  };
-
-  const openMarketItemModal = (item: Partial<MarketItem> | null) => {
-    setEditingItem(item ? { ...item, item_data: item.item_data || {} } : { item_type: 'Обычный', item_data: {}, quantity: 1 });
-    setActiveModal(MODAL_PAGE_MARKET_ITEM);
+  const handleLogout = () => {
+    localStorage.removeItem('adminId');
+    routeNavigator.push('/');
   };
 
   const handleSaveMarketItem = async () => {
-    const adminId = localStorage.getItem('adminId');
-    const url = editingItem?.id ? `${API_URL}/market/items/${editingItem.id}` : `${API_URL}/market/items`;
-    const method = editingItem?.id ? 'PUT' : 'POST';
+    if (!editingItem) return;
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', 'x-admin-id': adminId || '' },
+      const response = await fetch(`${API_URL}/market/items`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-id': localStorage.getItem('adminId') || '',
+        },
         body: JSON.stringify(editingItem),
       });
+
       if (response.ok) {
-        showResultSnackbar('Товар сохранен', true);
+        showResultSnackbar('Товар успешно добавлен', true);
         setActiveModal(null);
+        setEditingItem(null);
         fetchMarketItems();
       } else {
-        const result = await response.json();
-        throw new Error(result.error || 'Не удалось сохранить товар');
+        const errorData = await response.json();
+        showResultSnackbar(errorData.error || 'Ошибка при добавлении товара', false);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
-      showResultSnackbar(message, false);
+      showResultSnackbar('Ошибка сети', false);
     }
   };
 
-  const handleDeleteMarketItem = async (itemId: number) => {
-    setPopout(
-      <Alert
-        actions={[{ title: 'Отмена', mode: 'cancel' }, { title: 'Удалить', mode: 'destructive', action: async () => {
-          const adminId = localStorage.getItem('adminId');
-          try {
-            const response = await fetch(`${API_URL}/market/items/${itemId}`, {
-              method: 'DELETE',
-              headers: { 'x-admin-id': adminId || '' },
-            });
-            if (response.ok) {
-              showResultSnackbar(`Товар #${itemId} удален`, true);
-              fetchMarketItems();
-            } else {
-              const result = await response.json();
-              throw new Error(result.error || 'Не удалось удалить товар');
-            }
-          } catch (error) {
-            const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
-            showResultSnackbar(message, false);
-          }
-        }}]}
-        actionsLayout="vertical"
-        onClose={() => setPopout(null)}
-      >
-        <p>Подтверждение удаления</p>
-        <p>{`Вы уверены, что хотите удалить товар ID ${itemId}?`}</p>
-      </Alert>
-    );
+  const filteredCharacters = characters.filter(char =>
+    char.character_name.toLowerCase().includes(characterSearch.toLowerCase()) ||
+    char.faction.toLowerCase().includes(characterSearch.toLowerCase())
+  );
+
+  const filteredMarketItems = marketItems.filter(item =>
+    item.name.toLowerCase().includes(itemSearch.toLowerCase())
+  );
+
+  const renderOverviewTab = () => (
+    <>
+      <Group header={<Header>📊 Общая статистика</Header>}>
+        <CardGrid size="l">
+          <Card>
+            <SimpleCell
+              before={<Icon24Users />}
+              after={<Counter mode="primary">{characters.length}</Counter>}
+            >
+              <Text weight="2">Всего персонажей</Text>
+              <Subhead>Зарегистрированных в системе</Subhead>
+            </SimpleCell>
+          </Card>
+          <Card>
+            <SimpleCell
+              after={<Counter mode="primary">{marketItems.length}</Counter>}
+            >
+              <Text weight="2">Товаров в маркете</Text>
+              <Subhead>Доступно для покупки</Subhead>
+            </SimpleCell>
+          </Card>
+          <Card>
+            <SimpleCell
+              after={<Counter mode="primary">{updates.length}</Counter>}
+            >
+              <Text weight="2">Ожидающих изменений</Text>
+              <Subhead>В очереди на обработку</Subhead>
+            </SimpleCell>
+          </Card>
+        </CardGrid>
+      </Group>
+
+      <Group header={<Header>🔧 Системные операции</Header>}>
+        <Div>
+          <ButtonGroup stretched mode="vertical" gap="m">
+            <Button 
+              size="l" 
+              mode="primary" 
+              onClick={handleBackup}
+              before={<Icon24Download />}
+            >
+              💾 Скачать бэкап базы данных
+            </Button>
+            <Button 
+              size="l" 
+              mode="secondary" 
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${API_URL}/admin/collections/fix-rarity`, { method: 'POST' });
+                  const data = await response.json();
+                  showResultSnackbar(data.message || 'Редкости обновлены', true);
+    } catch (error) {
+                  showResultSnackbar('Ошибка обновления редкостей', false);
+                }
+              }}
+              before={<Icon24Settings />}
+            >
+              🔧 Исправить редкость предметов
+            </Button>
+          </ButtonGroup>
+        </Div>
+      </Group>
+
+      <Group header={<Header>📚 Документация API</Header>}>
+        <Div>
+          <Text style={{ marginBottom: 16, color: 'var(--vkui--color_text_secondary)' }}>
+            Полная документация всех API endpoints доступна через Swagger UI
+          </Text>
+          <Button 
+            size="l" 
+            mode="outline" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            stretched
+          >
+            📖 Открыть Swagger UI
+          </Button>
+        </Div>
+      </Group>
+    </>
+  );
+
+  const renderCharactersTab = () => (
+    <>
+      <Group header={<Header>👥 Управление персонажами</Header>}>
+        <Search
+          value={characterSearch}
+          onChange={(e) => setCharacterSearch(e.target.value)}
+          placeholder="Поиск по имени или фракции"
+        />
+        <Div>
+          {loading.characters ? (
+            <Spinner size="m" style={{ margin: '20px 0' }} />
+          ) : (
+            filteredCharacters.map((character) => (
+              <RichCell
+                key={character.id}
+                before={<Avatar size={40} />}
+                after={
+                  <Badge mode="new">
+                    {character.status}
+                  </Badge>
+                }
+                multiline
+                subtitle={`Ранг: ${character.rank} • Фракция: ${character.faction}`}
+              >
+                {character.character_name}
+              </RichCell>
+            ))
+          )}
+        </Div>
+      </Group>
+    </>
+  );
+
+  const renderMarketTab = () => (
+    <>
+      <Group header={<Header>🛒 Управление маркетом</Header>}>
+        <Search
+          value={itemSearch}
+          onChange={(e) => setItemSearch(e.target.value)}
+          placeholder="Поиск товаров"
+        />
+        <Div>
+          <Button
+            size="l"
+            mode="primary"
+            onClick={() => {
+              setEditingItem({
+                name: '',
+                description: '',
+                price: 0,
+                item_type: 'Обычный',
+                item_data: {},
+                image_url: '',
+                quantity: 1
+              });
+    setActiveModal(MODAL_PAGE_MARKET_ITEM);
+            }}
+            before={<Icon24Add />}
+          >
+            Добавить товар
+          </Button>
+        </Div>
+        <Div>
+          {loading.items ? (
+            <Spinner size="m" style={{ margin: '20px 0' }} />
+          ) : (
+            filteredMarketItems.map((item) => (
+              <RichCell
+                key={item.id}
+                multiline
+                after={`${item.price} ₭`}
+                subtitle={`Тип: ${item.item_type} • Количество: ${item.quantity}`}
+              >
+                {item.name}
+              </RichCell>
+            ))
+          )}
+        </Div>
+      </Group>
+    </>
+  );
+
+  const renderCryptoTab = () => (
+    <Group header={<Header>💰 Управление криптовалютами</Header>}>
+      <Div>
+        <Text style={{ marginBottom: 16, color: 'var(--vkui--color_text_secondary)' }}>
+          Управление криптовалютами доступно через API. Используйте Swagger UI для полного функционала.
+        </Text>
+        <ButtonGroup stretched mode="vertical" gap="m">
+          <Button 
+            size="l" 
+            mode="secondary" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            before={<Icon24MoneyCircle />}
+          >
+            📈 Управление криптовалютами
+          </Button>
+          <Button 
+            size="l" 
+            mode="secondary" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+          >
+            📊 События и волатильность
+          </Button>
+        </ButtonGroup>
+      </Div>
+    </Group>
+  );
+
+  const renderPurchasesTab = () => (
+    <Group header={<Header>🛍️ Управление покупками</Header>}>
+      <Div>
+        <Text style={{ marginBottom: 16, color: 'var(--vkui--color_text_secondary)' }}>
+          Управление категориями и предметами для покупки доступно через API.
+        </Text>
+        <ButtonGroup stretched mode="vertical" gap="m">
+          <Button 
+            size="l" 
+            mode="secondary" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+          >
+            🏷️ Категории покупок
+          </Button>
+          <Button 
+            size="l" 
+            mode="secondary" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            before={<Icon24Gift />}
+          >
+            🎁 Предметы для покупки
+          </Button>
+        </ButtonGroup>
+      </Div>
+    </Group>
+  );
+
+  const renderCollectionsTab = () => (
+    <Group header={<Header>🎴 Управление коллекциями</Header>}>
+      <Div>
+        <Text style={{ marginBottom: 16, color: 'var(--vkui--color_text_secondary)' }}>
+          Управление сериями, предметами и паками коллекций доступно через API.
+        </Text>
+        <ButtonGroup stretched mode="vertical" gap="m">
+          <Button 
+            size="l" 
+            mode="secondary" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            before={<Icon24Gift />}
+          >
+            📚 Серии коллекций
+          </Button>
+          <Button 
+            size="l" 
+            mode="secondary" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            before={<Icon24Add />}
+          >
+            🎁 Предметы коллекций
+          </Button>
+          <Button 
+            size="l" 
+            mode="secondary" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            before={<Icon24Gift />}
+          >
+            📦 Паки коллекций
+          </Button>
+        </ButtonGroup>
+      </Div>
+    </Group>
+  );
+
+  const renderUpdatesTab = () => (
+    <Group header={<Header>📝 Ожидающие изменения</Header>}>
+      <Div>
+        {loading.updates ? (
+          <Spinner size="m" style={{ margin: '20px 0' }} />
+        ) : (
+          updates.map((update) => (
+            <RichCell
+              key={update.id}
+              after={
+                <Badge mode="new">
+                  {update.status}
+                </Badge>
+              }
+            >
+              {update.character_name}
+            </RichCell>
+          ))
+        )}
+      </Div>
+    </Group>
+  );
+
+  const renderBulkTab = () => (
+    <Group header={<Header>⚡ Массовые операции</Header>}>
+      <Div>
+        <ButtonGroup stretched mode="vertical" gap="m">
+          <Button size="l" mode="secondary">
+            👑 Массовое управление персонажами
+          </Button>
+          <Button size="l" mode="secondary">
+            📈 Управление Биржей
+          </Button>
+          <Button size="l" mode="secondary">
+            🎪 Управление Ивентами
+          </Button>
+          <Button size="l" mode="secondary">
+            📋 Управление заявками на активности
+          </Button>
+        </ButtonGroup>
+      </Div>
+    </Group>
+  );
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return renderOverviewTab();
+      case 'characters':
+        return renderCharactersTab();
+      case 'market':
+        return renderMarketTab();
+      case 'crypto':
+        return renderCryptoTab();
+      case 'purchases':
+        return renderPurchasesTab();
+      case 'collections':
+        return renderCollectionsTab();
+      case 'updates':
+        return renderUpdatesTab();
+      case 'bulk':
+        return renderBulkTab();
+      default:
+        return renderOverviewTab();
+    }
   };
 
   const modal = (
     <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
       <ModalPage
         id={MODAL_PAGE_MARKET_ITEM}
-        header={<ModalPageHeader>{editingItem?.id ? 'Редактировать товар' : 'Добавить товар'}</ModalPageHeader>}
-        onClose={() => setActiveModal(null)}
+        onClose={() => {
+          setActiveModal(null);
+          setEditingItem(null);
+        }}
+        header={<ModalPageHeader>Добавить товар</ModalPageHeader>}
       >
-        <FormLayoutGroup onSubmit={(e: React.FormEvent) => { e.preventDefault(); handleSaveMarketItem(); }}>
+        <FormLayoutGroup>
           <FormItem top="Название">
-            <Input value={editingItem?.name || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, name: e.target.value }))} />
+            <Input
+              value={editingItem?.name || ''}
+              onChange={(e) => setEditingItem(prev => ({ ...prev, name: e.target.value }))}
+            />
           </FormItem>
           <FormItem top="Описание">
-            <Textarea value={editingItem?.description || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, description: e.target.value }))} />
+            <Textarea
+              value={editingItem?.description || ''}
+              onChange={(e) => setEditingItem(prev => ({ ...prev, description: e.target.value }))}
+            />
           </FormItem>
           <FormItem top="Цена">
-            <Input type="number" value={editingItem?.price || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, price: Number(e.target.value) }))} />
-          </FormItem>
-          <FormItem top="URL изображения">
-            <Input value={editingItem?.image_url || ''} onChange={(e) => setEditingItem(prev => ({ ...prev, image_url: e.target.value }))} />
-          </FormItem>
-          <FormItem top="Количество">
-            <Input type="number" value={editingItem?.quantity || 0} onChange={(e) => setEditingItem(prev => ({ ...prev, quantity: Number(e.target.value) }))} />
+            <Input
+              type="number"
+              value={editingItem?.price || 0}
+              onChange={(e) => setEditingItem(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
+            />
           </FormItem>
           <FormItem top="Тип предмета">
             <Select
-              value={editingItem?.item_type}
+              value={editingItem?.item_type || 'Обычный'}
               onChange={(e) => setEditingItem(prev => ({ ...prev, item_type: e.target.value as any }))}
               options={[
                 { label: 'Обычный', value: 'Обычный' },
-                { label: 'Синки', value: 'Синки' },
+                { label: 'Синки', value: 'Синки' }
               ]}
             />
           </FormItem>
           {editingItem?.item_type === 'Синки' && (
             <>
-              <FormItem top="Тип Синки">
+              <FormItem top="Тип синки">
                 <Select
-                  value={editingItem.item_data?.sinki_type}
+                  value={editingItem?.item_data?.sinki_type || 'Осколок'}
                   onChange={(e) => setEditingItem(prev => ({ ...prev, item_data: { ...prev?.item_data, sinki_type: e.target.value as any } }))}
                   options={[
                     { label: 'Осколок', value: 'Осколок' },
                     { label: 'Фокус', value: 'Фокус' },
-                    { label: 'Эхо', value: 'Эхо' },
+                    { label: 'Эхо', value: 'Эхо' }
                   ]}
                 />
               </FormItem>
-              <FormItem top="Ранг Синки">
+              <FormItem top="Ранг">
                 <Select
-                  placeholder="Не выбрано"
-                  value={editingItem.item_data?.rank}
+                  value={editingItem?.item_data?.rank || 'F'}
                   onChange={(e) => setEditingItem(prev => ({ ...prev, item_data: { ...prev?.item_data, rank: e.target.value as any } }))}
                   options={[
                     { label: 'F', value: 'F' }, { label: 'E', value: 'E' }, { label: 'D', value: 'D' },
@@ -424,84 +624,42 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         Админ-панель
       </PanelHeader>
       
-      {/* Быстрый доступ к новым модулям */}
-      <Group header={<Header>Управление новыми модулями</Header>}>
-        <Div>
-          <ButtonGroup stretched mode="horizontal" gap="m">
-            <Button 
-              size="m" 
-              mode="secondary" 
-              onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
-              stretched
-            >
-              Криптовалюты (API)
-            </Button>
-            <Button 
-              size="m" 
-              mode="secondary" 
-              onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
-              stretched
-            >
-              Покупки (API)
-            </Button>
-          </ButtonGroup>
-        </Div>
-        <Div>
-          <Button 
-            size="m" 
-            mode="secondary" 
-            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
-            stretched
-          >
-            Коллекции (API)
-          </Button>
-        </Div>
-        <Div>
-          <Button 
-            size="m" 
-            mode="primary" 
-            onClick={handleBackup}
-            stretched
-          >
-            💾 Скачать бэкап базы данных
-          </Button>
-        </Div>
-        <Div>
-          <Button 
-            size="m" 
-            mode="secondary" 
-            onClick={async () => {
-              try {
-                const response = await fetch(`${API_URL}/admin/collections/fix-rarity`, { method: 'POST' });
-                const data = await response.json();
-                showResultSnackbar(data.message || 'Редкости обновлены', true);
-              } catch (error) {
-                showResultSnackbar('Ошибка обновления редкостей', false);
-              }
-            }}
-            stretched
-          >
-            🔧 Исправить редкость предметов
-          </Button>
-        </Div>
-        <Div style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>
-          Управление криптовалютами, покупками и коллекциями доступно через API (Swagger UI). 
-          Полноценный интерфейс управления будет добавлен в следующих обновлениях.
-        </Div>
-      </Group>
-      
       <Tabs>
+        <TabsItem 
+          selected={activeTab === 'overview'} 
+          onClick={() => setActiveTab('overview')}
+        >
+          📊 Обзор
+        </TabsItem>
         <TabsItem 
           selected={activeTab === 'characters'} 
           onClick={() => setActiveTab('characters')}
         >
-          👥 Анкеты
+          👥 Персонажи
         </TabsItem>
         <TabsItem 
           selected={activeTab === 'market'} 
           onClick={() => setActiveTab('market')}
         >
           🛒 Маркет
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'crypto'} 
+          onClick={() => setActiveTab('crypto')}
+        >
+          💰 Криптовалюты
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'purchases'} 
+          onClick={() => setActiveTab('purchases')}
+        >
+          🛍️ Покупки
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'collections'} 
+          onClick={() => setActiveTab('collections')}
+        >
+          🎴 Коллекции
         </TabsItem>
         <TabsItem 
           selected={activeTab === 'updates'} 
@@ -517,153 +675,9 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         </TabsItem>
       </Tabs>
 
-      {activeTab === 'characters' && (
-        <Group>
-        <Header>Реестр анкет</Header>
-        <Search value={characterSearch} onChange={(e) => setCharacterSearch(e.target.value)} />
-        {loading.characters ? <Spinner /> : (
-          <CardGrid size="l">
-            {characters.filter(c => c.character_name.toLowerCase().includes(characterSearch.toLowerCase())).map((char) => (
-              <Card key={char.id}>
-                <Header>{char.character_name}</Header>
-                <Div>
-                  <p><b>Статус:</b> {char.status}</p>
-                  <p><b>Ранг:</b> {char.rank}</p>
-                  <p><b>Фракция:</b> {char.faction}</p>
-                  <p><b>Позиция:</b> {char.faction_position}</p>
-                  <p><b>Автор:</b> <Link href={`https://vk.com/id${char.vk_id}`} target="_blank">{`ID: ${char.vk_id}`}</Link></p>
-                </Div>
-                 <ButtonGroup mode="horizontal" gap="m" stretched style={{ padding: '0 16px 16px' }}>
-                   {char.status === 'на рассмотрении' && (
-                     <>
-                        <Button size="m" appearance="positive" onClick={() => handleStatusChange(char.id, 'Принято')}>
-                          Принять
-                        </Button>
-                        <Button size="m" appearance="negative" onClick={() => handleStatusChange(char.id, 'Отклонено')}>
-                          Отклонить
-                        </Button>
-                     </>
-                   )}
-                  <Button size="m" onClick={() => routeNavigator.push(`/anketa_detail/${char.id}`)}>
-                    Открыть
-                  </Button>
-                  <Button size="m" appearance="neutral" onClick={() => routeNavigator.push(`/admin_anketa_edit/${char.id}`)}>
-                    Редактировать
-                  </Button>
-                  <Button size="m" appearance="positive" onClick={() => handleExportAnketa(char.id)}>
-                    📄 Экспорт
-                  </Button>
-                  <Button size="m" appearance="negative" onClick={() => handleDeleteCharacter(char.id)}>
-                    Удалить
-                  </Button>
-                </ButtonGroup>
-              </Card>
-            ))}
-          </CardGrid>
-        )}
-      </Group>
-      )}
-
-      {activeTab === 'updates' && (
-        <Group>
-       <Header>Ожидающие проверки изменения</Header>
-       {loading.updates ? <Spinner /> : (
-         updates.filter(u => u.status === 'pending').map(update => (
-           <Cell key={update.id} hasActive hasHover onClick={() => routeNavigator.push(`/update_viewer/${update.id}`)}>
-             Запрос на обновление для {update.character_name} (ID: {update.character_id})
-           </Cell>
-         ))
-       )}
-      </Group>
-      )}
-
-      {activeTab === 'market' && (
-        <Group>
-        <Div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Header>Товары на рынке</Header>
-          <Button before={<Icon24Add />} onClick={() => openMarketItemModal(null)}>Добавить товар</Button>
-        </Div>
-        <Search value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} />
-        {loading.items ? <Spinner /> : (
-          <CardGrid size="l">
-            {marketItems.filter(i => i.name.toLowerCase().includes(itemSearch.toLowerCase())).map((item) => (
-              <Card key={item.id}>
-                <Header>{item.name}</Header>
-                <Div>
-                  <p>{item.description}</p>
-                  <p><b>Цена: {item.price}</b></p>
-                  <p><b>В наличии: {item.quantity}</b></p>
-                </Div>
-                <ButtonGroup mode="horizontal" gap="m" stretched style={{ padding: '0 16px 16px' }}>
-                  <Button size="m" onClick={() => openMarketItemModal(item)}>Редактировать</Button>
-                  <Button size="m" appearance="negative" onClick={() => handleDeleteMarketItem(item.id)}>Удалить</Button>
-                </ButtonGroup>
-              </Card>
-            ))}
-          </CardGrid>
-        )}
-      </Group>
-      )}
-
-      {activeTab === 'bulk' && (
-        <Group>
-        <Div>
-          <Button 
-            size="l" 
-            stretched 
-            mode="secondary" 
-            onClick={() => routeNavigator.push('/admin_activity_requests')}
-          >
-            Управление заявками на активности
-          </Button>
-        </Div>
-        <Div>
-          <Button
-            size="l"
-            stretched
-            mode="secondary"
-            onClick={() => routeNavigator.push('/admin_market')}
-          >
-            Управление Биржей
-          </Button>
-        </Div>
-        <Div>
-          <Button
-            size="l"
-            stretched
-            mode="secondary"
-            onClick={() => routeNavigator.push('/admin_events')}
-          >
-            Управление Ивентами
-          </Button>
-        </Div>
-        <Div>
-          <Button
-            size="l"
-            stretched
-            mode="secondary"
-            onClick={() => routeNavigator.push('/bulk_characters')}
-          >
-            👑 Массовое управление персонажами
-          </Button>
-        </Div>
-        <Div>
-          <Button
-            size="l"
-            stretched
-            mode="secondary"
-            onClick={handleMarketReset}
-            style={{ backgroundColor: '#dc3545', color: '#fff' }}
-          >
-            ⚠️ ПОЛНЫЙ СБРОС БИРЖИ
-          </Button>
-        </Div>
-      </Group>
-      )}
-      
-      {snackbar}
-      {popout}
+      {renderContent()}
       {modal}
+      {snackbar}
     </Panel>
   );
 };
