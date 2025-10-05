@@ -82,12 +82,14 @@ const rarityColors = {
 export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
 
-  const [activeTab, setActiveTab] = useState<'catalog' | 'my'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'my' | 'search'>('catalog');
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<PurchaseItem[]>([]);
   const [myPurchases, setMyPurchases] = useState<Purchase[]>([]);
+  const [otherPurchases, setOtherPurchases] = useState<Purchase[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
+  const [searchCharacter, setSearchCharacter] = useState<Character | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [selectedItem, setSelectedItem] = useState<PurchaseItem | null>(null);
   const [filters, setFilters] = useState({
@@ -296,6 +298,12 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
           >
             Мои покупки
           </TabsItem>
+          <TabsItem
+            selected={activeTab === 'search'}
+            onClick={() => setActiveTab('search')}
+          >
+            Поиск
+          </TabsItem>
         </Tabs>
       </Group>
 
@@ -421,13 +429,13 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
                               )}
                               {item.rank_required && (
                                 <span style={{
-                                  padding: '2px 8px',
+                                  padding: '2px 6px',
                                   borderRadius: 4,
-                                  fontSize: 12,
-                                  backgroundColor: 'var(--vkui--color_background_accent)',
-                                  color: 'white'
+                                  fontSize: 10,
+                                  backgroundColor: 'var(--vkui--color_background_tertiary)',
+                                  color: 'var(--vkui--color_text_secondary)'
                                 }}>
-                                  Ранг {item.rank_required}+
+                                  {item.rank_required}+
                                 </span>
                               )}
                             </div>
@@ -557,6 +565,95 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
               <Div>
                 <Text style={{ textAlign: 'center', color: 'var(--vkui--color_text_secondary)' }}>
                   {selectedCharacter ? 'У вас пока нет покупок' : 'Выберите персонажа'}
+                </Text>
+              </Div>
+            </Group>
+          )}
+        </>
+      )}
+
+      {/* Вкладка "Поиск" */}
+      {activeTab === 'search' && (
+        <>
+          <Group header={<Header>Поиск покупок персонажа</Header>}>
+            <FormItem top="Выберите персонажа">
+              <Select
+                value={searchCharacter?.id.toString() || ''}
+                onChange={async (e) => {
+                  const char = characters.find(c => c.id === parseInt(e.target.value));
+                  if (char) {
+                    setSearchCharacter(char);
+                    setLoading(true);
+                    try {
+                      const response = await fetch(`${API_URL}/purchases/my/${char.id}`);
+                      if (response.ok) {
+                        const data = await response.json();
+                        setOtherPurchases(data);
+                      }
+                    } catch (error) {
+                      console.error('Error fetching purchases:', error);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }
+                }}
+                options={[
+                  { label: 'Выберите персонажа', value: '' },
+                  ...characters.map(char => ({
+                    label: `${char.character_name} (${char.rank})`,
+                    value: char.id.toString()
+                  }))
+                ]}
+                placeholder="Выберите персонажа"
+              />
+            </FormItem>
+          </Group>
+
+          {loading && <Spinner size="m" style={{ margin: '20px auto' }} />}
+
+          {!loading && searchCharacter && otherPurchases.length > 0 && (
+            <>
+              <Group header={<Header>Покупки: {searchCharacter.character_name}</Header>}>
+                <Div>
+                  <Text style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>
+                    Всего предметов: {otherPurchases.length}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>
+                    Потрачено: {formatPrice(otherPurchases.reduce((sum, p) => sum + p.purchase_price, 0))}
+                  </Text>
+                </Div>
+              </Group>
+
+              <Group>
+                {otherPurchases.map((purchase) => (
+                  <SimpleCell
+                    key={purchase.id}
+                    before={<div style={{ fontSize: 32 }}>{purchase.category_icon}</div>}
+                    subtitle={`${purchase.category_name} • ${formatPrice(purchase.purchase_price)} • ${formatDate(purchase.purchased_at)}`}
+                    after={
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontSize: 12,
+                        backgroundColor: rarityColors[purchase.rarity as keyof typeof rarityColors],
+                        color: 'white'
+                      }}>
+                        {getRarityLabel(purchase.rarity)}
+                      </span>
+                    }
+                  >
+                    {purchase.name}
+                  </SimpleCell>
+                ))}
+              </Group>
+            </>
+          )}
+
+          {!loading && searchCharacter && otherPurchases.length === 0 && (
+            <Group>
+              <Div>
+                <Text style={{ textAlign: 'center', color: 'var(--vkui--color_text_secondary)' }}>
+                  У этого персонажа пока нет покупок
                 </Text>
               </Div>
             </Group>

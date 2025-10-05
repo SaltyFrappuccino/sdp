@@ -20,6 +20,9 @@ import {
   Progress,
   Counter,
   Avatar,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Icon28DoneOutline, Icon28ErrorCircleOutline, Icon28FavoriteOutline } from '@vkontakte/icons';
@@ -124,6 +127,7 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
   const [openedItems, setOpenedItems] = useState<CollectionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<any>(null);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSeries();
@@ -233,6 +237,13 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
 
       if (response.ok) {
         const result = await response.json();
+        console.log('Buy pack result:', result);
+        
+        // Проверяем наличие purchase_id
+        if (!result.purchase_id) {
+          showSnackbar('Ошибка: не получен ID покупки', false);
+          return;
+        }
         
         // Открываем пак
         const openResponse = await fetch(`${API_URL}/collections/open-pack/${result.purchase_id}`, {
@@ -247,6 +258,9 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
           if (selectedCharacter) {
             fetchCollection(selectedCharacter.id);
           }
+        } else {
+          const openError = await openResponse.json();
+          showSnackbar(openError.error || 'Ошибка открытия пака', false);
         }
       } else {
         const error = await response.json();
@@ -386,6 +400,7 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
                       onClick={() => {
                         setSelectedSeries(s);
                         fetchSeriesDetails(s.id);
+                        setActiveModal('series');
                       }}
                     >
                       Просмотреть предметы
@@ -489,74 +504,6 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
                   Закрыть
                 </Button>
               </Div>
-            </Group>
-          )}
-
-          {/* Детали серии */}
-          {selectedSeries && (
-            <Group header={<Header>{selectedSeries.name}</Header>}>
-              <Div>
-                <Button size="m" mode="secondary" onClick={() => setSelectedSeries(null)}>
-                  ← Назад
-                </Button>
-              </Div>
-
-              {loading && <Spinner size="m" style={{ margin: '20px auto' }} />}
-
-              {!loading && seriesItems.length > 0 && (
-                <Div>
-                  {seriesItems.map((item) => {
-                    const owned = collection.find(c => c.item_id === item.id);
-                    return (
-                      <Card key={item.id} mode="outline" style={{ marginBottom: 8, opacity: owned ? 1 : 0.6 }}>
-                        <Div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{
-                              width: 50,
-                              height: 50,
-                              borderRadius: 8,
-                              backgroundColor: rarityColors[item.rarity],
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 24
-                            }}>
-                              {owned ? '✓' : '?'}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <Text weight="2" style={{ fontSize: 16 }}>
-                                {owned ? item.name : '???'}
-                              </Text>
-                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                                <span style={{
-                                  padding: '2px 8px',
-                                  borderRadius: 4,
-                                  fontSize: 12,
-                                  backgroundColor: rarityColors[item.rarity],
-                                  color: 'white'
-                                }}>
-                                  {rarityLabels[item.rarity]}
-                                </span>
-                                <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)' }}>
-                                  Шанс: {item.drop_rate}%
-                                </Text>
-                                {owned && (
-                                  <Counter mode="primary">×{owned.quantity}</Counter>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          {owned && item.description && (
-                            <Text style={{ fontSize: 14, marginTop: 8, color: 'var(--vkui--color_text_secondary)' }}>
-                              {item.description}
-                            </Text>
-                          )}
-                        </Div>
-                      </Card>
-                    );
-                  })}
-                </Div>
-              )}
             </Group>
           )}
         </>
@@ -707,6 +654,88 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
           )}
         </Group>
       )}
+
+      {/* Модальное окно деталей серии */}
+      <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
+        <ModalPage
+          id="series"
+          onClose={() => {
+            setActiveModal(null);
+            setSelectedSeries(null);
+          }}
+          header={
+            <ModalPageHeader>
+              {selectedSeries?.name || 'Предметы коллекции'}
+            </ModalPageHeader>
+          }
+        >
+          {selectedSeries && (
+            <Group>
+              {loading && <Spinner size="m" style={{ margin: '20px auto' }} />}
+
+              {!loading && seriesItems.length > 0 && (
+                <>
+                  <Div>
+                    <Text style={{ marginBottom: 16, color: 'var(--vkui--color_text_secondary)' }}>
+                      {selectedSeries.description}
+                    </Text>
+                  </Div>
+                  {seriesItems.map((item) => {
+                    const owned = collection.find(c => c.item_id === item.id);
+                    return (
+                      <Card key={item.id} mode="outline" style={{ marginBottom: 8, opacity: owned ? 1 : 0.6 }}>
+                        <Div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{
+                              width: 50,
+                              height: 50,
+                              borderRadius: 8,
+                              backgroundColor: rarityColors[item.rarity],
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 24
+                            }}>
+                              {owned ? '✓' : '?'}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Text weight="2" style={{ fontSize: 16 }}>
+                                {owned ? item.name : '???'}
+                              </Text>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                                <span style={{
+                                  padding: '2px 8px',
+                                  borderRadius: 4,
+                                  fontSize: 12,
+                                  backgroundColor: rarityColors[item.rarity],
+                                  color: 'white'
+                                }}>
+                                  {rarityLabels[item.rarity]}
+                                </span>
+                                <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)' }}>
+                                  Шанс: {item.drop_rate}%
+                                </Text>
+                                {owned && (
+                                  <Counter mode="primary">×{owned.quantity}</Counter>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {owned && item.description && (
+                            <Text style={{ fontSize: 14, marginTop: 8, color: 'var(--vkui--color_text_secondary)' }}>
+                              {item.description}
+                            </Text>
+                          )}
+                        </Div>
+                      </Card>
+                    );
+                  })}
+                </>
+              )}
+            </Group>
+          )}
+        </ModalPage>
+      </ModalRoot>
 
       {snackbar}
     </Panel>

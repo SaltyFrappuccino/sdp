@@ -18,10 +18,15 @@ import {
   Snackbar,
   SimpleCell,
   Avatar,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader,
+  Counter,
+  CardGrid
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Icon28DoneOutline, Icon28ErrorCircleOutline } from '@vkontakte/icons';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { API_URL } from '../api';
 
 interface NavIdProps {
@@ -114,6 +119,7 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
   const [tradeQuantity, setTradeQuantity] = useState('');
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<any>(null);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCryptos();
@@ -367,6 +373,7 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
                         onClick={() => {
                           setSelectedCrypto(crypto);
                           setTradeAction('buy');
+                          setActiveModal('trade');
                         }}
                         disabled={!selectedCharacter}
                       >
@@ -379,6 +386,7 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
                         onClick={() => {
                           setSelectedCrypto(crypto);
                           setTradeAction('sell');
+                          setActiveModal('trade');
                         }}
                         disabled={!selectedCharacter}
                       >
@@ -390,57 +398,6 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
               </Group>
             );
           })}
-
-          {/* Модальное окно торговли */}
-          {selectedCrypto && (
-            <Group header={<Header>{tradeAction === 'buy' ? 'Купить' : 'Продать'} {selectedCrypto.name}</Header>}>
-              <Card>
-                <Div>
-                  <Text weight="2" style={{ marginBottom: 8 }}>
-                    Текущая цена: {formatPrice(selectedCrypto.current_price)} ₭
-                  </Text>
-                  
-                  <FormItem top="Количество монет">
-                    <Input
-                      type="number"
-                      value={tradeQuantity}
-                      onChange={(e) => setTradeQuantity(e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </FormItem>
-
-                  {tradeQuantity && (
-                    <Text style={{ marginTop: 8 }}>
-                      Сумма: {formatPrice(parseFloat(tradeQuantity) * selectedCrypto.current_price)} ₭
-                    </Text>
-                  )}
-
-                  <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                    <Button
-                      size="l"
-                      mode="primary"
-                      stretched
-                      onClick={handleTrade}
-                      disabled={loading || !tradeQuantity}
-                    >
-                      Подтвердить
-                    </Button>
-                    <Button
-                      size="l"
-                      mode="secondary"
-                      stretched
-                      onClick={() => {
-                        setSelectedCrypto(null);
-                        setTradeQuantity('');
-                      }}
-                    >
-                      Отмена
-                    </Button>
-                  </div>
-                </Div>
-              </Card>
-            </Group>
-          )}
         </>
       )}
 
@@ -548,13 +505,14 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
       {/* Вкладка "Топ" */}
       {activeTab === 'leaderboard' && (
         <Group header={<Header>Топ держателей криптовалют</Header>}>
-          {leaderboard.map((entry, index) => (
-            <SimpleCell
-              key={entry.character_id}
-              before={
-                <div style={{
-                  width: 40,
-                  height: 40,
+          {leaderboard.filter(entry => entry.total_value > 0).length > 0 ? (
+            leaderboard.filter(entry => entry.total_value > 0).map((entry, index) => (
+              <SimpleCell
+                key={entry.character_id}
+                before={
+                  <div style={{
+                    width: 40,
+                    height: 40,
                   borderRadius: '50%',
                   backgroundColor: index < 3 ? ['#FFD700', '#C0C0C0', '#CD7F32'][index] : 'var(--vkui--color_background_secondary)',
                   display: 'flex',
@@ -569,7 +527,14 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
             >
               {entry.character_name}
             </SimpleCell>
-          ))}
+          ))
+          ) : (
+            <Div>
+              <Text style={{ textAlign: 'center', color: 'var(--vkui--color_text_secondary)' }}>
+                Нет держателей криптовалют
+              </Text>
+            </Div>
+          )}
         </Group>
       )}
 
@@ -609,6 +574,99 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
           )}
         </>
       )}
+
+      {/* Модальное окно торговли */}
+      <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
+        <ModalPage
+          id="trade"
+          onClose={() => {
+            setActiveModal(null);
+            setTradeQuantity('');
+          }}
+          header={
+            <ModalPageHeader>
+              {tradeAction === 'buy' ? 'Купить' : 'Продать'} {selectedCrypto?.name}
+            </ModalPageHeader>
+          }
+        >
+          {selectedCrypto && (
+            <Group>
+              <Div>
+                <Text weight="2" style={{ fontSize: 18, marginBottom: 4 }}>
+                  {selectedCrypto.name}
+                </Text>
+                <Text style={{ color: 'var(--vkui--color_text_secondary)', marginBottom: 16 }}>
+                  {selectedCrypto.ticker_symbol}
+                </Text>
+
+                {/* График цены */}
+                {selectedCrypto.history && selectedCrypto.history.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={selectedCrypto.history}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="timestamp" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="price" stroke="#3f8ae0" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                <FormItem top="Текущая цена">
+                  <div style={{ fontSize: 24, fontWeight: 'bold', color: 'var(--vkui--color_text_accent)' }}>
+                    {formatPrice(selectedCrypto.current_price)} ₭
+                  </div>
+                </FormItem>
+
+                <FormItem top="Количество монет">
+                  <Input
+                    type="number"
+                    value={tradeQuantity}
+                    onChange={(e) => setTradeQuantity(e.target.value)}
+                    placeholder="0.00"
+                    step="0.01"
+                  />
+                </FormItem>
+
+                {tradeQuantity && parseFloat(tradeQuantity) > 0 && (
+                  <FormItem top="Общая сумма">
+                    <div style={{ fontSize: 20, fontWeight: 'bold' }}>
+                      {formatPrice(parseFloat(tradeQuantity) * selectedCrypto.current_price)} ₭
+                    </div>
+                  </FormItem>
+                )}
+
+                {selectedCharacter && (
+                  <FormItem top="Доступно средств">
+                    <Text style={{ fontSize: 16 }}>
+                      {selectedCharacter.currency.toLocaleString()} ₭
+                    </Text>
+                  </FormItem>
+                )}
+
+                <FormItem>
+                  <Button
+                    size="l"
+                    mode="primary"
+                    stretched
+                    onClick={async () => {
+                      await handleTrade();
+                      setActiveModal(null);
+                      setTradeQuantity('');
+                    }}
+                    disabled={loading || !tradeQuantity || parseFloat(tradeQuantity) <= 0}
+                    loading={loading}
+                  >
+                    {tradeAction === 'buy' ? 'Купить' : 'Продать'}
+                  </Button>
+                </FormItem>
+              </Div>
+            </Group>
+          )}
+        </ModalPage>
+      </ModalRoot>
 
       {snackbar}
     </Panel>
