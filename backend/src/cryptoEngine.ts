@@ -30,7 +30,10 @@ async function updateCryptoPrices() {
   try {
     console.log('[CryptoEngine] Начало обновления цен криптовалют...');
     
-    const db = dbInstance || await initDB();
+    if (!dbInstance) {
+      dbInstance = await initDB();
+    }
+    const db = dbInstance;
 
     // Получаем все активные криптовалюты
     const cryptocurrencies = db.prepare(`
@@ -125,7 +128,10 @@ async function updateCryptoPrices() {
  */
 async function cleanupExpiredEvents() {
   try {
-    const db = dbInstance || await initDB();
+    if (!dbInstance) {
+      dbInstance = await initDB();
+    }
+    const db = dbInstance;
     const result = db.prepare(`
       DELETE FROM CryptoEvents
       WHERE datetime(end_time) < datetime('now')
