@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { initDB } from './database.js';
+import { fileURLToPath } from 'url';
 
 const getAttributePointsForRank = (rank: string): number => {
   switch (rank) {
@@ -798,6 +799,35 @@ router.get('/characters/:id/ai-analysis', async (req: Request, res: Response) =>
   }
 });
 
+router.get('/admin/backup', async (req, res) => {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    
+    // For ES Modules, __dirname is not defined. We create it.
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+
+    const dbPath = path.resolve(__dirname, '../../database.db');
+    
+    if (!fs.existsSync(dbPath)) {
+      console.error(`Database file not found at: ${dbPath}`);
+      return res.status(404).json({ error: 'Database file not found' });
+    }
+    
+    const dbBuffer = fs.readFileSync(dbPath);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `backup_${timestamp}.db`;
+    
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(dbBuffer);
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    res.status(500).json({ error: 'Failed to create backup' });
+  }
+});
+
 router.post('/market/items', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
   if (adminId !== ADMIN_VK_ID) {
@@ -1574,7 +1604,6 @@ router.post('/events/:id/branches', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось создать ветку ивента' });
   }
 });
-
 // GET /api/events/:id/branches - Получить все ветки ивента
 router.get('/events/:id/branches', async (req: Request, res: Response) => {
   try {
@@ -2321,7 +2350,6 @@ router.post('/bets/:bet_id/place', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось разместить ставку' });
   }
 });
-
 // PUT /api/bets/:bet_id/settle - Завершить ставку (админы)
 router.put('/bets/:bet_id/settle', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
@@ -3114,7 +3142,6 @@ router.post('/casino/dice/start', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось начать игру' });
   }
 });
-
 // POST /api/casino/roulette/start - Начать игру в рулетку (списать ставку)
 router.post('/casino/roulette/start', async (req: Request, res: Response) => {
   try {
@@ -3866,7 +3893,6 @@ router.post('/poker/rooms/:id/join', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось присоединиться к комнате' });
   }
 });
-
 /**
  * @swagger
  * /api/poker/rooms/{id}/leave:
@@ -4618,7 +4644,6 @@ router.delete('/poker/rooms/:id', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось удалить комнату' });
   }
 });
-
 // POST /api/admin/market/reset - Полный сброс биржи (только для админов)
 router.post('/admin/market/reset', async (req: Request, res: Response) => {
   try {
@@ -5419,7 +5444,6 @@ router.put('/admin/crypto/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update cryptocurrency' });
   }
 });
-
 // Удалить криптовалюту
 router.delete('/admin/crypto/:id', async (req, res) => {
   try {
@@ -6212,7 +6236,6 @@ router.delete('/admin/collections/series/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete series' });
   }
 });
-
 // Создать предмет коллекции
 router.post('/admin/collections/item', async (req, res) => {
   try {
@@ -6351,14 +6374,84 @@ router.post('/admin/collections/give-item', async (req, res) => {
   }
 });
 
+// Fix collection items rarity
+router.post('/admin/collections/fix-rarity', async (req, res) => {
+  try {
+    const db = await initDB();
+    
+    // Маппинг названий на редкость (из seed данных)
+    const rarityMap: { [key: string]: string } = {
+      // Проводники
+      'Арбитр': 'legendary',
+      'Дон Чёрной Лилии': 'legendary',
+      'Верховный Судья': 'legendary',
+      'Зодиак: Овен': 'epic',
+      'Паладин Света': 'rare',
+      'Капо Лилии': 'rare',
+      'Высший Офицер': 'rare',
+      'Инквизитор': 'uncommon',
+      'Нова': 'uncommon',
+      'Солдат': 'common',
+      'Детектив': 'common',
+      'Аурит': 'common',
+      // Острова
+      'Кага - Столица прогресса': 'epic',
+      'Хоши - Духовный центр': 'epic',
+      'Ичи - Торговая столица': 'rare',
+      'Куро - Теневой остров': 'rare',
+      'Мидзу - Дикие земли': 'uncommon',
+      'Сора - Нейтральная зона': 'uncommon',
+      // Существа
+      'Дракон Бездны': 'mythic',
+      'Феникс Возрождения': 'legendary',
+      'Левиафан': 'epic',
+      'Кицунэ Девяти Хвостов': 'rare',
+      'Грифон': 'rare',
+      'Теневой Волк': 'uncommon',
+      'Элементаль Огня': 'uncommon',
+      'Лесной Дух': 'common',
+      // Фракции
+      'Эмблема ОСС': 'epic',
+      'Знак Чёрной Лилии': 'epic',
+      'Печать Порядка': 'epic',
+      'Великий Храм Рассвета': 'rare',
+      'Цитадель Лилии': 'rare',
+      'Шпиль Порядка': 'rare'
+    };
+    
+    let updated = 0;
+    for (const [name, rarity] of Object.entries(rarityMap)) {
+      const result = await db.run(
+        'UPDATE CollectionItems SET rarity = ? WHERE name = ? AND (rarity IS NULL OR rarity = "")',
+        [rarity, name]
+      );
+      if (result.changes && result.changes > 0) {
+        updated += result.changes;
+      }
+    }
+    
+    await db.close();
+    res.json({ success: true, message: `Обновлено ${updated} предметов` });
+  } catch (error) {
+    console.error('Error fixing rarity:', error);
+    res.status(500).json({ error: 'Failed to fix rarity' });
+  }
+});
+
 // Backup database
 router.get('/admin/backup', async (req, res) => {
   try {
     const fs = await import('fs');
     const path = await import('path');
-    const dbPath = path.resolve('./database.db');
+    
+    // For ES Modules, __dirname is not defined. We create it.
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+
+    const dbPath = path.resolve(__dirname, '../../database.db');
     
     if (!fs.existsSync(dbPath)) {
+      console.error(`Database file not found at: ${dbPath}`);
       return res.status(404).json({ error: 'Database file not found' });
     }
     

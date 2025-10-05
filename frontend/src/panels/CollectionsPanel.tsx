@@ -23,6 +23,7 @@ import {
   ModalRoot,
   ModalPage,
   ModalPageHeader,
+  RichCell,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Icon28DoneOutline, Icon28ErrorCircleOutline, Icon28FavoriteOutline } from '@vkontakte/icons';
@@ -257,6 +258,7 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
         if (openResponse.ok) {
           const items = await openResponse.json();
           setOpenedItems(items);
+          setActiveModal('pack-results');
           showSnackbar(`Получено предметов: ${items.length}!`, true);
           fetchCharacters();
           if (selectedCharacter) {
@@ -410,56 +412,6 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
               ))}
             </CardGrid>
           </Group>
-
-          {/* Открытые предметы */}
-          {openedItems.length > 0 && (
-            <Group header={<Header>🎉 Вы получили:</Header>}>
-              {openedItems.map((item, index) => (
-                <Card key={index} mode="shadow" style={{ marginBottom: 8 }}>
-                  <Div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: 8,
-                        backgroundColor: rarityColors[item.rarity],
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 32
-                      }}>
-                        ✨
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <Text weight="2" style={{ fontSize: 16 }}>
-                          {item.name}
-                        </Text>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          backgroundColor: rarityColors[item.rarity],
-                          color: 'white'
-                        }}>
-                          {rarityLabels[item.rarity]}
-                        </span>
-                      </div>
-                    </div>
-                  </Div>
-                </Card>
-              ))}
-              <Div>
-                <Button
-                  size="l"
-                  mode="secondary"
-                  stretched
-                  onClick={() => setOpenedItems([])}
-                >
-                  Закрыть
-                </Button>
-              </Div>
-            </Group>
-          )}
         </>
       )}
 
@@ -738,6 +690,47 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
               )}
             </Group>
           )}
+        </ModalPage>
+
+        <ModalPage
+          id="pack-results"
+          onClose={() => {
+            setActiveModal(null);
+            setOpenedItems([]);
+          }}
+          header={<ModalPageHeader>Содержимое пака</ModalPageHeader>}
+          dynamicContentHeight
+        >
+          <Div>
+            {openedItems.length > 0 ? (
+              <CardGrid size="m">
+                {openedItems.map((item, index) => (
+                  <Card key={index}>
+                    <Div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text weight="2" style={{ fontSize: 18 }}>{item.name}</Text>
+                        <span style={{
+                          fontWeight: 'bold',
+                          fontSize: 12,
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          color: 'white',
+                          backgroundColor: rarityColors[item.rarity as keyof typeof rarityColors] || '#000'
+                        }}>
+                          {rarityLabels[item.rarity]}
+                        </span>
+                      </div>
+                      <Text style={{ color: 'var(--vkui--color_text_secondary)', fontSize: 14 }}>
+                        {item.description}
+                      </Text>
+                    </Div>
+                  </Card>
+                ))}
+              </CardGrid>
+            ) : (
+              <Div>Нет предметов для отображения.</Div>
+            )}
+          </Div>
         </ModalPage>
       </ModalRoot>
 

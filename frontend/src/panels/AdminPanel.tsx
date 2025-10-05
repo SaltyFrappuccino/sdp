@@ -80,6 +80,42 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const [itemSearch, setItemSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'characters' | 'market' | 'updates' | 'bulk'>('characters');
 
+  const handleBackup = async () => {
+    try {
+      showResultSnackbar('Начинаю скачивание...', true);
+      const response = await fetch(`${API_URL}/admin/backup`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка сети');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = 'backup.db';
+      if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch && filenameMatch.length === 2) {
+              filename = filenameMatch[1];
+          }
+      }
+      
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      showResultSnackbar('Бэкап успешно скачан!', true);
+    } catch (error) {
+      console.error('Backup download failed:', error);
+      const message = error instanceof Error ? error.message : 'Не удалось скачать бэкап';
+      showResultSnackbar(message, false);
+    }
+  };
+
   const fetchCharacters = async () => {
     try {
       const response = await fetch(`${API_URL}/characters`);
@@ -424,10 +460,28 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           <Button 
             size="m" 
             mode="primary" 
-            onClick={() => window.open(`${API_URL}/admin/backup`, '_blank')}
+            onClick={handleBackup}
             stretched
           >
             💾 Скачать бэкап базы данных
+          </Button>
+        </Div>
+        <Div>
+          <Button 
+            size="m" 
+            mode="secondary" 
+            onClick={async () => {
+              try {
+                const response = await fetch(`${API_URL}/admin/collections/fix-rarity`, { method: 'POST' });
+                const data = await response.json();
+                showResultSnackbar(data.message || 'Редкости обновлены', true);
+              } catch (error) {
+                showResultSnackbar('Ошибка обновления редкостей', false);
+              }
+            }}
+            stretched
+          >
+            🔧 Исправить редкость предметов
           </Button>
         </Div>
         <Div style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>
