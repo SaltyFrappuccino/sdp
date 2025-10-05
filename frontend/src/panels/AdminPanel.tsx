@@ -388,6 +388,44 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         Админ-панель
       </PanelHeader>
       
+      {/* Быстрый доступ к новым модулям */}
+      <Group header={<Header>Управление новыми модулями</Header>}>
+        <Div>
+          <ButtonGroup stretched mode="horizontal" gap="m">
+            <Button 
+              size="m" 
+              mode="secondary" 
+              onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+              stretched
+            >
+              💰 Криптовалюты (API)
+            </Button>
+            <Button 
+              size="m" 
+              mode="secondary" 
+              onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+              stretched
+            >
+              🛒 Покупки (API)
+            </Button>
+          </ButtonGroup>
+        </Div>
+        <Div>
+          <Button 
+            size="m" 
+            mode="secondary" 
+            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            stretched
+          >
+            🎴 Коллекции (API)
+          </Button>
+        </Div>
+        <Div style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>
+          Управление криптовалютами, покупками и коллекциями доступно через API (Swagger UI). 
+          Полноценный интерфейс управления будет добавлен в следующих обновлениях.
+        </Div>
+      </Group>
+      
       <Tabs>
         <TabsItem 
           selected={activeTab === 'characters'} 
