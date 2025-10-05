@@ -22,7 +22,7 @@ import {
   Tabs,
   TabsItem
 } from '@vkontakte/vkui';
-import { useRouteNavigator, NavIdProps } from '@vkontakte/vk-mini-apps-router';
+import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { API_URL } from '../api';
 import { XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
@@ -79,7 +79,8 @@ interface Portfolio {
 
 const MODAL_PAGE_TRADE = 'trade';
 
-interface BlockchainExchangePanelProps extends NavIdProps {
+interface BlockchainExchangePanelProps {
+  id: string;
   fetchedUser?: UserInfo;
 }
 

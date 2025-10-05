@@ -134,36 +134,31 @@ export const AdminCollectionsPanel: FC<NavIdProps> = ({ id }) => {
         actions={[
           {
             title: 'Отмена',
-            autoClose: true,
-            mode: 'cancel'
+            mode: 'cancel',
           },
           {
             title: 'Удалить',
-            autoClose: true,
             mode: 'destructive',
             action: async () => {
               try {
                 const response = await fetch(`${API_URL}/collections/${collectionId}`, {
-                  method: 'DELETE'
+                  method: 'DELETE',
                 });
-
                 if (response.ok) {
-                  showResultSnackbar('Коллекция удалена', true);
+                  showResultSnackbar('Коллекция успешно удалена', true);
                   fetchCollections();
                 } else {
-                  const error = await response.json();
-                  showResultSnackbar(error.error || 'Ошибка при удалении', false);
+                  showResultSnackbar('Ошибка удаления коллекции', false);
                 }
               } catch (error) {
-                console.error('Failed to delete collection:', error);
-                showResultSnackbar('Не удалось удалить коллекцию', false);
+                showResultSnackbar('Сетевая ошибка', false);
               }
-            }
-          }
+            },
+          },
         ]}
         onClose={() => setPopout(null)}
-        header="Удаление коллекции"
-        text="Вы уверены, что хотите удалить эту коллекцию?"
+        title="Подтверждение удаления"
+        description="Вы уверены, что хотите удалить эту коллекцию?"
       />
     );
   };
@@ -183,10 +178,14 @@ export const AdminCollectionsPanel: FC<NavIdProps> = ({ id }) => {
 
   const modal = (
     <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
-      <ModalPage id={MODAL_PAGE_COLLECTION} onClose={() => setActiveModal(null)}>
-        <ModalPageHeader>
-          Создать коллекцию
-        </ModalPageHeader>
+      <ModalPage
+        id={MODAL_PAGE_COLLECTION}
+        header={
+          <ModalPageHeader>
+            {editingCollection?.id ? 'Редактировать коллекцию' : 'Создать коллекцию'}
+          </ModalPageHeader>
+        }
+      >
         <FormLayoutGroup>
           <FormItem top="Название коллекции" status={!editingCollection?.name ? 'error' : 'default'}>
             <Input
@@ -286,11 +285,10 @@ export const AdminCollectionsPanel: FC<NavIdProps> = ({ id }) => {
 
       <Group>
         <Header
-          aside={
+          after={
             <Button
               size="s"
-              mode="primary"
-              onClick={() => setActiveModal(MODAL_PAGE_CREATE)}
+              onClick={() => openCollectionModal(null)}
             >
               ➕ Создать коллекцию
             </Button>
@@ -324,13 +322,12 @@ export const AdminCollectionsPanel: FC<NavIdProps> = ({ id }) => {
 
       <Group>
         <Header
-          aside={
+          after={
             <Button
-              before={<Icon24Add />}
-              onClick={() => openCollectionModal({})}
-              mode="primary"
+              size="s"
+              onClick={() => openCollectionModal(null)}
             >
-              Создать коллекцию
+              ➕ Создать коллекцию
             </Button>
           }
         >
@@ -380,7 +377,7 @@ export const AdminCollectionsPanel: FC<NavIdProps> = ({ id }) => {
                   <ButtonGroup mode="horizontal" gap="s" style={{ marginTop: '12px' }}>
                     <Button
                       size="s"
-                      mode="destructive"
+                      appearance="negative"
                       onClick={() => handleDeleteCollection(collection.id)}
                     >
                       <Icon24Delete />

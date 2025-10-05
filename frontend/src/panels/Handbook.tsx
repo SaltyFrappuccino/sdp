@@ -3,18 +3,18 @@ import {
   Panel,
   PanelHeader,
   Group,
-  Card,
-  CardGrid,
-  Header,
-  Text,
-  Button,
   Search,
   PanelHeaderBack,
-  Spinner
+  Spinner,
+  SplitLayout,
+  SplitCol,
+  Cell,
+  Header,
+  Text,
+  Button
 } from '@vkontakte/vkui';
-import { Icon24ChevronRight } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { MarkdownHandbookParser, HandbookData, HandbookSection, HandbookSubsection } from '../utils/markdownHandbookParser';
+import { MarkdownHandbookParser, HandbookData, HandbookChapter, HandbookArticle } from '../utils/markdownHandbookParser';
 
 interface HandbookProps {
   id: string;
@@ -23,20 +23,25 @@ interface HandbookProps {
 export const Handbook: React.FC<HandbookProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSection, setSelectedSection] = useState<string | null>(null);
-  const [handbookData, setHandbookData] = useState<HandbookData>({});
+  const [handbookData, setHandbookData] = useState<HandbookData>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeChapter, setActiveChapter] = useState<string | null>(null);
+  const [activeArticle, setActiveArticle] = useState<string | null>(null);
 
   useEffect(() => {
     const loadHandbookData = async () => {
       try {
-        console.log('Starting to load handbook data...');
         setIsLoading(true);
         setError(null);
-        const data = await MarkdownHandbookParser.loadAllChapters();
-        console.log('Handbook data loaded successfully:', data);
+        const data = await MarkdownHandbookParser.loadHandbook();
         setHandbookData(data);
+        if (data.length > 0) {
+          setActiveChapter(data[0].id);
+          if (data[0].articles.length > 0) {
+            setActiveArticle(data[0].articles[0].id);
+          }
+        }
       } catch (err) {
         console.error('Error loading handbook data:', err);
         setError('Ошибка загрузки данных справочника');
@@ -47,6 +52,39 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
 
     loadHandbookData();
   }, []);
+
+  const handleChapterClick = (chapterId: string) => {
+    setActiveChapter(chapterId);
+    const chapter = handbookData.find(c => c.id === chapterId);
+    if (chapter && chapter.articles.length > 0) {
+      setActiveArticle(chapter.articles[0].id);
+    } else {
+      setActiveArticle(null);
+    }
+  };
+  
+  const filteredData = searchQuery
+  ? handbookData.map(chapter => {
+      const filteredArticles = chapter.articles.filter(article =>
+        article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        article.content.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      return { ...chapter, articles: filteredArticles };
+    }).filter(chapter => chapter.articles.length > 0)
+  : handbookData;
+
+
+  const renderArticleContent = (article: HandbookArticle) => {
+    return (
+      <div style={{ padding: '12px' }}>
+        <Header>{article.title}</Header>
+        {MarkdownHandbookParser.parseMarkdownToReact(article.content)}
+      </div>
+    );
+  };
+
+  const currentChapter = handbookData.find(c => c.id === activeChapter);
+  const currentArticle = currentChapter?.articles.find(a => a.id === activeArticle);
 
   if (isLoading) {
     return (
@@ -81,248 +119,53 @@ export const Handbook: React.FC<HandbookProps> = ({ id }) => {
     );
   }
 
-  // Получаем все секции из загруженных данных
-  const allSections = Object.values(handbookData).flat();
-  console.log('All sections:', allSections.length, allSections.map(s => `${s.title} (${s.category})`));
-
-  const filteredSections = allSections.filter(section =>
-    section.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    section.content.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    section.content.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  console.log('Filtered sections:', filteredSections.length);
-
-  // Группируем разделы по категориям и сортируем по приоритету
-  const groupedSections = filteredSections.reduce((groups, section) => {
-    const category = section.category || 'Другое';
-    if (!groups[category]) {
-      groups[category] = [];
-    }
-    groups[category].push(section);
-    return groups;
-  }, {} as Record<string, typeof allSections>);
-
-  // Сортируем разделы внутри каждой категории по приоритету
-  Object.keys(groupedSections).forEach(category => {
-    groupedSections[category].sort((a, b) => (a.priority || 999) - (b.priority || 999));
-  });
-
-  // Порядок категорий
-  const categoryOrder = [
-    'Основы мира',
-    'Политика и власть',
-    'Персонажи',
-    'Механики',
-    'Боевая система',
-    'Предметы',
-    'Технические системы'
-  ];
-
-  const renderMarkdownContent = (content: string) => {
-    return MarkdownHandbookParser.parseMarkdownToReact(content);
-  };
-
-  const renderSectionContent = (section: typeof allSections[0]) => (
-    <Card key={section.id} style={{ marginBottom: '16px' }}>
-      <div style={{ padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
-          <div style={{
-            color: section.color,
-            marginRight: '12px',
-            fontSize: '24px'
-          }}>
-            {section.icon}
-          </div>
-          <div>
-            <Header style={{ color: section.color, margin: 0 }}>
-              {section.content.title}
-            </Header>
-          </div>
-        </div>
-
-        <Text style={{ marginBottom: '16px', lineHeight: '1.5' }}>
-          {section.content.description}
-        </Text>
-
-        <div>
-          <Header style={{ marginBottom: '8px' }}>
-            Ключевые моменты:
-          </Header>
-          <ul style={{ margin: 0, paddingLeft: '20px' }}>
-            {section.content.keyPoints.map((point, index) => (
-              <li key={index} style={{ marginBottom: '8px', lineHeight: '1.4' }}>
-                <Text>{point}</Text>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {section.content.subsections && section.content.subsections.length > 0 && (
-          <div style={{ marginTop: '20px' }}>
-            <Header style={{ marginBottom: '12px' }}>
-              Подразделы:
-            </Header>
-            <div>
-              {section.content.subsections.map((subsection, index) => (
-                <Card key={subsection.id} style={{ marginBottom: '12px' }}>
-                  <div style={{ padding: '12px' }}>
-                    <Header style={{ marginBottom: '8px', fontSize: '16px' }}>
-                      {subsection.title}
-                    </Header>
-                    <div style={{
-                      backgroundColor: 'var(--vkui--color_background_secondary)',
-                      padding: '20px',
-                      borderRadius: '12px',
-                      border: `2px solid ${section.color}15`,
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                      overflow: 'hidden'
-                    }}>
-                      {renderMarkdownContent(subsection.content)}
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {section.content.detailedContent && (
-          <div style={{ marginTop: '20px' }}>
-            <Header style={{ marginBottom: '12px' }}>
-              Подробная информация:
-            </Header>
-            <div style={{
-              backgroundColor: 'var(--vkui--color_background_secondary)',
-              padding: '24px',
-              borderRadius: '12px',
-              border: `2px solid ${section.color}20`,
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-              overflow: 'hidden'
-            }}>
-              {renderMarkdownContent(section.content.detailedContent)}
-            </div>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-
   return (
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
         Справочник
       </PanelHeader>
-
       <Group>
-        <div style={{ padding: '16px' }}>
-          <Search
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск по справочнику..."
-            style={{ marginBottom: '16px' }}
-          />
-
-          {searchQuery && (
-            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: '8px' }}>
-              <Text>Найдено разделов: {filteredSections.length}</Text>
-            </div>
-          )}
-
-          {selectedSection ? (
-            <div>
-              <div style={{ marginBottom: '16px' }}>
-                <Button
-                  mode="tertiary"
-                  onClick={() => setSelectedSection(null)}
-                  before={<Icon24ChevronRight style={{ transform: 'rotate(180deg)' }} />}
-                >
-                  Назад к разделам
-                </Button>
-              </div>
-              {renderSectionContent(allSections.find(s => s.id === selectedSection)!)}
-            </div>
-          ) : (
-            <div>
-              {categoryOrder.map(category => {
-                const categorySections = groupedSections[category];
-                if (!categorySections || categorySections.length === 0) return null;
-
-                return (
-                  <div key={category} style={{ marginBottom: '32px' }}>
-                    <Header style={{
-                      marginBottom: '16px',
-                      padding: '8px 16px',
-                      backgroundColor: 'var(--vkui--color_background_secondary)',
-                      borderRadius: '8px',
-                      border: '1px solid var(--vkui--color_field_border)'
-                    }}>
-                      {category}
-                    </Header>
-                    <CardGrid size="s">
-                      {categorySections.map((section) => (
-                        <Card
-                          key={section.id}
-                          style={{
-                            cursor: 'pointer',
-                            transition: 'transform 0.2s, box-shadow 0.2s',
-                            border: `2px solid ${section.color}20`,
-                            height: '180px',
-                            display: 'flex',
-                            flexDirection: 'column'
-                          }}
-                          onClick={() => setSelectedSection(section.id)}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = `0 4px 12px ${section.color}30`;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }}
-                        >
-                          <div style={{
-                            padding: '16px',
-                            textAlign: 'center',
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between'
-                          }}>
-                            <div>
-                              <div style={{
-                                color: section.color,
-                                fontSize: '32px',
-                                marginBottom: '12px'
-                              }}>
-                                {section.icon}
-                              </div>
-                              <Header style={{ color: section.color, margin: 0, fontSize: '16px' }}>
-                                {section.title}
-                              </Header>
-                            </div>
-                            <Text style={{
-                              marginTop: '8px',
-                              fontSize: '13px',
-                              opacity: 0.8,
-                              lineHeight: '1.3',
-                              overflow: 'hidden',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 3,
-                              WebkitBoxOrient: 'vertical'
-                            }}>
-                              {section.content.description.substring(0, 120)}...
-                            </Text>
-                          </div>
-                        </Card>
-                      ))}
-                    </CardGrid>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <Search
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Поиск по справочнику..."
+          style={{ marginBottom: '16px' }}
+        />
       </Group>
+      <SplitLayout style={{ justifyContent: 'center' }}>
+        <SplitCol fixed width={280} maxWidth={280}>
+          <Group>
+            {filteredData.map((chapter) => (
+              <div key={chapter.id}>
+                <Header>{chapter.title}</Header>
+                {chapter.articles.map((article) => (
+                  <Cell
+                    key={article.id}
+                    onClick={() => {
+                      setActiveChapter(chapter.id);
+                      setActiveArticle(article.id);
+                    }}
+                    selected={activeArticle === article.id}
+                  >
+                    {article.title}
+                  </Cell>
+                ))}
+              </div>
+            ))}
+          </Group>
+        </SplitCol>
+        <SplitCol>
+          <Group>
+            {currentChapter && (
+              <div style={{ padding: '12px' }}>
+                <Header>{currentChapter.title}</Header>
+                {MarkdownHandbookParser.parseMarkdownToReact(currentChapter.contentBeforeArticles)}
+              </div>
+            )}
+            {currentArticle && renderArticleContent(currentArticle)}
+          </Group>
+        </SplitCol>
+      </SplitLayout>
     </Panel>
   );
 };

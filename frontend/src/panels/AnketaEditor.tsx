@@ -183,10 +183,25 @@ export const AnketaEditor: FC<NavIdProps & {
   const routeNavigator = useRouteNavigator();
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [factions, setFactions] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
     const adminId = localStorage.getItem('adminId');
     setIsAdmin(!!adminId);
+
+    const fetchFactions = async () => {
+      try {
+        const response = await fetch(`${API_URL}/factions`);
+        if (response.ok) {
+          const data = await response.json();
+          setFactions(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch factions:', error);
+      }
+    };
+
+    fetchFactions();
   }, []);
 
   const handleImportAnketa = async (event: Event) => {
@@ -389,7 +404,7 @@ export const AnketaEditor: FC<NavIdProps & {
                 options={[
                   { label: 'Отражённый Свет Солнца', value: 'Отражённый Свет Солнца' },
                   { label: 'Чёрная Лилия', value: 'Чёрная Лилия' },
-                  ...(factions || []).map(faction => ({
+                  ...(factions || []).map((faction: { name: string }) => ({
                     label: faction.name,
                     value: faction.name
                   })),

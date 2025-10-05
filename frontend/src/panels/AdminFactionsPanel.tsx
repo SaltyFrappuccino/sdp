@@ -145,36 +145,33 @@ export const AdminFactionsPanel: FC<NavIdProps> = ({ id }) => {
         actions={[
           {
             title: 'Отмена',
-            autoClose: true,
-            mode: 'cancel'
+            mode: 'cancel',
           },
           {
             title: 'Удалить',
-            autoClose: true,
             mode: 'destructive',
             action: async () => {
               try {
                 const response = await fetch(`${API_URL}/factions/${factionId}`, {
-                  method: 'DELETE'
+                  method: 'DELETE',
                 });
-
                 if (response.ok) {
-                  showResultSnackbar('Фракция удалена', true);
+                  showResultSnackbar('Фракция успешно удалена', true);
                   fetchFactions();
                 } else {
                   const error = await response.json();
-                  showResultSnackbar(error.error || 'Ошибка при удалении', false);
+                  showResultSnackbar(error.error || 'Ошибка удаления фракции', false);
                 }
               } catch (error) {
                 console.error('Failed to delete faction:', error);
-                showResultSnackbar('Не удалось удалить фракцию', false);
+                showResultSnackbar('Сетевая ошибка', false);
               }
-            }
-          }
+            },
+          },
         ]}
         onClose={() => setPopout(null)}
-        header="Удаление фракции"
-        text="Вы уверены, что хотите удалить эту фракцию? Все персонажи в этой фракции станут независимыми."
+        title="Подтверждение удаления"
+        description="Вы уверены, что хотите удалить эту фракцию?"
       />
     );
   };
@@ -191,10 +188,14 @@ export const AdminFactionsPanel: FC<NavIdProps> = ({ id }) => {
 
   const modal = (
     <ModalRoot activeModal={activeModal} onClose={() => setActiveModal(null)}>
-      <ModalPage id={MODAL_PAGE_FACTION} onClose={() => setActiveModal(null)}>
-        <ModalPageHeader>
-          {editingFaction?.id ? 'Редактировать фракцию' : 'Создать фракцию'}
-        </ModalPageHeader>
+      <ModalPage
+        id={MODAL_PAGE_FACTION}
+        header={
+          <ModalPageHeader>
+            {editingFaction?.id ? 'Редактировать фракцию' : 'Создать фракцию'}
+          </ModalPageHeader>
+        }
+      >
         <FormLayoutGroup>
           <FormItem top="Название фракции" status={!editingFaction?.name ? 'error' : 'default'}>
             <Input
@@ -278,11 +279,10 @@ export const AdminFactionsPanel: FC<NavIdProps> = ({ id }) => {
 
       <Group>
         <Header
-          aside={
+          after={
             <Button
               size="s"
-              mode="primary"
-              onClick={() => setActiveModal(MODAL_PAGE_CREATE)}
+              onClick={() => openFactionModal({})}
             >
               ➕ Создать
             </Button>
@@ -324,11 +324,10 @@ export const AdminFactionsPanel: FC<NavIdProps> = ({ id }) => {
 
       <Group>
         <Header
-          aside={
+          after={
             <Button
-              before={<Icon24Add />}
-              onClick={() => openFactionModal({})}
-              mode="primary"
+              size="s"
+              onClick={() => openFactionModal(null)}
             >
               Создать фракцию
             </Button>
@@ -384,7 +383,7 @@ export const AdminFactionsPanel: FC<NavIdProps> = ({ id }) => {
                     </Button>
                     <Button
                       size="s"
-                      mode="destructive"
+                      appearance="negative"
                       onClick={() => handleDeleteFaction(faction.id)}
                     >
                       <Icon24Delete />

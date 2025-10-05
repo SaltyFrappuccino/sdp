@@ -375,13 +375,9 @@ export const AdminPurchasesPanel: FC<NavIdProps> = ({ id }) => {
       {activeTab === 'categories' && (
         <Group>
           <Header
-            aside={
-              <Button
-                size="s"
-                mode="primary"
-                onClick={() => setActiveModal(MODAL_PAGE_CREATE_CATEGORY)}
-              >
-                ➕ Создать категорию
+            after={
+              <Button size="s" onClick={() => setActiveModal(MODAL_PAGE_CATEGORY)}>
+                Создать категорию
               </Button>
             }
           >
@@ -421,13 +417,9 @@ export const AdminPurchasesPanel: FC<NavIdProps> = ({ id }) => {
       {activeTab === 'items' && (
         <Group>
           <Header
-            aside={
-              <Button
-                size="s"
-                mode="primary"
-                onClick={() => setActiveModal(MODAL_PAGE_CREATE_ITEM)}
-              >
-                ➕ Создать предмет
+            after={
+              <Button size="s" onClick={() => setActiveModal(MODAL_PAGE_ITEM)}>
+                Создать товар
               </Button>
             }
           >

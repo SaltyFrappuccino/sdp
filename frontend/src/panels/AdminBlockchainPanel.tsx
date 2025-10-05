@@ -70,9 +70,9 @@ export const AdminBlockchainPanel: React.FC<{ id: string }> = ({ id }) => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'tokens' | 'transactions'>('tokens');
   const [transferForm, setTransferForm] = useState({
-    from_character_id: '',
-    to_character_id: '',
-    amount: '',
+    from_character_id: 0,
+    to_character_id: 0,
+    amount: 0,
     description: ''
   });
   const [tokenForm, setTokenForm] = useState({
@@ -150,9 +150,9 @@ export const AdminBlockchainPanel: React.FC<{ id: string }> = ({ id }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sender_character_id: parseInt(transferForm.from_character_id),
-          receiver_character_id: parseInt(transferForm.to_character_id),
-          amount: parseFloat(transferForm.amount),
+          sender_character_id: transferForm.from_character_id,
+          receiver_character_id: transferForm.to_character_id,
+          amount: transferForm.amount,
           description: transferForm.description || 'Перевод средств'
         }),
       });
@@ -160,7 +160,7 @@ export const AdminBlockchainPanel: React.FC<{ id: string }> = ({ id }) => {
       if (response.ok) {
         showResultSnackbar('Перевод выполнен успешно', true);
         setActiveModal(null);
-        setTransferForm({ from_character_id: '', to_character_id: '', amount: '', description: '' });
+        setTransferForm({ from_character_id: 0, to_character_id: 0, amount: 0, description: '' });
         fetchTransactions();
         fetchCharacters(); // Обновляем балансы
       } else {
@@ -237,7 +237,6 @@ export const AdminBlockchainPanel: React.FC<{ id: string }> = ({ id }) => {
         const result = await response.json();
         showResultSnackbar(`${result.message} (${result.count} токенов)`, true);
         fetchTokens();
-        fetchStats();
       } else {
         const error = await response.json();
         showResultSnackbar(error.error || 'Ошибка инициализации токенов', false);
@@ -338,7 +337,6 @@ export const AdminBlockchainPanel: React.FC<{ id: string }> = ({ id }) => {
 
       {activeTab === 'tokens' && (
         <Group>
-          {console.log('AdminBlockchainPanel: Рендерим секцию токенов')}
           <Header>
             Управление токенами
           </Header>
@@ -403,7 +401,7 @@ export const AdminBlockchainPanel: React.FC<{ id: string }> = ({ id }) => {
       {activeTab === 'transactions' && (
         <Group>
         <Header
-          aside={
+          after={
             <Button
               size="s"
               mode="primary"
@@ -474,36 +472,30 @@ export const AdminBlockchainPanel: React.FC<{ id: string }> = ({ id }) => {
           }
         >
           <FormLayoutGroup>
-            <FormItem top="От персонажа">
+            <FormItem top="От кого">
               <Select
-                value={transferForm.from_character_id || ''}
+                value={transferForm.from_character_id}
                 onChange={(e) => setTransferForm({ ...transferForm, from_character_id: parseInt(e.target.value) })}
-                options={characters.map(char => ({
-                  label: char.character_name,
-                  value: char.id.toString()
-                }))}
+                options={characters.map(c => ({ label: c.character_name, value: c.id }))}
               />
             </FormItem>
-            <FormItem top="К персонажу">
+            <FormItem top="Кому">
               <Select
-                value={transferForm.to_character_id || ''}
+                value={transferForm.to_character_id}
                 onChange={(e) => setTransferForm({ ...transferForm, to_character_id: parseInt(e.target.value) })}
-                options={characters.map(char => ({
-                  label: char.character_name,
-                  value: char.id.toString()
-                }))}
+                options={characters.map(c => ({ label: c.character_name, value: c.id }))}
               />
             </FormItem>
             <FormItem top="Сумма">
               <Input
                 type="number"
-                value={transferForm.amount || ''}
+                value={transferForm.amount}
                 onChange={(e) => setTransferForm({ ...transferForm, amount: parseFloat(e.target.value) })}
                 placeholder="Введите сумму"
               />
             </FormItem>
             <FormItem top="Описание">
-              <Textarea
+              <Input
                 value={transferForm.description || ''}
                 onChange={(e) => setTransferForm({ ...transferForm, description: e.target.value })}
                 placeholder="Описание перевода"
