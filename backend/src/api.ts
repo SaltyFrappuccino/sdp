@@ -5040,4 +5040,1305 @@ async function finishHand(db: any, hand_id: number) {
   }
 }
 
+// ========================================
+// КРИПТОВАЛЮТЫ (Блокчейн Биржа)
+// ========================================
+
+// Получить все криптовалюты
+router.get('/crypto/currencies', async (req, res) => {
+  try {
+    const db = await getDbConnection();
+    const cryptos = await db.all('SELECT * FROM CryptoCurrencies ORDER BY current_price DESC');
+    await db.close();
+    res.json(cryptos);
+  } catch (error) {
+    console.error('Error fetching cryptocurrencies:', error);
+    res.status(500).json({ error: 'Failed to fetch cryptocurrencies' });
+  }
+});
+
+// Получить конкретную крипту с графиком
+router.get('/crypto/currencies/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    const crypto = await db.get('SELECT * FROM CryptoCurrencies WHERE id = ?', [id]);
+    if (!crypto) {
+      await db.close();
+      return res.status(404).json({ error: 'Cryptocurrency not found' });
+    }
+
+    // Получаем историю цен (последние 100 записей)
+    const history = await db.all(`
+      SELECT price, timestamp 
+      FROM CryptoPriceHistory 
+      WHERE crypto_id = ? 
+      ORDER BY timestamp DESC 
+      LIMIT 100
+    `, [id]);
+
+    await db.close();
+    res.json({ ...crypto, history: history.reverse() });
+  } catch (error) {
+    console.error('Error fetching cryptocurrency:', error);
+    res.status(500).json({ error: 'Failed to fetch cryptocurrency' });
+  }
+});
+
+// Получить портфель персонажа
+router.get('/crypto/portfolio/:character_id', async (req, res) => {
+  try {
+    const { character_id } = req.params;
+    const db = await getDbConnection();
+    
+    let portfolio = await db.get('SELECT * FROM CryptoPortfolios WHERE character_id = ?', [character_id]);
+    
+    // Создаём портфель если не существует
+    if (!portfolio) {
+      await db.run('INSERT INTO CryptoPortfolios (character_id, crypto_balances) VALUES (?, ?)', [character_id, '{}']);
+      portfolio = { character_id, crypto_balances: '{}' };
+    }
+
+    // Парсим балансы
+    const balances = JSON.parse(portfolio.crypto_balances || '{}');
+    
+    // Получаем текущие цены криптовалют
+    const cryptos = await db.all('SELECT * FROM CryptoCurrencies');
+    
+    // Формируем детали портфеля
+    const portfolioDetails = [];
+    let totalValue = 0;
+
+    for (const [cryptoId, balance] of Object.entries(balances)) {
+      const crypto = cryptos.find(c => c.id === parseInt(cryptoId));
+      if (crypto && balance.quantity > 0) {
+        const currentValue = balance.quantity * crypto.current_price;
+        const costBasis = balance.quantity * balance.average_purchase_price;
+        const profit = currentValue - costBasis;
+        const profitPercent = (profit / costBasis) * 100;
+
+        portfolioDetails.push({
+          crypto_id: crypto.id,
+          name: crypto.name,
+          ticker_symbol: crypto.ticker_symbol,
+          quantity: balance.quantity,
+          average_purchase_price: balance.average_purchase_price,
+          current_price: crypto.current_price,
+          current_value: currentValue,
+          profit,
+          profit_percent: profitPercent
+        });
+
+        totalValue += currentValue;
+      }
+    }
+
+    await db.close();
+    res.json({
+      character_id,
+      total_value: totalValue,
+      assets: portfolioDetails
+    });
+  } catch (error) {
+    console.error('Error fetching crypto portfolio:', error);
+    res.status(500).json({ error: 'Failed to fetch crypto portfolio' });
+  }
+});
+
+// Купить криптовалюту
+router.post('/crypto/buy', async (req, res) => {
+  try {
+    const { character_id, crypto_id, quantity } = req.body;
+
+    if (!character_id || !crypto_id || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+
+    const db = await getDbConnection();
+
+    // Получаем криптовалюту
+    const crypto = await db.get('SELECT * FROM CryptoCurrencies WHERE id = ?', [crypto_id]);
+    if (!crypto) {
+      await db.close();
+      return res.status(404).json({ error: 'Cryptocurrency not found' });
+    }
+
+    // Получаем персонажа
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      await db.close();
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    const totalCost = quantity * crypto.current_price;
+
+    // Проверяем баланс
+    if (character.currency < totalCost) {
+      await db.close();
+      return res.status(400).json({ error: 'Insufficient funds' });
+    }
+
+    // Списываем кредиты
+    await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [totalCost, character_id]);
+
+    // Обновляем портфель
+    let portfolio = await db.get('SELECT * FROM CryptoPortfolios WHERE character_id = ?', [character_id]);
+    if (!portfolio) {
+      await db.run('INSERT INTO CryptoPortfolios (character_id, crypto_balances) VALUES (?, ?)', [character_id, '{}']);
+      portfolio = { character_id, crypto_balances: '{}' };
+    }
+
+    const balances = JSON.parse(portfolio.crypto_balances || '{}');
+    
+    if (!balances[crypto_id]) {
+      balances[crypto_id] = { quantity: 0, average_purchase_price: 0 };
+    }
+
+    // Обновляем среднюю цену покупки
+    const oldTotalCost = balances[crypto_id].quantity * balances[crypto_id].average_purchase_price;
+    const newTotalCost = oldTotalCost + totalCost;
+    const newTotalQuantity = balances[crypto_id].quantity + quantity;
+    
+    balances[crypto_id].quantity = newTotalQuantity;
+    balances[crypto_id].average_purchase_price = newTotalCost / newTotalQuantity;
+
+    await db.run('UPDATE CryptoPortfolios SET crypto_balances = ?, updated_at = CURRENT_TIMESTAMP WHERE character_id = ?', 
+      [JSON.stringify(balances), character_id]);
+
+    // Записываем транзакцию
+    await db.run(`
+      INSERT INTO CryptoTransactions (character_id, crypto_id, transaction_type, quantity, price_per_coin, total_amount)
+      VALUES (?, ?, 'buy', ?, ?, ?)
+    `, [character_id, crypto_id, quantity, crypto.current_price, totalCost]);
+
+    await db.close();
+    res.json({ success: true, message: 'Cryptocurrency purchased successfully' });
+  } catch (error) {
+    console.error('Error buying cryptocurrency:', error);
+    res.status(500).json({ error: 'Failed to buy cryptocurrency' });
+  }
+});
+
+// Продать криптовалюту
+router.post('/crypto/sell', async (req, res) => {
+  try {
+    const { character_id, crypto_id, quantity } = req.body;
+
+    if (!character_id || !crypto_id || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+
+    const db = await getDbConnection();
+
+    // Получаем криптовалюту
+    const crypto = await db.get('SELECT * FROM CryptoCurrencies WHERE id = ?', [crypto_id]);
+    if (!crypto) {
+      await db.close();
+      return res.status(404).json({ error: 'Cryptocurrency not found' });
+    }
+
+    // Получаем портфель
+    const portfolio = await db.get('SELECT * FROM CryptoPortfolios WHERE character_id = ?', [character_id]);
+    if (!portfolio) {
+      await db.close();
+      return res.status(400).json({ error: 'No cryptocurrency holdings found' });
+    }
+
+    const balances = JSON.parse(portfolio.crypto_balances || '{}');
+    
+    if (!balances[crypto_id] || balances[crypto_id].quantity < quantity) {
+      await db.close();
+      return res.status(400).json({ error: 'Insufficient cryptocurrency balance' });
+    }
+
+    const totalProceeds = quantity * crypto.current_price;
+
+    // Начисляем кредиты
+    await db.run('UPDATE Characters SET currency = currency + ? WHERE id = ?', [totalProceeds, character_id]);
+
+    // Обновляем портфель
+    balances[crypto_id].quantity -= quantity;
+    
+    if (balances[crypto_id].quantity <= 0) {
+      delete balances[crypto_id];
+    }
+
+    await db.run('UPDATE CryptoPortfolios SET crypto_balances = ?, updated_at = CURRENT_TIMESTAMP WHERE character_id = ?', 
+      [JSON.stringify(balances), character_id]);
+
+    // Записываем транзакцию
+    await db.run(`
+      INSERT INTO CryptoTransactions (character_id, crypto_id, transaction_type, quantity, price_per_coin, total_amount)
+      VALUES (?, ?, 'sell', ?, ?, ?)
+    `, [character_id, crypto_id, quantity, crypto.current_price, totalProceeds]);
+
+    await db.close();
+    res.json({ success: true, message: 'Cryptocurrency sold successfully' });
+  } catch (error) {
+    console.error('Error selling cryptocurrency:', error);
+    res.status(500).json({ error: 'Failed to sell cryptocurrency' });
+  }
+});
+
+// Получить историю транзакций
+router.get('/crypto/transactions/:character_id', async (req, res) => {
+  try {
+    const { character_id } = req.params;
+    const db = await getDbConnection();
+    
+    const transactions = await db.all(`
+      SELECT t.*, c.name, c.ticker_symbol
+      FROM CryptoTransactions t
+      JOIN CryptoCurrencies c ON c.id = t.crypto_id
+      WHERE t.character_id = ?
+      ORDER BY t.created_at DESC
+      LIMIT 100
+    `, [character_id]);
+
+    await db.close();
+    res.json(transactions);
+  } catch (error) {
+    console.error('Error fetching crypto transactions:', error);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// Топ держателей криптовалют
+router.get('/crypto/leaderboard', async (req, res) => {
+  try {
+    const db = await getDbConnection();
+    
+    const portfolios = await db.all('SELECT * FROM CryptoPortfolios');
+    const cryptos = await db.all('SELECT * FROM CryptoCurrencies');
+    
+    const leaderboard = [];
+
+    for (const portfolio of portfolios) {
+      const character = await db.get('SELECT id, character_name FROM Characters WHERE id = ?', [portfolio.character_id]);
+      if (!character) continue;
+
+      const balances = JSON.parse(portfolio.crypto_balances || '{}');
+      let totalValue = 0;
+
+      for (const [cryptoId, balance] of Object.entries(balances)) {
+        const crypto = cryptos.find(c => c.id === parseInt(cryptoId));
+        if (crypto) {
+          totalValue += balance.quantity * crypto.current_price;
+        }
+      }
+
+      if (totalValue > 0) {
+        leaderboard.push({
+          character_id: character.id,
+          character_name: character.character_name,
+          total_value: totalValue
+        });
+      }
+    }
+
+    // Сортируем по убыванию стоимости
+    leaderboard.sort((a, b) => b.total_value - a.total_value);
+
+    await db.close();
+    res.json(leaderboard.slice(0, 10)); // Топ-10
+  } catch (error) {
+    console.error('Error fetching crypto leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// Получить активные события
+router.get('/crypto/events', async (req, res) => {
+  try {
+    const db = await getDbConnection();
+    const now = new Date().toISOString();
+    
+    const events = await db.all(`
+      SELECT e.*, c.name as crypto_name, c.ticker_symbol
+      FROM CryptoEvents e
+      LEFT JOIN CryptoCurrencies c ON c.id = e.impacted_crypto_id
+      WHERE e.end_time >= ?
+      ORDER BY e.start_time DESC
+    `, [now]);
+
+    await db.close();
+    res.json(events);
+  } catch (error) {
+    console.error('Error fetching crypto events:', error);
+    res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
+// ========================================
+// АДМИН ЭНДПОИНТЫ ДЛЯ КРИПТОВАЛЮТ
+// ========================================
+
+// Создать криптовалюту
+router.post('/admin/crypto/create', async (req, res) => {
+  try {
+    const { name, ticker_symbol, description, current_price, base_volatility, total_supply } = req.body;
+
+    if (!name || !ticker_symbol || !current_price) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const db = await getDbConnection();
+    
+    const result = await db.run(`
+      INSERT INTO CryptoCurrencies (name, ticker_symbol, description, current_price, base_volatility, total_supply, circulating_supply)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [name, ticker_symbol, description, current_price, base_volatility || 0.15, total_supply || 1000000000, total_supply || 1000000000]);
+
+    await db.close();
+    res.json({ success: true, id: result.lastID });
+  } catch (error) {
+    console.error('Error creating cryptocurrency:', error);
+    res.status(500).json({ error: 'Failed to create cryptocurrency' });
+  }
+});
+
+// Обновить криптовалюту
+router.put('/admin/crypto/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, ticker_symbol, description, current_price, base_volatility, total_supply } = req.body;
+
+    const db = await getDbConnection();
+    
+    await db.run(`
+      UPDATE CryptoCurrencies 
+      SET name = ?, ticker_symbol = ?, description = ?, current_price = ?, base_volatility = ?, total_supply = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [name, ticker_symbol, description, current_price, base_volatility, total_supply, id]);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating cryptocurrency:', error);
+    res.status(500).json({ error: 'Failed to update cryptocurrency' });
+  }
+});
+
+// Удалить криптовалюту
+router.delete('/admin/crypto/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    await db.run('DELETE FROM CryptoCurrencies WHERE id = ?', [id]);
+    
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting cryptocurrency:', error);
+    res.status(500).json({ error: 'Failed to delete cryptocurrency' });
+  }
+});
+
+// Создать событие
+router.post('/admin/crypto/event', async (req, res) => {
+  try {
+    const { title, description, impacted_crypto_id, impact_strength, duration_hours } = req.body;
+
+    if (!title || !description || impact_strength === undefined || !duration_hours) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const db = await getDbConnection();
+    
+    const now = new Date();
+    const endTime = new Date(now.getTime() + duration_hours * 60 * 60 * 1000);
+
+    await db.run(`
+      INSERT INTO CryptoEvents (title, description, impacted_crypto_id, impact_strength, start_time, end_time)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [title, description, impacted_crypto_id || null, impact_strength, now.toISOString(), endTime.toISOString()]);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error creating crypto event:', error);
+    res.status(500).json({ error: 'Failed to create event' });
+  }
+});
+
+// Изменить волатильность
+router.put('/admin/crypto/volatility/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { base_volatility } = req.body;
+
+    const db = await getDbConnection();
+    
+    await db.run(`
+      UPDATE CryptoCurrencies 
+      SET base_volatility = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [base_volatility, id]);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating volatility:', error);
+    res.status(500).json({ error: 'Failed to update volatility' });
+  }
+});
+
+// Сбросить рынок криптовалют
+router.post('/admin/crypto/reset', async (req, res) => {
+  try {
+    const db = await getDbConnection();
+    
+    // Удаляем все портфели
+    await db.run('DELETE FROM CryptoPortfolios');
+    // Удаляем все транзакции
+    await db.run('DELETE FROM CryptoTransactions');
+    // Удаляем историю цен
+    await db.run('DELETE FROM CryptoPriceHistory');
+    // Удаляем события
+    await db.run('DELETE FROM CryptoEvents');
+    
+    // Пересоздаём криптовалюты с начальными ценами
+    await db.run('DELETE FROM CryptoCurrencies');
+    
+    const cryptos = [
+      { name: 'Гоголь Коин', ticker: 'GOGOL', description: 'Официальная криптовалюта литературных энтузиастов. Очень волатильная.', price: 1000, volatility: 0.15, supply: 21000000 },
+      { name: 'Казах Коин', ticker: 'KAZAH', description: 'Народная криптовалюта степей. Известна своей непредсказуемостью.', price: 500, volatility: 0.20, supply: 100000000 },
+      { name: 'Башня Бога РП Коин', ticker: 'BBG', description: 'Престижная крипта для элиты. Стабильная и дорогая.', price: 5000, volatility: 0.10, supply: 10000000 },
+      { name: 'Я ненавижу Котов Коин', ticker: 'ICATS', description: 'Мемная крипта для собачников. Очень рискованная инвестиция!', price: 100, volatility: 0.25, supply: 500000000 },
+      { name: 'Я люблю Собак Коин', ticker: 'ILOVDOGS', description: 'Крипта лучших друзей человека. К луне! 🐕🚀', price: 150, volatility: 0.18, supply: 420690000 },
+      { name: 'PainCoin', ticker: 'PAIN', description: 'Для тех, кто любит боль... финансовую боль. Экстремальная волатильность!', price: 666, volatility: 0.30, supply: 66600000 }
+    ];
+
+    const stmt = await db.prepare(`
+      INSERT INTO CryptoCurrencies (name, ticker_symbol, description, current_price, base_volatility, total_supply, circulating_supply)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    for (const crypto of cryptos) {
+      await stmt.run(crypto.name, crypto.ticker, crypto.description, crypto.price, crypto.volatility, crypto.supply, crypto.supply);
+    }
+    
+    await stmt.finalize();
+
+    await db.close();
+    res.json({ success: true, message: 'Crypto market reset successfully' });
+  } catch (error) {
+    console.error('Error resetting crypto market:', error);
+    res.status(500).json({ error: 'Failed to reset crypto market' });
+  }
+});
+
+// ========================================
+// ПОКУПКИ (Расширенный маркетплейс)
+// ========================================
+
+// Получить все категории
+router.get('/purchases/categories', async (req, res) => {
+  try {
+    const db = await getDbConnection();
+    const categories = await db.all('SELECT * FROM PurchaseCategories ORDER BY display_order');
+    await db.close();
+    res.json(categories);
+  } catch (error) {
+    console.error('Error fetching purchase categories:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+// Получить предметы с фильтрами
+router.get('/purchases/items', async (req, res) => {
+  try {
+    const { category_id, island, rank, rarity, min_price, max_price } = req.query;
+    
+    const db = await getDbConnection();
+    
+    let query = 'SELECT * FROM PurchaseItems WHERE available = 1';
+    const params: any[] = [];
+
+    if (category_id) {
+      query += ' AND category_id = ?';
+      params.push(category_id);
+    }
+
+    if (island) {
+      query += ' AND (island = ? OR island IS NULL)';
+      params.push(island);
+    }
+
+    if (rank) {
+      query += ' AND (rank_required = ? OR rank_required IS NULL)';
+      params.push(rank);
+    }
+
+    if (rarity) {
+      query += ' AND rarity = ?';
+      params.push(rarity);
+    }
+
+    if (min_price) {
+      query += ' AND base_price >= ?';
+      params.push(parseInt(min_price as string));
+    }
+
+    if (max_price) {
+      query += ' AND base_price <= ?';
+      params.push(parseInt(max_price as string));
+    }
+
+    query += ' ORDER BY base_price DESC';
+
+    const items = await db.all(query, params);
+    
+    await db.close();
+    res.json(items);
+  } catch (error) {
+    console.error('Error fetching purchase items:', error);
+    res.status(500).json({ error: 'Failed to fetch items' });
+  }
+});
+
+// Получить детали предмета
+router.get('/purchases/items/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    const item = await db.get('SELECT * FROM PurchaseItems WHERE id = ?', [id]);
+    if (!item) {
+      await db.close();
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Получаем категорию
+    const category = await db.get('SELECT * FROM PurchaseCategories WHERE id = ?', [item.category_id]);
+
+    // Получаем список владельцев
+    const owners = await db.all(`
+      SELECT c.id, c.character_name, cp.purchase_price, cp.purchased_at
+      FROM CharacterPurchases cp
+      JOIN Characters c ON c.id = cp.character_id
+      WHERE cp.item_id = ?
+      ORDER BY cp.purchased_at DESC
+      LIMIT 10
+    `, [id]);
+
+    await db.close();
+    res.json({ ...item, category, owners });
+  } catch (error) {
+    console.error('Error fetching purchase item:', error);
+    res.status(500).json({ error: 'Failed to fetch item' });
+  }
+});
+
+// Купить предмет
+router.post('/purchases/buy', async (req, res) => {
+  try {
+    const { character_id, item_id } = req.body;
+
+    if (!character_id || !item_id) {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+
+    const db = await getDbConnection();
+
+    // Получаем предмет
+    const item = await db.get('SELECT * FROM PurchaseItems WHERE id = ? AND available = 1', [item_id]);
+    if (!item) {
+      await db.close();
+      return res.status(404).json({ error: 'Item not found or not available' });
+    }
+
+    // Получаем персонажа
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      await db.close();
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    // Проверяем баланс
+    if (character.currency < item.base_price) {
+      await db.close();
+      return res.status(400).json({ error: 'Insufficient funds' });
+    }
+
+    // Проверяем ранг (если требуется)
+    if (item.rank_required) {
+      const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+      const characterRankIndex = rankOrder.indexOf(character.rank);
+      const requiredRankIndex = rankOrder.indexOf(item.rank_required);
+      
+      if (characterRankIndex < requiredRankIndex) {
+        await db.close();
+        return res.status(400).json({ error: `Requires rank ${item.rank_required} or higher` });
+      }
+    }
+
+    // Списываем кредиты
+    await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [item.base_price, character_id]);
+
+    // Записываем покупку
+    await db.run(`
+      INSERT INTO CharacterPurchases (character_id, item_id, purchase_price)
+      VALUES (?, ?, ?)
+    `, [character_id, item_id, item.base_price]);
+
+    await db.close();
+    res.json({ success: true, message: 'Item purchased successfully' });
+  } catch (error) {
+    console.error('Error purchasing item:', error);
+    res.status(500).json({ error: 'Failed to purchase item' });
+  }
+});
+
+// Получить мои покупки
+router.get('/purchases/my/:character_id', async (req, res) => {
+  try {
+    const { character_id } = req.params;
+    const db = await getDbConnection();
+    
+    const purchases = await db.all(`
+      SELECT cp.*, pi.name, pi.description, pi.image_url, pi.rarity, pc.name as category_name, pc.icon as category_icon
+      FROM CharacterPurchases cp
+      JOIN PurchaseItems pi ON pi.id = cp.item_id
+      JOIN PurchaseCategories pc ON pc.id = pi.category_id
+      WHERE cp.character_id = ?
+      ORDER BY cp.purchased_at DESC
+    `, [character_id]);
+
+    await db.close();
+    res.json(purchases);
+  } catch (error) {
+    console.error('Error fetching character purchases:', error);
+    res.status(500).json({ error: 'Failed to fetch purchases' });
+  }
+});
+
+// Получить владельцев предмета
+router.get('/purchases/item/:id/owners', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    const owners = await db.all(`
+      SELECT c.id, c.character_name, c.rank, c.faction, cp.purchase_price, cp.purchased_at
+      FROM CharacterPurchases cp
+      JOIN Characters c ON c.id = cp.character_id
+      WHERE cp.item_id = ?
+      ORDER BY cp.purchased_at DESC
+    `, [id]);
+
+    await db.close();
+    res.json(owners);
+  } catch (error) {
+    console.error('Error fetching item owners:', error);
+    res.status(500).json({ error: 'Failed to fetch owners' });
+  }
+});
+
+// ========================================
+// АДМИН ЭНДПОИНТЫ ДЛЯ ПОКУПОК
+// ========================================
+
+// Создать категорию
+router.post('/admin/purchases/category', async (req, res) => {
+  try {
+    const { name, icon, description, display_order } = req.body;
+
+    if (!name || !icon) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const db = await getDbConnection();
+    
+    const result = await db.run(`
+      INSERT INTO PurchaseCategories (name, icon, description, display_order)
+      VALUES (?, ?, ?, ?)
+    `, [name, icon, description, display_order || 0]);
+
+    await db.close();
+    res.json({ success: true, id: result.lastID });
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+// Обновить категорию
+router.put('/admin/purchases/category/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, icon, description, display_order } = req.body;
+
+    const db = await getDbConnection();
+    
+    await db.run(`
+      UPDATE PurchaseCategories 
+      SET name = ?, icon = ?, description = ?, display_order = ?
+      WHERE id = ?
+    `, [name, icon, description, display_order, id]);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating category:', error);
+    res.status(500).json({ error: 'Failed to update category' });
+  }
+});
+
+// Удалить категорию
+router.delete('/admin/purchases/category/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    await db.run('DELETE FROM PurchaseCategories WHERE id = ?', [id]);
+    
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ error: 'Failed to delete category' });
+  }
+});
+
+// Создать предмет
+router.post('/admin/purchases/item', async (req, res) => {
+  try {
+    const { category_id, name, description, base_price, island, rank_required, image_url, rarity, properties } = req.body;
+
+    if (!category_id || !name || !description || !base_price) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const db = await getDbConnection();
+    
+    const result = await db.run(`
+      INSERT INTO PurchaseItems (category_id, name, description, base_price, island, rank_required, image_url, rarity, properties, available)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `, [category_id, name, description, base_price, island, rank_required, image_url, rarity || 'common', properties || '{}']);
+
+    await db.close();
+    res.json({ success: true, id: result.lastID });
+  } catch (error) {
+    console.error('Error creating purchase item:', error);
+    res.status(500).json({ error: 'Failed to create item' });
+  }
+});
+
+// Обновить предмет
+router.put('/admin/purchases/item/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category_id, name, description, base_price, island, rank_required, image_url, rarity, properties, available } = req.body;
+
+    const db = await getDbConnection();
+    
+    await db.run(`
+      UPDATE PurchaseItems 
+      SET category_id = ?, name = ?, description = ?, base_price = ?, island = ?, rank_required = ?, image_url = ?, rarity = ?, properties = ?, available = ?
+      WHERE id = ?
+    `, [category_id, name, description, base_price, island, rank_required, image_url, rarity, properties, available ? 1 : 0, id]);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating purchase item:', error);
+    res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
+// Удалить предмет
+router.delete('/admin/purchases/item/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    await db.run('DELETE FROM PurchaseItems WHERE id = ?', [id]);
+    
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting purchase item:', error);
+    res.status(500).json({ error: 'Failed to delete item' });
+  }
+});
+
+// ========================================
+// КОЛЛЕКЦИИ
+// ========================================
+
+// Получить все серии коллекций
+router.get('/collections/series', async (req, res) => {
+  try {
+    const db = await getDbConnection();
+    const series = await db.all('SELECT * FROM CollectionSeries WHERE active = 1 ORDER BY season DESC, id');
+    await db.close();
+    res.json(series);
+  } catch (error) {
+    console.error('Error fetching collection series:', error);
+    res.status(500).json({ error: 'Failed to fetch series' });
+  }
+});
+
+// Получить детали серии с предметами
+router.get('/collections/series/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    const series = await db.get('SELECT * FROM CollectionSeries WHERE id = ?', [id]);
+    if (!series) {
+      await db.close();
+      return res.status(404).json({ error: 'Series not found' });
+    }
+
+    const items = await db.all('SELECT * FROM CollectionItems WHERE series_id = ? ORDER BY rarity DESC', [id]);
+
+    await db.close();
+    res.json({ ...series, items });
+  } catch (error) {
+    console.error('Error fetching collection series:', error);
+    res.status(500).json({ error: 'Failed to fetch series' });
+  }
+});
+
+// Получить доступные паки
+router.get('/collections/packs', async (req, res) => {
+  try {
+    const db = await getDbConnection();
+    const packs = await db.all(`
+      SELECT p.*, s.name as series_name
+      FROM CollectionPacks p
+      LEFT JOIN CollectionSeries s ON s.id = p.series_id
+      WHERE p.active = 1
+      ORDER BY p.price
+    `);
+    await db.close();
+    res.json(packs);
+  } catch (error) {
+    console.error('Error fetching collection packs:', error);
+    res.status(500).json({ error: 'Failed to fetch packs' });
+  }
+});
+
+// Купить пак
+router.post('/collections/buy-pack', async (req, res) => {
+  try {
+    const { character_id, pack_id } = req.body;
+
+    if (!character_id || !pack_id) {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+
+    const db = await getDbConnection();
+
+    // Получаем пак
+    const pack = await db.get('SELECT * FROM CollectionPacks WHERE id = ? AND active = 1', [pack_id]);
+    if (!pack) {
+      await db.close();
+      return res.status(404).json({ error: 'Pack not found' });
+    }
+
+    // Получаем персонажа
+    const character = await db.get('SELECT * FROM Characters WHERE id = ?', [character_id]);
+    if (!character) {
+      await db.close();
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    // Проверяем баланс
+    if (character.currency < pack.price) {
+      await db.close();
+      return res.status(400).json({ error: 'Insufficient funds' });
+    }
+
+    // Списываем кредиты
+    await db.run('UPDATE Characters SET currency = currency - ? WHERE id = ?', [pack.price, character_id]);
+
+    await db.close();
+    res.json({ success: true, message: 'Pack purchased successfully' });
+  } catch (error) {
+    console.error('Error buying pack:', error);
+    res.status(500).json({ error: 'Failed to buy pack' });
+  }
+});
+
+// Открыть пак
+router.post('/collections/open-pack/:pack_id', async (req, res) => {
+  try {
+    const { pack_id } = req.params;
+    const { character_id } = req.body;
+
+    if (!character_id) {
+      return res.status(400).json({ error: 'Character ID required' });
+    }
+
+    const db = await getDbConnection();
+
+    const pack = await db.get('SELECT * FROM CollectionPacks WHERE id = ?', [pack_id]);
+    if (!pack) {
+      await db.close();
+      return res.status(404).json({ error: 'Pack not found' });
+    }
+
+    // Получаем доступные предметы
+    let items;
+    if (pack.series_id) {
+      items = await db.all('SELECT * FROM CollectionItems WHERE series_id = ?', [pack.series_id]);
+    } else {
+      items = await db.all('SELECT * FROM CollectionItems');
+    }
+
+    if (items.length === 0) {
+      await db.close();
+      return res.status(400).json({ error: 'No items available in this pack' });
+    }
+
+    // Генерируем выпавшие предметы
+    const droppedItems = [];
+    const rarityWeights = {
+      'mythic': 0.001,
+      'legendary': 0.01,
+      'epic': 0.05,
+      'rare': 0.15,
+      'uncommon': 0.30,
+      'common': 0.489
+    };
+
+    // Гарантируем минимальную редкость
+    const guaranteedRarity = pack.guaranteed_rarity || 'common';
+    let hasGuaranteed = false;
+
+    for (let i = 0; i < pack.items_count; i++) {
+      let selectedItem;
+
+      // Последняя карта - гарантированная
+      if (i === pack.items_count - 1 && !hasGuaranteed) {
+        const guaranteedItems = items.filter(item => item.rarity === guaranteedRarity);
+        if (guaranteedItems.length > 0) {
+          selectedItem = guaranteedItems[Math.floor(Math.random() * guaranteedItems.length)];
+          hasGuaranteed = true;
+        }
+      }
+
+      if (!selectedItem) {
+        // Взвешенный случайный выбор
+        const rand = Math.random();
+        let cumulative = 0;
+        let selectedRarity = 'common';
+
+        for (const [rarity, weight] of Object.entries(rarityWeights)) {
+          cumulative += weight;
+          if (rand <= cumulative) {
+            selectedRarity = rarity;
+            break;
+          }
+        }
+
+        const rarityItems = items.filter(item => item.rarity === selectedRarity);
+        if (rarityItems.length > 0) {
+          selectedItem = rarityItems[Math.floor(Math.random() * rarityItems.length)];
+          
+          if (selectedRarity === guaranteedRarity || 
+              Object.keys(rarityWeights).indexOf(selectedRarity) > Object.keys(rarityWeights).indexOf(guaranteedRarity)) {
+            hasGuaranteed = true;
+          }
+        } else {
+          // Если нет предметов такой редкости, берём случайный
+          selectedItem = items[Math.floor(Math.random() * items.length)];
+        }
+      }
+
+      if (selectedItem) {
+        droppedItems.push(selectedItem);
+
+        // Добавляем в коллекцию персонажа
+        const existing = await db.get('SELECT * FROM CharacterCollection WHERE character_id = ? AND item_id = ?', 
+          [character_id, selectedItem.id]);
+
+        if (existing) {
+          await db.run('UPDATE CharacterCollection SET quantity = quantity + 1 WHERE character_id = ? AND item_id = ?', 
+            [character_id, selectedItem.id]);
+        } else {
+          await db.run('INSERT INTO CharacterCollection (character_id, item_id, quantity) VALUES (?, ?, 1)', 
+            [character_id, selectedItem.id]);
+        }
+      }
+    }
+
+    await db.close();
+    res.json({ success: true, items: droppedItems });
+  } catch (error) {
+    console.error('Error opening pack:', error);
+    res.status(500).json({ error: 'Failed to open pack' });
+  }
+});
+
+// Получить мою коллекцию
+router.get('/collections/my/:character_id', async (req, res) => {
+  try {
+    const { character_id } = req.params;
+    const { series_id } = req.query;
+
+    const db = await getDbConnection();
+    
+    let collection;
+    if (series_id) {
+      collection = await db.all(`
+        SELECT cc.*, ci.name, ci.description, ci.rarity, ci.image_url, ci.lore_text, ci.series_id
+        FROM CharacterCollection cc
+        JOIN CollectionItems ci ON ci.id = cc.item_id
+        WHERE cc.character_id = ? AND ci.series_id = ?
+        ORDER BY ci.rarity DESC, ci.name
+      `, [character_id, series_id]);
+    } else {
+      collection = await db.all(`
+        SELECT cc.*, ci.name, ci.description, ci.rarity, ci.image_url, ci.lore_text, ci.series_id,
+               cs.name as series_name
+        FROM CharacterCollection cc
+        JOIN CollectionItems ci ON ci.id = cc.item_id
+        JOIN CollectionSeries cs ON cs.id = ci.series_id
+        WHERE cc.character_id = ?
+        ORDER BY ci.series_id, ci.rarity DESC, ci.name
+      `, [character_id]);
+    }
+
+    await db.close();
+    res.json(collection);
+  } catch (error) {
+    console.error('Error fetching character collection:', error);
+    res.status(500).json({ error: 'Failed to fetch collection' });
+  }
+});
+
+// Топ коллекционеров
+router.get('/collections/leaderboard', async (req, res) => {
+  try {
+    const db = await getDbConnection();
+    
+    const leaderboard = await db.all(`
+      SELECT c.id as character_id, c.character_name,
+             COUNT(DISTINCT cc.item_id) as unique_items,
+             SUM(cc.quantity) as total_items
+      FROM Characters c
+      JOIN CharacterCollection cc ON cc.character_id = c.id
+      GROUP BY c.id
+      ORDER BY unique_items DESC, total_items DESC
+      LIMIT 10
+    `);
+
+    await db.close();
+    res.json(leaderboard);
+  } catch (error) {
+    console.error('Error fetching collections leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// ========================================
+// АДМИН ЭНДПОИНТЫ ДЛЯ КОЛЛЕКЦИЙ
+// ========================================
+
+// Создать серию
+router.post('/admin/collections/series', async (req, res) => {
+  try {
+    const { name, description, total_items, season } = req.body;
+
+    if (!name || !total_items) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const db = await getDbConnection();
+    
+    const result = await db.run(`
+      INSERT INTO CollectionSeries (name, description, total_items, season, active)
+      VALUES (?, ?, ?, ?, 1)
+    `, [name, description, total_items, season || 1]);
+
+    await db.close();
+    res.json({ success: true, id: result.lastID });
+  } catch (error) {
+    console.error('Error creating series:', error);
+    res.status(500).json({ error: 'Failed to create series' });
+  }
+});
+
+// Обновить серию
+router.put('/admin/collections/series/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, total_items, season, active } = req.body;
+
+    const db = await getDbConnection();
+    
+    await db.run(`
+      UPDATE CollectionSeries 
+      SET name = ?, description = ?, total_items = ?, season = ?, active = ?
+      WHERE id = ?
+    `, [name, description, total_items, season, active ? 1 : 0, id]);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating series:', error);
+    res.status(500).json({ error: 'Failed to update series' });
+  }
+});
+
+// Удалить серию
+router.delete('/admin/collections/series/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    await db.run('DELETE FROM CollectionSeries WHERE id = ?', [id]);
+    
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting series:', error);
+    res.status(500).json({ error: 'Failed to delete series' });
+  }
+});
+
+// Создать предмет коллекции
+router.post('/admin/collections/item', async (req, res) => {
+  try {
+    const { series_id, name, description, rarity, image_url, lore_text, drop_rate, properties } = req.body;
+
+    if (!series_id || !name || !rarity || drop_rate === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const db = await getDbConnection();
+    
+    const result = await db.run(`
+      INSERT INTO CollectionItems (series_id, name, description, rarity, image_url, lore_text, drop_rate, properties)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [series_id, name, description, rarity, image_url, lore_text, drop_rate, properties || '{}']);
+
+    await db.close();
+    res.json({ success: true, id: result.lastID });
+  } catch (error) {
+    console.error('Error creating collection item:', error);
+    res.status(500).json({ error: 'Failed to create item' });
+  }
+});
+
+// Обновить предмет коллекции
+router.put('/admin/collections/item/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { series_id, name, description, rarity, image_url, lore_text, drop_rate, properties } = req.body;
+
+    const db = await getDbConnection();
+    
+    await db.run(`
+      UPDATE CollectionItems 
+      SET series_id = ?, name = ?, description = ?, rarity = ?, image_url = ?, lore_text = ?, drop_rate = ?, properties = ?
+      WHERE id = ?
+    `, [series_id, name, description, rarity, image_url, lore_text, drop_rate, properties, id]);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating collection item:', error);
+    res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
+// Удалить предмет коллекции
+router.delete('/admin/collections/item/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDbConnection();
+    
+    await db.run('DELETE FROM CollectionItems WHERE id = ?', [id]);
+    
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting collection item:', error);
+    res.status(500).json({ error: 'Failed to delete item' });
+  }
+});
+
+// Создать пак
+router.post('/admin/collections/pack', async (req, res) => {
+  try {
+    const { name, description, price, guaranteed_rarity, items_count, series_id } = req.body;
+
+    if (!name || !price || !guaranteed_rarity || !items_count) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const db = await getDbConnection();
+    
+    const result = await db.run(`
+      INSERT INTO CollectionPacks (name, description, price, guaranteed_rarity, items_count, series_id, active)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `, [name, description, price, guaranteed_rarity, items_count, series_id || null]);
+
+    await db.close();
+    res.json({ success: true, id: result.lastID });
+  } catch (error) {
+    console.error('Error creating pack:', error);
+    res.status(500).json({ error: 'Failed to create pack' });
+  }
+});
+
+// Обновить пак
+router.put('/admin/collections/pack/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, price, guaranteed_rarity, items_count, series_id, active } = req.body;
+
+    const db = await getDbConnection();
+    
+    await db.run(`
+      UPDATE CollectionPacks 
+      SET name = ?, description = ?, price = ?, guaranteed_rarity = ?, items_count = ?, series_id = ?, active = ?
+      WHERE id = ?
+    `, [name, description, price, guaranteed_rarity, items_count, series_id, active ? 1 : 0, id]);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating pack:', error);
+    res.status(500).json({ error: 'Failed to update pack' });
+  }
+});
+
+// Выдать предмет персонажу
+router.post('/admin/collections/give-item', async (req, res) => {
+  try {
+    const { character_id, item_id, quantity } = req.body;
+
+    if (!character_id || !item_id || !quantity) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const db = await getDbConnection();
+
+    const existing = await db.get('SELECT * FROM CharacterCollection WHERE character_id = ? AND item_id = ?', 
+      [character_id, item_id]);
+
+    if (existing) {
+      await db.run('UPDATE CharacterCollection SET quantity = quantity + ? WHERE character_id = ? AND item_id = ?', 
+        [quantity, character_id, item_id]);
+    } else {
+      await db.run('INSERT INTO CharacterCollection (character_id, item_id, quantity) VALUES (?, ?, ?)', 
+        [character_id, item_id, quantity]);
+    }
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error giving collection item:', error);
+    res.status(500).json({ error: 'Failed to give item' });
+  }
+});
+
 export default router;

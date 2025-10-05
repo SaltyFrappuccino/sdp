@@ -725,8 +725,179 @@ export async function initDB() {
       console.warn('Could not add turn_timeout_at column:', error);
     }
 
+    // ========================================
+    // КРИПТОВАЛЮТЫ (Блокчейн Биржа)
+    // ========================================
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS CryptoCurrencies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        ticker_symbol TEXT NOT NULL UNIQUE,
+        description TEXT,
+        current_price REAL NOT NULL,
+        base_volatility REAL DEFAULT 0.15,
+        total_supply BIGINT DEFAULT 1000000000,
+        circulating_supply BIGINT DEFAULT 1000000000,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS CryptoPortfolios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL UNIQUE,
+        crypto_balances TEXT DEFAULT '{}', -- JSON с балансами {crypto_id: {quantity, average_purchase_price}}
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS CryptoTransactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        crypto_id INTEGER NOT NULL,
+        transaction_type TEXT NOT NULL CHECK (transaction_type IN ('buy', 'sell')),
+        quantity REAL NOT NULL,
+        price_per_coin REAL NOT NULL,
+        total_amount REAL NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY(crypto_id) REFERENCES CryptoCurrencies(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS CryptoPriceHistory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crypto_id INTEGER NOT NULL,
+        price REAL NOT NULL,
+        timestamp TEXT NOT NULL, -- ISO 8601 format
+        FOREIGN KEY(crypto_id) REFERENCES CryptoCurrencies(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS CryptoEvents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        impacted_crypto_id INTEGER,
+        impact_strength REAL NOT NULL, -- от -1 до 1
+        start_time DATETIME NOT NULL,
+        end_time DATETIME NOT NULL,
+        created_by_admin_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(impacted_crypto_id) REFERENCES CryptoCurrencies(id) ON DELETE CASCADE
+      );
+    `);
+
+    // ========================================
+    // ПОКУПКИ (Расширенный маркетплейс)
+    // ========================================
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS PurchaseCategories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        icon TEXT NOT NULL,
+        description TEXT,
+        display_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS PurchaseItems (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        base_price INTEGER NOT NULL,
+        island TEXT, -- Кага, Ичи, Хоши, и т.д.
+        rank_required TEXT, -- минимальный ранг для покупки
+        image_url TEXT,
+        rarity TEXT DEFAULT 'common' CHECK (rarity IN ('common', 'rare', 'epic', 'legendary')),
+        properties TEXT DEFAULT '{}', -- JSON с характеристиками
+        is_collectible INTEGER DEFAULT 0,
+        available INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(category_id) REFERENCES PurchaseCategories(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS CharacterPurchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        purchase_price INTEGER NOT NULL,
+        purchased_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY(item_id) REFERENCES PurchaseItems(id) ON DELETE CASCADE
+      );
+    `);
+
+    // ========================================
+    // КОЛЛЕКЦИИ
+    // ========================================
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS CollectionSeries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        total_items INTEGER NOT NULL,
+        season INTEGER DEFAULT 1,
+        active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS CollectionItems (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        series_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        rarity TEXT NOT NULL CHECK (rarity IN ('common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic')),
+        image_url TEXT,
+        lore_text TEXT,
+        drop_rate REAL NOT NULL, -- от 0 до 1
+        properties TEXT DEFAULT '{}', -- JSON
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(series_id) REFERENCES CollectionSeries(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS CharacterCollection (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        item_id INTEGER NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        obtained_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY(item_id) REFERENCES CollectionItems(id) ON DELETE CASCADE,
+        UNIQUE(character_id, item_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS CollectionPacks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        price INTEGER NOT NULL,
+        guaranteed_rarity TEXT, -- минимальная гарантированная редкость
+        items_count INTEGER DEFAULT 5, -- количество предметов в паке
+        series_id INTEGER, -- NULL если пак содержит предметы из всех серий
+        active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(series_id) REFERENCES CollectionSeries(id) ON DELETE SET NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS CollectionTradeOffers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        offered_item_id INTEGER NOT NULL,
+        requested_item_id INTEGER,
+        requested_rarity TEXT, -- если хочет любой предмет определенной редкости
+        status TEXT DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY(offered_item_id) REFERENCES CollectionItems(id) ON DELETE CASCADE,
+        FOREIGN KEY(requested_item_id) REFERENCES CollectionItems(id) ON DELETE SET NULL
+      );
+    `);
+
     await seedStocks(db);
     await seedHorses(db);
+    await seedCryptoCurrencies(db);
+    await seedPurchaseCategories(db);
+    await seedCollectionSeries(db);
 
     return db;
 
@@ -775,4 +946,223 @@ export async function seedHorses(db: any) {
   
   await stmt.finalize();
   console.log('Horses seeded successfully');
+}
+
+export async function seedCryptoCurrencies(db: any) {
+  const existingCryptos = await db.get('SELECT COUNT(*) as count FROM CryptoCurrencies');
+  if (existingCryptos.count > 0) {
+    console.log('CryptoCurrencies already exist, skipping seed');
+    return;
+  }
+
+  const cryptos = [
+    { name: 'Гоголь Коин', ticker: 'GOGOL', description: 'Официальная криптовалюта литературных энтузиастов. Очень волатильная.', price: 1000, volatility: 0.15, supply: 21000000 },
+    { name: 'Казах Коин', ticker: 'KAZAH', description: 'Народная криптовалюта степей. Известна своей непредсказуемостью.', price: 500, volatility: 0.20, supply: 100000000 },
+    { name: 'Башня Бога РП Коин', ticker: 'BBG', description: 'Престижная крипта для элиты. Стабильная и дорогая.', price: 5000, volatility: 0.10, supply: 10000000 },
+    { name: 'Я ненавижу Котов Коин', ticker: 'ICATS', description: 'Мемная крипта для собачников. Очень рискованная инвестиция!', price: 100, volatility: 0.25, supply: 500000000 },
+    { name: 'Я люблю Собак Коин', ticker: 'ILOVDOGS', description: 'Крипта лучших друзей человека. К луне! 🐕🚀', price: 150, volatility: 0.18, supply: 420690000 },
+    { name: 'PainCoin', ticker: 'PAIN', description: 'Для тех, кто любит боль... финансовую боль. Экстремальная волатильность!', price: 666, volatility: 0.30, supply: 66600000 }
+  ];
+
+  console.log('Seeding cryptocurrencies...');
+  const stmt = await db.prepare(`
+    INSERT INTO CryptoCurrencies (name, ticker_symbol, description, current_price, base_volatility, total_supply, circulating_supply)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  for (const crypto of cryptos) {
+    await stmt.run(crypto.name, crypto.ticker, crypto.description, crypto.price, crypto.volatility, crypto.supply, crypto.supply);
+  }
+  
+  await stmt.finalize();
+  console.log('CryptoCurrencies seeded successfully');
+}
+
+export async function seedPurchaseCategories(db: any) {
+  const existingCategories = await db.get('SELECT COUNT(*) as count FROM PurchaseCategories');
+  if (existingCategories.count > 0) {
+    console.log('PurchaseCategories already exist, skipping seed');
+    return;
+  }
+
+  const categories = [
+    { name: 'Транспорт', icon: '🚗', description: 'Автомобили, мотоциклы и другие средства передвижения', order: 1 },
+    { name: 'Недвижимость', icon: '🏠', description: 'Квартиры, виллы и коммерческая недвижимость', order: 2 },
+    { name: 'Предметы роскоши', icon: '💎', description: 'Эксклюзивные товары для элиты', order: 3 },
+    { name: 'Особое снаряжение', icon: '⚔️', description: 'Уникальное боевое и тактическое снаряжение', order: 4 },
+    { name: 'Эксклюзивы', icon: '🎭', description: 'Уникальные предметы и услуги', order: 5 }
+  ];
+
+  console.log('Seeding purchase categories...');
+  const stmt = await db.prepare(`
+    INSERT INTO PurchaseCategories (name, icon, description, display_order)
+    VALUES (?, ?, ?, ?)
+  `);
+  
+  for (const category of categories) {
+    await stmt.run(category.name, category.icon, category.description, category.order);
+  }
+  
+  await stmt.finalize();
+  console.log('PurchaseCategories seeded successfully');
+
+  // Добавляем начальные предметы
+  await seedInitialPurchaseItems(db);
+}
+
+async function seedInitialPurchaseItems(db: any) {
+  const items = [
+    // Транспорт (category_id: 1)
+    { category: 1, name: 'Магнитный автомобиль Sber AI', description: 'Роскошный автомобиль с автопилотом и голографическим интерфейсом. Разгон до 200 км/ч за 3 секунды.', price: 500000000, island: 'Кага', rank: 'C', rarity: 'rare', properties: JSON.stringify({ speed: 200, autopilot: true }) },
+    { category: 1, name: 'Скоростной мотоцикл Arasaka', description: 'Боевой мотоцикл с усиленной броней и встроенным оружием. Для настоящих безумцев.', price: 250000000, island: 'Кага', rank: 'D', rarity: 'epic', properties: JSON.stringify({ speed: 250, armor: 'medium', weapons: true }) },
+    { category: 1, name: 'Традиционная лодка', description: 'Изящная деревянная лодка ручной работы. Идеально для медитации на воде.', price: 10000000, island: 'Хоши', rank: 'F', rarity: 'common', properties: JSON.stringify({ capacity: 4 }) },
+    
+    // Недвижимость (category_id: 2)
+    { category: 2, name: 'Квартира в Неон-Сити', description: 'Современная квартира 80 кв.м. с панорамным видом на город. 45 этаж.', price: 250000000, island: 'Кага', rank: 'C', rarity: 'rare', properties: JSON.stringify({ area: 80, floor: 45, view: 'city' }) },
+    { category: 2, name: 'Вилла в Зелёном Плаце', description: 'Роскошная вилла с садом, бассейном и личной охраной. Символ статуса.', price: 10000000000, island: 'Кага', rank: 'A', rarity: 'legendary', properties: JSON.stringify({ area: 500, garden: true, pool: true, security: 'premium' }) },
+    { category: 2, name: 'Дом в Предгорье Лотоса', description: 'Уютный дом в традиционном стиле у подножия священных гор. Идеально для уединения.', price: 100000000, island: 'Хоши', rank: 'D', rarity: 'rare', properties: JSON.stringify({ area: 120, style: 'traditional' }) },
+    { category: 2, name: 'Склад в Порту "Могила"', description: 'Большой склад в портовой зоне. Отлично подходит для... легальных операций.', price: 150000000, island: 'Куро', rank: 'C', rarity: 'common', properties: JSON.stringify({ area: 500, location: 'port' }) },
+    
+    // Предметы роскоши (category_id: 3)
+    { category: 3, name: 'Членство в клубе "Диско Элизиум"', description: 'Годовой VIP-абонемент в самый престижный клуб мира. Доступ в закрытые зоны.', price: 500000000, island: 'Кага', rank: 'B', rarity: 'epic', properties: JSON.stringify({ duration: '1 year', vip: true }) },
+    { category: 3, name: 'Имплант от Arasaka', description: 'Кибернетический имплант, улучшающий рефлексы и восприятие. Эксклюзивная модель.', price: 1000000000, island: 'Кага', rank: 'A', rarity: 'legendary', properties: JSON.stringify({ type: 'neural', enhancement: 'reflexes' }) },
+    { category: 3, name: 'Абонемент в Онсэн "Уходящего Тумана"', description: 'Годовой доступ к легендарным горячим источникам. Углубляет связь с Существами.', price: 50000000, island: 'Хоши', rank: 'C', rarity: 'rare', properties: JSON.stringify({ duration: '1 year', benefit: 'spirit_connection' }) },
+    
+    // Особое снаряжение (category_id: 4)
+    { category: 4, name: 'Бронекостюм Arasaka Type-7', description: 'Легкий, но прочный бронекостюм с активной камуфляжной системой.', price: 750000000, island: 'Кага', rank: 'B', rarity: 'epic', properties: JSON.stringify({ defense: 'high', camouflage: true, weight: 'light' }) },
+    { category: 4, name: 'Тактический дрон-разведчик', description: 'Миниатюрный дрон для разведки с термальным зрением и глушилкой сигналов.', price: 200000000, island: 'Кага', rank: 'C', rarity: 'rare', properties: JSON.stringify({ range: '5km', thermal: true, jammer: true }) },
+    
+    // Эксклюзивы (category_id: 5)
+    { category: 5, name: 'Приглашение на закрытый аукцион', description: 'Разовое приглашение на элитный аукцион "Ракудзати". Что там продают? Всё.', price: 1000000000, island: 'Ичи', rank: 'A', rarity: 'legendary', properties: JSON.stringify({ uses: 1, access: 'auction' }) },
+    { category: 5, name: 'Персональная консультация мастера', description: 'Час времени с легендарным мастером. Выберите: кузнец, стратег или мудрец.', price: 500000000, island: null, rank: 'B', rarity: 'epic', properties: JSON.stringify({ duration: '1 hour', type: 'consultation' }) }
+  ];
+
+  console.log('Seeding initial purchase items...');
+  const stmt = await db.prepare(`
+    INSERT INTO PurchaseItems (category_id, name, description, base_price, island, rank_required, rarity, properties)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  for (const item of items) {
+    await stmt.run(item.category, item.name, item.description, item.price, item.island, item.rank, item.rarity, item.properties);
+  }
+  
+  await stmt.finalize();
+  console.log('Initial purchase items seeded successfully');
+}
+
+export async function seedCollectionSeries(db: any) {
+  const existingSeries = await db.get('SELECT COUNT(*) as count FROM CollectionSeries');
+  if (existingSeries.count > 0) {
+    console.log('CollectionSeries already exist, skipping seed');
+    return;
+  }
+
+  const series = [
+    { name: 'Легендарные Проводники', description: 'Коллекция карточек величайших Проводников в истории', total: 12, season: 1 },
+    { name: 'Острова мира', description: 'Красивые иллюстрации шести главных островов', total: 6, season: 1 },
+    { name: 'Существа', description: 'Редкие и могущественные Существа из разных измерений', total: 20, season: 1 },
+    { name: 'Фракции', description: 'История и символы трёх великих фракций', total: 15, season: 1 }
+  ];
+
+  console.log('Seeding collection series...');
+  const seriesStmt = await db.prepare(`
+    INSERT INTO CollectionSeries (name, description, total_items, season)
+    VALUES (?, ?, ?, ?)
+  `);
+  
+  for (const s of series) {
+    await seriesStmt.run(s.name, s.description, s.total, s.season);
+  }
+  
+  await seriesStmt.finalize();
+  console.log('CollectionSeries seeded successfully');
+
+  // Добавляем предметы коллекций
+  await seedCollectionItems(db);
+  
+  // Добавляем паки
+  await seedCollectionPacks(db);
+}
+
+async function seedCollectionItems(db: any) {
+  const items = [
+    // Легендарные Проводники (series_id: 1)
+    { series: 1, name: 'Арбитр', desc: 'Глава Отражённого Света Солнца', rarity: 'legendary', drop: 0.01, lore: 'Живое воплощение идеалов фракции, ближайший к божественному свету.' },
+    { series: 1, name: 'Дон Чёрной Лилии', desc: 'Глава криминальной империи', rarity: 'legendary', drop: 0.01, lore: 'Его слово - абсолютный закон в теневом мире.' },
+    { series: 1, name: 'Верховный Судья', desc: 'Глава Порядка', rarity: 'legendary', drop: 0.01, lore: 'Высшая судебная инстанция для всех Проводников.' },
+    { series: 1, name: 'Зодиак: Овен', desc: 'Командир первого отряда', rarity: 'epic', drop: 0.05, lore: 'Живая легенда, чья сила непререкаема.' },
+    { series: 1, name: 'Паладин Света', desc: 'Почётный титул воина ОСС', rarity: 'rare', drop: 0.10, lore: 'Проявил невероятную доблесть и силу духа.' },
+    { series: 1, name: 'Капо Лилии', desc: 'Глава боевой бригады', rarity: 'rare', drop: 0.10, lore: 'Контролирует территорию и криминальный бизнес.' },
+    { series: 1, name: 'Высший Офицер', desc: 'Элита Порядка', rarity: 'rare', drop: 0.10, lore: 'Проводник ранга A+ на службе закона.' },
+    { series: 1, name: 'Инквизитор', desc: 'Старший следователь', rarity: 'uncommon', drop: 0.15, lore: 'Расследует самые сложные дела.' },
+    { series: 1, name: 'Нова', desc: 'Рядовой боец Зодиака', rarity: 'uncommon', drop: 0.15, lore: 'Член элитного военного отряда.' },
+    { series: 1, name: 'Солдат', desc: 'Посвящённый член Семьи', rarity: 'common', drop: 0.20, lore: 'Принёс клятву верности Чёрной Лилии.' },
+    { series: 1, name: 'Детектив', desc: 'Следователь Порядка', rarity: 'common', drop: 0.20, lore: 'Занимается рутинными расследованиями.' },
+    { series: 1, name: 'Аурит', desc: 'Рядовой член ОСС', rarity: 'common', drop: 0.20, lore: 'Начинающий, но преданный последователь.' },
+
+    // Острова мира (series_id: 2)
+    { series: 2, name: 'Кага - Столица прогресса', desc: 'Глобальная столица мира', rarity: 'epic', drop: 0.08, lore: 'Воплощение технологического прогресса и порядка.' },
+    { series: 2, name: 'Хоши - Духовный центр', desc: 'Остров гармонии', rarity: 'epic', drop: 0.08, lore: 'Здесь время течёт иначе, духовность важнее материального.' },
+    { series: 2, name: 'Ичи - Торговая столица', desc: 'Остров капитализма', rarity: 'rare', drop: 0.12, lore: 'Здесь кредиты решают всё.' },
+    { series: 2, name: 'Куро - Теневой остров', desc: 'Владение Чёрной Лилии', rarity: 'rare', drop: 0.12, lore: 'Мир ржавого металла и вечных теней.' },
+    { series: 2, name: 'Мидзу - Дикие земли', desc: 'Нетронутая природа', rarity: 'uncommon', drop: 0.15, lore: 'Первозданный мир древних лесов.' },
+    { series: 2, name: 'Сора - Нейтральная зона', desc: 'Дипломатическая столица', rarity: 'uncommon', drop: 0.15, lore: 'Островок здравомыслия в безумном мире.' },
+
+    // Существа - первые 10 для примера (series_id: 3)
+    { series: 3, name: 'Дракон Бездны', desc: 'Существо SSS ранга', rarity: 'mythic', drop: 0.001, lore: 'Воплощение первичного хаоса.' },
+    { series: 3, name: 'Феникс Возрождения', desc: 'Существо SS ранга', rarity: 'legendary', drop: 0.01, lore: 'Рождается из пепла снова и снова.' },
+    { series: 3, name: 'Левиафан', desc: 'Существо S ранга', rarity: 'epic', drop: 0.05, lore: 'Повелитель глубин океана.' },
+    { series: 3, name: 'Кицунэ Девяти Хвостов', desc: 'Существо A ранга', rarity: 'rare', drop: 0.10, lore: 'Мудрый дух-оборотень.' },
+    { series: 3, name: 'Грифон', desc: 'Существо B ранга', rarity: 'rare', drop: 0.12, lore: 'Благородный страж.' },
+    { series: 3, name: 'Теневой Волк', desc: 'Существо C ранга', rarity: 'uncommon', drop: 0.15, lore: 'Охотник в темноте.' },
+    { series: 3, name: 'Элементаль Огня', desc: 'Существо D ранга', rarity: 'uncommon', drop: 0.15, lore: 'Живое пламя.' },
+    { series: 3, name: 'Лесной Дух', desc: 'Существо E ранга', rarity: 'common', drop: 0.20, lore: 'Хранитель природы.' },
+
+    // Фракции - первые 10 (series_id: 4)
+    { series: 4, name: 'Эмблема ОСС', desc: 'Символ Отражённого Света Солнца', rarity: 'epic', drop: 0.06, lore: 'Солнечный диск, излучающий свет.' },
+    { series: 4, name: 'Знак Чёрной Лилии', desc: 'Символ криминальной империи', rarity: 'epic', drop: 0.06, lore: 'Чёрная лилия на алом фоне.' },
+    { series: 4, name: 'Печать Порядка', desc: 'Символ закона', rarity: 'epic', drop: 0.06, lore: 'Весы правосудия.' },
+    { series: 4, name: 'Великий Храм Рассвета', desc: 'Святыня ОСС', rarity: 'rare', drop: 0.10, lore: 'Расположен у Lux Aeterna.' },
+    { series: 4, name: 'Цитадель Лилии', desc: 'Крепость Дона', rarity: 'rare', drop: 0.10, lore: 'Неприступная резиденция главы.' },
+    { series: 4, name: 'Шпиль Порядка', desc: 'Штаб-квартира', rarity: 'rare', drop: 0.10, lore: 'Монолит высотой два километра.' }
+  ];
+
+  console.log('Seeding collection items...');
+  const stmt = await db.prepare(`
+    INSERT INTO CollectionItems (series_id, name, description, rarity, drop_rate, lore_text)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  
+  for (const item of items) {
+    await stmt.run(item.series, item.name, item.desc, item.rarity, item.drop, item.lore);
+  }
+  
+  await stmt.finalize();
+  console.log('Collection items seeded successfully');
+}
+
+async function seedCollectionPacks(db: any) {
+  const packs = [
+    { name: 'Стандартный пак', desc: 'Базовый набор из 5 случайных карточек', price: 50000, guaranteed: 'common', items: 5, series: null },
+    { name: 'Премиум пак', desc: 'Набор из 5 карточек с гарантированной редкой', price: 150000, guaranteed: 'rare', items: 5, series: null },
+    { name: 'Легендарный пак', desc: 'Набор из 5 карточек с гарантированной эпической', price: 500000, guaranteed: 'epic', items: 5, series: null },
+    { name: 'Пак "Проводники"', desc: 'Специализированный пак с карточками Проводников', price: 200000, guaranteed: 'uncommon', items: 5, series: 1 },
+    { name: 'Пак "Острова"', desc: 'Коллекция всех островов мира', price: 300000, guaranteed: 'rare', items: 6, series: 2 },
+    { name: 'Пак "Существа"', desc: 'Могущественные Существа', price: 250000, guaranteed: 'rare', items: 5, series: 3 },
+    { name: 'Пак "Фракции"', desc: 'История трёх великих фракций', price: 200000, guaranteed: 'uncommon', items: 5, series: 4 }
+  ];
+
+  console.log('Seeding collection packs...');
+  const stmt = await db.prepare(`
+    INSERT INTO CollectionPacks (name, description, price, guaranteed_rarity, items_count, series_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  
+  for (const pack of packs) {
+    await stmt.run(pack.name, pack.desc, pack.price, pack.guaranteed, pack.items, pack.series);
+  }
+  
+  await stmt.finalize();
+  console.log('Collection packs seeded successfully');
 }

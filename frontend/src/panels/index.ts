@@ -21,3 +21,6 @@ export { HorseStatsPanel } from './HorseStatsPanel';
 export { NewEventsPanel } from './NewEventsPanel';
 export { NewAdminEventsPanel } from './NewAdminEventsPanel';
 export { BulkCharacterManagement } from './BulkCharacterManagement';
+export { CryptoExchangePanel } from './CryptoExchangePanel';
+export { PurchasesPanel } from './PurchasesPanel';
+export { CollectionsPanel } from './CollectionsPanel';

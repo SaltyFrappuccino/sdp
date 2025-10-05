@@ -34,6 +34,9 @@ export const DEFAULT_VIEW_PANELS = {
   EVENTS: 'events',
   ADMIN_EVENTS: 'admin_events',
   BULK_CHARACTERS: 'bulk_characters',
+  CRYPTO_EXCHANGE: 'crypto_exchange',
+  PURCHASES: 'purchases',
+  COLLECTIONS: 'collections',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -62,6 +65,9 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.EVENTS, `/${DEFAULT_VIEW_PANELS.EVENTS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_EVENTS, `/${DEFAULT_VIEW_PANELS.ADMIN_EVENTS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.BULK_CHARACTERS, `/${DEFAULT_VIEW_PANELS.BULK_CHARACTERS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.CRYPTO_EXCHANGE, `/${DEFAULT_VIEW_PANELS.CRYPTO_EXCHANGE}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.PURCHASES, `/${DEFAULT_VIEW_PANELS.PURCHASES}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.COLLECTIONS, `/${DEFAULT_VIEW_PANELS.COLLECTIONS}`, []),
     ]),
   ]),
 ]);
