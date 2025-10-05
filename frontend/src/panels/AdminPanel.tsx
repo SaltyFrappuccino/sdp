@@ -398,7 +398,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
               onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
               stretched
             >
-              💰 Криптовалюты (API)
+              Криптовалюты (API)
             </Button>
             <Button 
               size="m" 
@@ -406,7 +406,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
               onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
               stretched
             >
-              🛒 Покупки (API)
+              Покупки (API)
             </Button>
           </ButtonGroup>
         </Div>
@@ -417,7 +417,17 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
             onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
             stretched
           >
-            🎴 Коллекции (API)
+            Коллекции (API)
+          </Button>
+        </Div>
+        <Div>
+          <Button 
+            size="m" 
+            mode="primary" 
+            onClick={() => window.open(`${API_URL}/admin/backup`, '_blank')}
+            stretched
+          >
+            💾 Скачать бэкап базы данных
           </Button>
         </Div>
         <Div style={{ fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>

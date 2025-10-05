@@ -133,6 +133,10 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
   const [character, setCharacter] = useState<Character | null>(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
+  const [cryptoPortfolio, setCryptoPortfolio] = useState<any[]>([]);
+  const [stockPortfolio, setStockPortfolio] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [collection, setCollection] = useState<any[]>([]);
 
   const handleExportAnketa = () => {
     if (!character) return;
@@ -193,8 +197,43 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
       }
     };
 
+    const fetchAdditionalData = async () => {
+      try {
+        // Криптопортфель
+        const cryptoRes = await fetch(`${API_URL}/crypto/portfolio/${characterId}`);
+        if (cryptoRes.ok) {
+          const cryptoData = await cryptoRes.json();
+          setCryptoPortfolio(cryptoData);
+        }
+
+        // Биржа (акции)
+        const stockRes = await fetch(`${API_URL}/market/portfolio/${characterId}`);
+        if (stockRes.ok) {
+          const stockData = await stockRes.json();
+          setStockPortfolio(stockData);
+        }
+
+        // Покупки
+        const purchasesRes = await fetch(`${API_URL}/purchases/my/${characterId}`);
+        if (purchasesRes.ok) {
+          const purchasesData = await purchasesRes.json();
+          setPurchases(purchasesData);
+        }
+
+        // Коллекция
+        const collectionRes = await fetch(`${API_URL}/collections/my/${characterId}`);
+        if (collectionRes.ok) {
+          const collectionData = await collectionRes.json();
+          setCollection(collectionData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch additional data:', error);
+      }
+    };
+
     if (characterId) {
       fetchCharacter();
+      fetchAdditionalData();
     }
   }, [characterId]);
 
@@ -566,12 +605,93 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
                 <Div>{character.admin_note}</Div>
             </Group>
           )}
+
+          {/* Биржа (Акции) */}
+          {stockPortfolio.length > 0 && (
+            <Group header={<Header>Портфель на бирже</Header>}>
+              {stockPortfolio.map((stock: any, idx: number) => (
+                <SimpleCell key={idx} multiline after={<Text>{(stock.quantity * stock.current_price).toFixed(2)} ₭</Text>}>
+                  <Text weight="2">{stock.name} ({stock.ticker_symbol})</Text>
+                  <Text style={{ color: 'var(--vkui--color_text_secondary)', fontSize: 14 }}>
+                    {stock.quantity} × {stock.current_price} ₭
+                  </Text>
+                </SimpleCell>
+              ))}
+            </Group>
+          )}
+
+          {/* Криптовалюты */}
+          {cryptoPortfolio.length > 0 && (
+            <Group header={<Header>Криптопортфель</Header>}>
+              {cryptoPortfolio.map((crypto: any, idx: number) => (
+                <SimpleCell key={idx} multiline after={<Text>{(crypto.quantity * crypto.current_price).toFixed(2)} ₭</Text>}>
+                  <Text weight="2">{crypto.name} ({crypto.ticker_symbol})</Text>
+                  <Text style={{ color: 'var(--vkui--color_text_secondary)', fontSize: 14 }}>
+                    {crypto.quantity} × {crypto.current_price} ₭
+                  </Text>
+                </SimpleCell>
+              ))}
+            </Group>
+          )}
+
+          {/* Покупки */}
+          {purchases.length > 0 && (
+            <Group header={<Header>Владения</Header>}>
+              {purchases.map((item: any, idx: number) => (
+                <SimpleCell key={idx} multiline subtitle={item.description}>
+                  <Text weight="2">{item.name}</Text>
+                  <Text style={{ color: 'var(--vkui--color_text_secondary)', fontSize: 14 }}>
+                    {item.category_name}
+                  </Text>
+                </SimpleCell>
+              ))}
+            </Group>
+          )}
+
+          {/* Коллекция */}
+          {collection.length > 0 && (
+            <Group header={<Header>Коллекция</Header>}>
+              {collection.map((item: any, idx: number) => {
+                const rarityColors: { [key: string]: string } = {
+                  common: '#9E9E9E',
+                  uncommon: '#4CAF50',
+                  rare: '#2196F3',
+                  epic: '#9C27B0',
+                  legendary: '#FF9800',
+                  mythic: '#F44336'
+                };
+                return (
+                  <SimpleCell 
+                    key={idx} 
+                    multiline 
+                    subtitle={item.description}
+                    after={<Text>×{item.quantity}</Text>}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Text weight="2">{item.name}</Text>
+                      <span style={{
+                        fontSize: 11,
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: rarityColors[item.rarity] || '#999',
+                        color: 'white',
+                        fontWeight: 'bold'
+                      }}>
+                        {item.rarity}
+                      </span>
+                    </div>
+                  </SimpleCell>
+                );
+              })}
+            </Group>
+          )}
+
           <Div>
             <Button stretched size="l" mode="secondary" onClick={fetchVersions}>
               История изменений
             </Button>
             <Button stretched size="l" mode="outline" onClick={handleExportAnketa} style={{ marginTop: '8px' }}>
-              📄 Экспорт анкеты
+              Экспорт анкеты
             </Button>
           </Div>
         </>

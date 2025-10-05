@@ -6079,7 +6079,7 @@ router.post('/collections/open-pack/:pack_id', async (req, res) => {
     }
 
     await db.close();
-    res.json({ success: true, items: droppedItems });
+    res.json(droppedItems);
   } catch (error) {
     console.error('Error opening pack:', error);
     res.status(500).json({ error: 'Failed to open pack' });
@@ -6348,6 +6348,30 @@ router.post('/admin/collections/give-item', async (req, res) => {
   } catch (error) {
     console.error('Error giving collection item:', error);
     res.status(500).json({ error: 'Failed to give item' });
+  }
+});
+
+// Backup database
+router.get('/admin/backup', async (req, res) => {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const dbPath = path.resolve('./database.db');
+    
+    if (!fs.existsSync(dbPath)) {
+      return res.status(404).json({ error: 'Database file not found' });
+    }
+    
+    const dbBuffer = fs.readFileSync(dbPath);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `backup_${timestamp}.db`;
+    
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(dbBuffer);
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    res.status(500).json({ error: 'Failed to create backup' });
   }
 });
 
