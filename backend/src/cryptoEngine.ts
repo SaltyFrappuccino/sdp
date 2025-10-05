@@ -1,6 +1,7 @@
-import Database from 'better-sqlite3';
+import { initDB } from './database.js';
 
-const db = new Database('anketi.db');
+// Получаем соединение с базой данных
+let db: any = null;
 
 interface CryptoCurrency {
   id: number;
@@ -25,8 +26,11 @@ const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 минут
 /**
  * Обновляет цены всех криптовалют на основе волатильности и активных событий
  */
-function updateCryptoPrices() {
+async function updateCryptoPrices() {
   try {
+    if (!db) {
+      db = await initDB();
+    }
     console.log('[CryptoEngine] Начало обновления цен криптовалют...');
 
     // Получаем все активные криптовалюты
@@ -120,8 +124,11 @@ function updateCryptoPrices() {
 /**
  * Очищает завершившиеся события
  */
-function cleanupExpiredEvents() {
+async function cleanupExpiredEvents() {
   try {
+    if (!db) {
+      db = await initDB();
+    }
     const result = db.prepare(`
       DELETE FROM CryptoEvents
       WHERE datetime(end_time) < datetime('now')
@@ -138,18 +145,21 @@ function cleanupExpiredEvents() {
 /**
  * Запускает движок криптовалют
  */
-export function startCryptoEngine() {
+export async function startCryptoEngine() {
   console.log('[CryptoEngine] Запуск движка криптовалют...');
   console.log(`[CryptoEngine] Интервал обновления: ${UPDATE_INTERVAL / 1000} секунд`);
 
+  // Инициализируем базу данных
+  db = await initDB();
+
   // Первое обновление сразу при запуске
-  updateCryptoPrices();
-  cleanupExpiredEvents();
+  await updateCryptoPrices();
+  await cleanupExpiredEvents();
 
   // Периодическое обновление цен
-  setInterval(() => {
-    updateCryptoPrices();
-    cleanupExpiredEvents();
+  setInterval(async () => {
+    await updateCryptoPrices();
+    await cleanupExpiredEvents();
   }, UPDATE_INTERVAL);
 
   console.log('[CryptoEngine] Движок криптовалют запущен успешно');

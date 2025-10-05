@@ -323,7 +323,7 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
       {/* Вкладка "Рынок" */}
       {activeTab === 'market' && (
         <>
-          {loading && <Spinner size="medium" style={{ margin: '20px auto' }} />}
+          {loading && <Spinner size="m" style={{ margin: '20px auto' }} />}
           
           {cryptos.map((crypto) => {
             const priceChange = crypto.base_volatility * 100;
@@ -523,7 +523,7 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
                 <SimpleCell
                   key={tx.id}
                   subtitle={`${formatDate(tx.created_at)} • ${tx.quantity.toFixed(4)} монет • ${formatPrice(tx.total_amount)} ₭`}
-                  badge={
+                  after={
                     <Text style={{ color: tx.transaction_type === 'buy' ? 'var(--vkui--color_text_positive)' : 'var(--vkui--color_text_negative)' }}>
                       {tx.transaction_type === 'buy' ? 'Покупка' : 'Продажа'}
                     </Text>

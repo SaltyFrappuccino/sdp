@@ -5047,7 +5047,7 @@ async function finishHand(db: any, hand_id: number) {
 // Получить все криптовалюты
 router.get('/crypto/currencies', async (req, res) => {
   try {
-    const db = await getDbConnection();
+    const db = await initDB();
     const cryptos = await db.all('SELECT * FROM CryptoCurrencies ORDER BY current_price DESC');
     await db.close();
     res.json(cryptos);
@@ -5061,7 +5061,7 @@ router.get('/crypto/currencies', async (req, res) => {
 router.get('/crypto/currencies/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const crypto = await db.get('SELECT * FROM CryptoCurrencies WHERE id = ?', [id]);
     if (!crypto) {
@@ -5090,7 +5090,7 @@ router.get('/crypto/currencies/:id', async (req, res) => {
 router.get('/crypto/portfolio/:character_id', async (req, res) => {
   try {
     const { character_id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     let portfolio = await db.get('SELECT * FROM CryptoPortfolios WHERE character_id = ?', [character_id]);
     
@@ -5111,10 +5111,10 @@ router.get('/crypto/portfolio/:character_id', async (req, res) => {
     let totalValue = 0;
 
     for (const [cryptoId, balance] of Object.entries(balances)) {
-      const crypto = cryptos.find(c => c.id === parseInt(cryptoId));
-      if (crypto && balance.quantity > 0) {
-        const currentValue = balance.quantity * crypto.current_price;
-        const costBasis = balance.quantity * balance.average_purchase_price;
+      const crypto = cryptos.find((c: any) => c.id === parseInt(cryptoId));
+      if (crypto && (balance as any).quantity > 0) {
+        const currentValue = (balance as any).quantity * crypto.current_price;
+        const costBasis = (balance as any).quantity * (balance as any).average_purchase_price;
         const profit = currentValue - costBasis;
         const profitPercent = (profit / costBasis) * 100;
 
@@ -5122,8 +5122,8 @@ router.get('/crypto/portfolio/:character_id', async (req, res) => {
           crypto_id: crypto.id,
           name: crypto.name,
           ticker_symbol: crypto.ticker_symbol,
-          quantity: balance.quantity,
-          average_purchase_price: balance.average_purchase_price,
+          quantity: (balance as any).quantity,
+          average_purchase_price: (balance as any).average_purchase_price,
           current_price: crypto.current_price,
           current_value: currentValue,
           profit,
@@ -5155,7 +5155,7 @@ router.post('/crypto/buy', async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
 
     // Получаем криптовалюту
     const crypto = await db.get('SELECT * FROM CryptoCurrencies WHERE id = ?', [crypto_id]);
@@ -5229,7 +5229,7 @@ router.post('/crypto/sell', async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
 
     // Получаем криптовалюту
     const crypto = await db.get('SELECT * FROM CryptoCurrencies WHERE id = ?', [crypto_id]);
@@ -5285,7 +5285,7 @@ router.post('/crypto/sell', async (req, res) => {
 router.get('/crypto/transactions/:character_id', async (req, res) => {
   try {
     const { character_id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const transactions = await db.all(`
       SELECT t.*, c.name, c.ticker_symbol
@@ -5307,7 +5307,7 @@ router.get('/crypto/transactions/:character_id', async (req, res) => {
 // Топ держателей криптовалют
 router.get('/crypto/leaderboard', async (req, res) => {
   try {
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const portfolios = await db.all('SELECT * FROM CryptoPortfolios');
     const cryptos = await db.all('SELECT * FROM CryptoCurrencies');
@@ -5322,9 +5322,9 @@ router.get('/crypto/leaderboard', async (req, res) => {
       let totalValue = 0;
 
       for (const [cryptoId, balance] of Object.entries(balances)) {
-        const crypto = cryptos.find(c => c.id === parseInt(cryptoId));
+        const crypto = cryptos.find((c: any) => c.id === parseInt(cryptoId));
         if (crypto) {
-          totalValue += balance.quantity * crypto.current_price;
+          totalValue += (balance as any).quantity * crypto.current_price;
         }
       }
 
@@ -5351,7 +5351,7 @@ router.get('/crypto/leaderboard', async (req, res) => {
 // Получить активные события
 router.get('/crypto/events', async (req, res) => {
   try {
-    const db = await getDbConnection();
+    const db = await initDB();
     const now = new Date().toISOString();
     
     const events = await db.all(`
@@ -5383,7 +5383,7 @@ router.post('/admin/crypto/create', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const result = await db.run(`
       INSERT INTO CryptoCurrencies (name, ticker_symbol, description, current_price, base_volatility, total_supply, circulating_supply)
@@ -5404,7 +5404,7 @@ router.put('/admin/crypto/:id', async (req, res) => {
     const { id } = req.params;
     const { name, ticker_symbol, description, current_price, base_volatility, total_supply } = req.body;
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run(`
       UPDATE CryptoCurrencies 
@@ -5424,7 +5424,7 @@ router.put('/admin/crypto/:id', async (req, res) => {
 router.delete('/admin/crypto/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run('DELETE FROM CryptoCurrencies WHERE id = ?', [id]);
     
@@ -5445,7 +5445,7 @@ router.post('/admin/crypto/event', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const now = new Date();
     const endTime = new Date(now.getTime() + duration_hours * 60 * 60 * 1000);
@@ -5469,7 +5469,7 @@ router.put('/admin/crypto/volatility/:id', async (req, res) => {
     const { id } = req.params;
     const { base_volatility } = req.body;
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run(`
       UPDATE CryptoCurrencies 
@@ -5488,7 +5488,7 @@ router.put('/admin/crypto/volatility/:id', async (req, res) => {
 // Сбросить рынок криптовалют
 router.post('/admin/crypto/reset', async (req, res) => {
   try {
-    const db = await getDbConnection();
+    const db = await initDB();
     
     // Удаляем все портфели
     await db.run('DELETE FROM CryptoPortfolios');
@@ -5537,7 +5537,7 @@ router.post('/admin/crypto/reset', async (req, res) => {
 // Получить все категории
 router.get('/purchases/categories', async (req, res) => {
   try {
-    const db = await getDbConnection();
+    const db = await initDB();
     const categories = await db.all('SELECT * FROM PurchaseCategories ORDER BY display_order');
     await db.close();
     res.json(categories);
@@ -5552,7 +5552,7 @@ router.get('/purchases/items', async (req, res) => {
   try {
     const { category_id, island, rank, rarity, min_price, max_price } = req.query;
     
-    const db = await getDbConnection();
+    const db = await initDB();
     
     let query = 'SELECT * FROM PurchaseItems WHERE available = 1';
     const params: any[] = [];
@@ -5603,7 +5603,7 @@ router.get('/purchases/items', async (req, res) => {
 router.get('/purchases/items/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const item = await db.get('SELECT * FROM PurchaseItems WHERE id = ?', [id]);
     if (!item) {
@@ -5641,7 +5641,7 @@ router.post('/purchases/buy', async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
 
     // Получаем предмет
     const item = await db.get('SELECT * FROM PurchaseItems WHERE id = ? AND available = 1', [item_id]);
@@ -5696,7 +5696,7 @@ router.post('/purchases/buy', async (req, res) => {
 router.get('/purchases/my/:character_id', async (req, res) => {
   try {
     const { character_id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const purchases = await db.all(`
       SELECT cp.*, pi.name, pi.description, pi.image_url, pi.rarity, pc.name as category_name, pc.icon as category_icon
@@ -5719,7 +5719,7 @@ router.get('/purchases/my/:character_id', async (req, res) => {
 router.get('/purchases/item/:id/owners', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const owners = await db.all(`
       SELECT c.id, c.character_name, c.rank, c.faction, cp.purchase_price, cp.purchased_at
@@ -5750,7 +5750,7 @@ router.post('/admin/purchases/category', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const result = await db.run(`
       INSERT INTO PurchaseCategories (name, icon, description, display_order)
@@ -5771,7 +5771,7 @@ router.put('/admin/purchases/category/:id', async (req, res) => {
     const { id } = req.params;
     const { name, icon, description, display_order } = req.body;
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run(`
       UPDATE PurchaseCategories 
@@ -5791,7 +5791,7 @@ router.put('/admin/purchases/category/:id', async (req, res) => {
 router.delete('/admin/purchases/category/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run('DELETE FROM PurchaseCategories WHERE id = ?', [id]);
     
@@ -5812,7 +5812,7 @@ router.post('/admin/purchases/item', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const result = await db.run(`
       INSERT INTO PurchaseItems (category_id, name, description, base_price, island, rank_required, image_url, rarity, properties, available)
@@ -5833,7 +5833,7 @@ router.put('/admin/purchases/item/:id', async (req, res) => {
     const { id } = req.params;
     const { category_id, name, description, base_price, island, rank_required, image_url, rarity, properties, available } = req.body;
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run(`
       UPDATE PurchaseItems 
@@ -5853,7 +5853,7 @@ router.put('/admin/purchases/item/:id', async (req, res) => {
 router.delete('/admin/purchases/item/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run('DELETE FROM PurchaseItems WHERE id = ?', [id]);
     
@@ -5872,7 +5872,7 @@ router.delete('/admin/purchases/item/:id', async (req, res) => {
 // Получить все серии коллекций
 router.get('/collections/series', async (req, res) => {
   try {
-    const db = await getDbConnection();
+    const db = await initDB();
     const series = await db.all('SELECT * FROM CollectionSeries WHERE active = 1 ORDER BY season DESC, id');
     await db.close();
     res.json(series);
@@ -5886,7 +5886,7 @@ router.get('/collections/series', async (req, res) => {
 router.get('/collections/series/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const series = await db.get('SELECT * FROM CollectionSeries WHERE id = ?', [id]);
     if (!series) {
@@ -5907,7 +5907,7 @@ router.get('/collections/series/:id', async (req, res) => {
 // Получить доступные паки
 router.get('/collections/packs', async (req, res) => {
   try {
-    const db = await getDbConnection();
+    const db = await initDB();
     const packs = await db.all(`
       SELECT p.*, s.name as series_name
       FROM CollectionPacks p
@@ -5932,7 +5932,7 @@ router.post('/collections/buy-pack', async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
 
     // Получаем пак
     const pack = await db.get('SELECT * FROM CollectionPacks WHERE id = ? AND active = 1', [pack_id]);
@@ -5975,7 +5975,7 @@ router.post('/collections/open-pack/:pack_id', async (req, res) => {
       return res.status(400).json({ error: 'Character ID required' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
 
     const pack = await db.get('SELECT * FROM CollectionPacks WHERE id = ?', [pack_id]);
     if (!pack) {
@@ -6016,7 +6016,7 @@ router.post('/collections/open-pack/:pack_id', async (req, res) => {
 
       // Последняя карта - гарантированная
       if (i === pack.items_count - 1 && !hasGuaranteed) {
-        const guaranteedItems = items.filter(item => item.rarity === guaranteedRarity);
+        const guaranteedItems = items.filter((item: any) => item.rarity === guaranteedRarity);
         if (guaranteedItems.length > 0) {
           selectedItem = guaranteedItems[Math.floor(Math.random() * guaranteedItems.length)];
           hasGuaranteed = true;
@@ -6037,7 +6037,7 @@ router.post('/collections/open-pack/:pack_id', async (req, res) => {
           }
         }
 
-        const rarityItems = items.filter(item => item.rarity === selectedRarity);
+        const rarityItems = items.filter((item: any) => item.rarity === selectedRarity);
         if (rarityItems.length > 0) {
           selectedItem = rarityItems[Math.floor(Math.random() * rarityItems.length)];
           
@@ -6082,7 +6082,7 @@ router.get('/collections/my/:character_id', async (req, res) => {
     const { character_id } = req.params;
     const { series_id } = req.query;
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     let collection;
     if (series_id) {
@@ -6116,7 +6116,7 @@ router.get('/collections/my/:character_id', async (req, res) => {
 // Топ коллекционеров
 router.get('/collections/leaderboard', async (req, res) => {
   try {
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const leaderboard = await db.all(`
       SELECT c.id as character_id, c.character_name,
@@ -6150,7 +6150,7 @@ router.post('/admin/collections/series', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const result = await db.run(`
       INSERT INTO CollectionSeries (name, description, total_items, season, active)
@@ -6171,7 +6171,7 @@ router.put('/admin/collections/series/:id', async (req, res) => {
     const { id } = req.params;
     const { name, description, total_items, season, active } = req.body;
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run(`
       UPDATE CollectionSeries 
@@ -6191,7 +6191,7 @@ router.put('/admin/collections/series/:id', async (req, res) => {
 router.delete('/admin/collections/series/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run('DELETE FROM CollectionSeries WHERE id = ?', [id]);
     
@@ -6212,7 +6212,7 @@ router.post('/admin/collections/item', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const result = await db.run(`
       INSERT INTO CollectionItems (series_id, name, description, rarity, image_url, lore_text, drop_rate, properties)
@@ -6233,7 +6233,7 @@ router.put('/admin/collections/item/:id', async (req, res) => {
     const { id } = req.params;
     const { series_id, name, description, rarity, image_url, lore_text, drop_rate, properties } = req.body;
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run(`
       UPDATE CollectionItems 
@@ -6253,7 +6253,7 @@ router.put('/admin/collections/item/:id', async (req, res) => {
 router.delete('/admin/collections/item/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run('DELETE FROM CollectionItems WHERE id = ?', [id]);
     
@@ -6274,7 +6274,7 @@ router.post('/admin/collections/pack', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     const result = await db.run(`
       INSERT INTO CollectionPacks (name, description, price, guaranteed_rarity, items_count, series_id, active)
@@ -6295,7 +6295,7 @@ router.put('/admin/collections/pack/:id', async (req, res) => {
     const { id } = req.params;
     const { name, description, price, guaranteed_rarity, items_count, series_id, active } = req.body;
 
-    const db = await getDbConnection();
+    const db = await initDB();
     
     await db.run(`
       UPDATE CollectionPacks 
@@ -6320,7 +6320,7 @@ router.post('/admin/collections/give-item', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const db = await getDbConnection();
+    const db = await initDB();
 
     const existing = await db.get('SELECT * FROM CharacterCollection WHERE character_id = ? AND item_id = ?', 
       [character_id, item_id]);

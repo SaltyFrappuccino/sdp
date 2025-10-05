@@ -36,7 +36,7 @@ async function startServer() {
   try {
     await initDB();
     startMarketEngine();
-    startCryptoEngine(); // Запускаем движок криптовалют
+    await startCryptoEngine(); // Запускаем движок криптовалют
     app.listen(port, '0.0.0.0', () => {
       console.log(`Server is running at http://localhost:${port}`);
       console.log(`API is available at http://localhost:${port}/api`);

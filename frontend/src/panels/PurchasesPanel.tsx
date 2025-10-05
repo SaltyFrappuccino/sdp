@@ -387,7 +387,7 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
               </Group>
 
               {/* Предметы */}
-              {loading && <Spinner size="medium" style={{ margin: '20px auto' }} />}
+              {loading && <Spinner size="m" style={{ margin: '20px auto' }} />}
               
               {!loading && items.length > 0 && (
                 <Group header={<Header>Доступные предметы ({items.length})</Header>}>
@@ -535,7 +535,7 @@ export const PurchasesPanel: FC<PurchasesPanelProps> = ({ id, fetchedUser }) => 
                     key={purchase.id}
                     before={<div style={{ fontSize: 32 }}>{purchase.category_icon}</div>}
                     subtitle={`${purchase.category_name} • ${formatPrice(purchase.purchase_price)} • ${formatDate(purchase.purchased_at)}`}
-                    badge={
+                    after={
                       <span style={{
                         padding: '2px 8px',
                         borderRadius: 4,

@@ -501,7 +501,7 @@ export const CollectionsPanel: FC<CollectionsPanelProps> = ({ id, fetchedUser })
                 </Button>
               </Div>
 
-              {loading && <Spinner size="medium" style={{ margin: '20px auto' }} />}
+              {loading && <Spinner size="m" style={{ margin: '20px auto' }} />}
 
               {!loading && seriesItems.length > 0 && (
                 <Div>
