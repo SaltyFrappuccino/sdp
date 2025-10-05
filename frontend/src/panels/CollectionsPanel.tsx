@@ -98,6 +98,7 @@ interface LeaderboardEntry {
 
 const rarityColors = {
   common: '#888888',
+  uncommon: '#4CAF50',
   rare: '#4A90E2',
   epic: '#9B59B6',
   legendary: '#F39C12',
@@ -106,6 +107,7 @@ const rarityColors = {
 
 const rarityLabels = {
   common: 'Обычный',
+  uncommon: 'Необычный',
   rare: 'Редкий',
   epic: 'Эпический',
   legendary: 'Легендарный',

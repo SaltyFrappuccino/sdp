@@ -808,7 +808,7 @@ router.get('/admin/backup', async (req, res) => {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
 
-    const dbPath = path.resolve(__dirname, '../../database.db');
+    const dbPath = path.resolve(__dirname, '../anketi.db');
     
     if (!fs.existsSync(dbPath)) {
       console.error(`Database file not found at: ${dbPath}`);
@@ -6448,7 +6448,7 @@ router.get('/admin/backup', async (req, res) => {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
 
-    const dbPath = path.resolve(__dirname, '../../database.db');
+    const dbPath = path.resolve(__dirname, '../../anketi.db');
     
     if (!fs.existsSync(dbPath)) {
       console.error(`Database file not found at: ${dbPath}`);
