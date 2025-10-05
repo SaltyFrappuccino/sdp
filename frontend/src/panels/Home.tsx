@@ -37,7 +37,7 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
         <Div>
           <ButtonGroup stretched mode="horizontal">
             <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('anketa')}>
-              Создать анкету
+              Создать анкету 1
             </Button>
             <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('my_anketas')}>
               Мои анкеты
