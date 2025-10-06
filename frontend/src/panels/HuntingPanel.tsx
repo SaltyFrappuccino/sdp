@@ -141,6 +141,14 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const data = await response.json();
       // Показываем только покупаемое снаряжение (не базовое)
       const shopItems = data.filter((item: any) => !item.is_basic);
+      
+      // Сортируем по типу и качеству (от худшего к лучшему)
+      const qualityOrder = { 'Обычное': 1, 'Хорошее': 2, 'Отличное': 3, 'Эпическое': 4, 'Легендарное': 5 };
+      shopItems.sort((a: any, b: any) => {
+        if (a.type !== b.type) return a.type.localeCompare(b.type);
+        return qualityOrder[a.quality] - qualityOrder[b.quality];
+      });
+      
       setShopGear(shopItems);
     } catch (error) {
       console.error('Ошибка при загрузке магазина:', error);
@@ -356,7 +364,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                     <option value="">Без оружия</option>
                     {gear.filter(g => g.type === 'Оружие').map(g => (
                       <option key={g.id} value={g.id}>
-                        {g.name} (+{(g.bonus_success * 100).toFixed(0)}%)
+                        {g.name} (+{(g.bonus_success * 100).toFixed(0)}%) {g.quantity > 1 ? `[${g.quantity}]` : ''}
                       </option>
                     ))}
                   </NativeSelect>
@@ -376,7 +384,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                     <option value="">Без брони</option>
                     {gear.filter(g => g.type === 'Броня').map(g => (
                       <option key={g.id} value={g.id}>
-                        {g.name} (+{(g.bonus_defense * 100).toFixed(0)}%)
+                        {g.name} (+{(g.bonus_defense * 100).toFixed(0)}%) {g.quantity > 1 ? `[${g.quantity}]` : ''}
                       </option>
                     ))}
                   </NativeSelect>
@@ -433,19 +441,29 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
       {activeTab === 'shop' && (
         <Group header={<Header>Магазин снаряжения</Header>}>
-          {shopGear.map(item => (
-            <Cell
-              key={item.id}
-              subtitle={`${item.type} • ${item.quality} • ${item.description}`}
-              after={
-                <Button size="s" onClick={() => handleBuyGear(item.id, item.price)}>
-                  {item.price.toLocaleString()} ₭
-                </Button>
-              }
-              multiline
-            >
-              {item.name}
-            </Cell>
+          {Object.entries(
+            shopGear.reduce((acc: any, item: any) => {
+              if (!acc[item.type]) acc[item.type] = [];
+              acc[item.type].push(item);
+              return acc;
+            }, {})
+          ).map(([type, items]: [string, any]) => (
+            <Group key={type} header={<Header mode="secondary">{type}</Header>}>
+              {items.map((item: any) => (
+                <Cell
+                  key={item.id}
+                  subtitle={`${item.quality} • ${item.description}`}
+                  after={
+                    <Button size="s" onClick={() => handleBuyGear(item.id, item.price)}>
+                      {item.price.toLocaleString()} ₭
+                    </Button>
+                  }
+                  multiline
+                >
+                  {item.name}
+                </Cell>
+              ))}
+            </Group>
           ))}
         </Group>
       )}

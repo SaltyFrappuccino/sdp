@@ -968,6 +968,7 @@ export async function initDB() {
         description TEXT,
         min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
         is_basic BOOLEAN DEFAULT 0,
+        is_consumable BOOLEAN DEFAULT 0,
         is_active BOOLEAN DEFAULT 1
       );
 
@@ -1007,6 +1008,7 @@ export async function initDB() {
         description TEXT,
         min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
         is_basic BOOLEAN DEFAULT 0,
+        is_consumable BOOLEAN DEFAULT 0,
         is_active BOOLEAN DEFAULT 1
       );
 
@@ -1045,6 +1047,7 @@ export async function initDB() {
         gear_id INTEGER NOT NULL,
         quantity INTEGER DEFAULT 1,
         is_equipped BOOLEAN DEFAULT 0,
+        condition REAL DEFAULT 1.0,
         FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
         FOREIGN KEY (gear_id) REFERENCES FishingGear(id) ON DELETE CASCADE
       );
@@ -1056,6 +1059,7 @@ export async function initDB() {
         gear_id INTEGER NOT NULL,
         quantity INTEGER DEFAULT 1,
         is_equipped BOOLEAN DEFAULT 0,
+        condition REAL DEFAULT 1.0,
         FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
         FOREIGN KEY (gear_id) REFERENCES HuntingGear(id) ON DELETE CASCADE
       );
@@ -1824,31 +1828,31 @@ export async function seedFishingData(db: any) {
     const basicBait = await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
       VALUES ('Кусок хлеба', 'Наживка', 'Базовое', 0, 0, 0, 'Обычный хлеб для приманки', 'F', 1)`);
 
-    // Покупаемое снаряжение
+    // Покупаемое снаряжение (цены согласно лору)
     await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Бамбуковая удочка', 'Удочка', 'Обычное', 10000, 0.05, 0, 'Простая удочка для новичков', 'F', 0)`);
+      VALUES ('Бамбуковая удочка', 'Удочка', 'Обычное', 50000, 0.05, 0, 'Простая удочка для новичков', 'F', 0)`);
 
     await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Карбоновое удилище', 'Удочка', 'Хорошее', 50000, 0.1, 0.05, 'Лёгкая и прочная удочка', 'E', 0)`);
+      VALUES ('Карбоновое удилище', 'Удочка', 'Хорошее', 250000, 0.1, 0.05, 'Лёгкая и прочная удочка', 'E', 0)`);
 
     await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Удочка Мастера', 'Удочка', 'Отличное', 200000, 0.15, 0.1, 'Профессиональная удочка с усиленной леской', 'D', 0)`);
+      VALUES ('Удочка Мастера', 'Удочка', 'Отличное', 1000000, 0.15, 0.1, 'Профессиональная удочка с усиленной леской', 'D', 0)`);
 
     await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Аурическая удочка', 'Удочка', 'Эпическое', 1000000, 0.25, 0.2, 'Удочка, пропитанная Аурой. Привлекает редкую рыбу', 'C', 0)`);
+      VALUES ('Аурическая удочка', 'Удочка', 'Эпическое', 5000000, 0.25, 0.2, 'Удочка, пропитанная Аурой. Привлекает редкую рыбу', 'C', 0)`);
 
     await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Посох Повелителя Вод', 'Удочка', 'Легендарное', 10000000, 0.4, 0.35, 'Легендарная удочка из Эхо-Зон', 'A', 0)`);
+      VALUES ('Посох Повелителя Вод', 'Удочка', 'Легендарное', 50000000, 0.4, 0.35, 'Легендарная удочка из Эхо-Зон', 'A', 0)`);
 
-    // Наживки
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Червяк', 'Наживка', 'Обычное', 1000, 0.02, 0, 'Обычная наживка', 'F', 0)`);
+    // Наживки (расходуемые)
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
+      VALUES ('Червяк', 'Наживка', 'Обычное', 5000, 0.02, 0, 'Обычная наживка', 'F', 0, 1)`);
 
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Светящаяся приманка', 'Наживка', 'Хорошее', 5000, 0.05, 0.03, 'Привлекает хищников', 'E', 0)`);
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
+      VALUES ('Светящаяся приманка', 'Наживка', 'Хорошее', 25000, 0.05, 0.03, 'Привлекает хищников', 'E', 0, 1)`);
 
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Ауральная эссенция', 'Наживка', 'Эпическое', 50000, 0.1, 0.15, 'Приманка из концентрированной Ауры', 'C', 0)`);
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
+      VALUES ('Ауральная эссенция', 'Наживка', 'Эпическое', 500000, 0.1, 0.15, 'Приманка из концентрированной Ауры', 'C', 0, 1)`);
 
     console.log('Fishing data seeded successfully!');
   } catch (error) {
@@ -1929,41 +1933,41 @@ export async function seedHuntingData(db: any) {
     const basicArmor = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
       VALUES ('Тряпки', 'Броня', 'Базовое', 0, 0, 0, 0, 'Обычная одежда без защиты', 'F', 1)`);
 
-    // Покупаемое оружие
+    // Покупаемое оружие (цены согласно лору)
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Охотничий нож', 'Оружие', 'Обычное', 15000, 0.1, 0, 0.05, 'Базовый нож охотника', 'F', 0)`);
+      VALUES ('Охотничий нож', 'Оружие', 'Обычное', 250000, 0.1, 0, 0.05, 'Базовый нож охотника', 'F', 0)`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Арбалет', 'Оружие', 'Хорошее', 80000, 0.2, 0, 0.1, 'Дальнобойное оружие', 'E', 0)`);
+      VALUES ('Арбалет', 'Оружие', 'Хорошее', 1000000, 0.2, 0, 0.1, 'Дальнобойное оружие', 'E', 0)`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Винтовка Охотника', 'Оружие', 'Отличное', 300000, 0.3, 0, 0.15, 'Современная винтовка для крупной дичи', 'D', 0)`);
+      VALUES ('Винтовка Охотника', 'Оружие', 'Отличное', 5000000, 0.3, 0, 0.15, 'Современная винтовка для крупной дичи', 'D', 0)`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Ауральный клинок', 'Оружие', 'Эпическое', 1500000, 0.45, 0, 0.25, 'Меч, пропитанный Аурой', 'C', 0)`);
+      VALUES ('Ауральный клинок', 'Оружие', 'Эпическое', 25000000, 0.45, 0, 0.25, 'Меч, пропитанный Аурой', 'C', 0)`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Убийца Бестий', 'Оружие', 'Легендарное', 15000000, 0.6, 0, 0.4, 'Легендарное оружие для охоты на Бестий', 'A', 0)`);
+      VALUES ('Убийца Бестий', 'Оружие', 'Легендарное', 100000000, 0.6, 0, 0.4, 'Легендарное оружие для охоты на Бестий', 'A', 0)`);
 
     // Покупаемая броня
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Кожаная куртка', 'Броня', 'Обычное', 20000, 0, 0.1, 0, 'Базовая защита', 'F', 0)`);
+      VALUES ('Кожаная куртка', 'Броня', 'Обычное', 1000000, 0, 0.1, 0, 'Базовая защита', 'F', 0)`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Укреплённый доспех', 'Броня', 'Хорошее', 100000, 0, 0.2, 0.05, 'Прочная броня охотника', 'E', 0)`);
+      VALUES ('Укреплённый доспех', 'Броня', 'Хорошее', 5000000, 0, 0.2, 0.05, 'Прочная броня охотника', 'E', 0)`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Ауральный щит', 'Броня', 'Эпическое', 2000000, 0, 0.4, 0.1, 'Щит из концентрированной Ауры', 'C', 0)`);
+      VALUES ('Ауральный щит', 'Броня', 'Эпическое', 50000000, 0, 0.4, 0.1, 'Щит из концентрированной Ауры', 'C', 0)`);
 
-    // Ловушки
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Капкан', 'Ловушка', 'Обычное', 5000, 0, 0, 0.1, 'Простая ловушка', 'F', 0)`);
+    // Ловушки (расходуемые)
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Капкан', 'Ловушка', 'Обычное', 50000, 0, 0, 0.1, 'Простая ловушка', 'F', 0, 1)`);
 
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Шоковая сеть', 'Ловушка', 'Хорошее', 30000, 0, 0, 0.2, 'Электрифицированная сеть', 'E', 0)`);
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Шоковая сеть', 'Ловушка', 'Хорошее', 250000, 0, 0, 0.2, 'Электрифицированная сеть', 'E', 0, 1)`);
 
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Ауральная клетка', 'Ловушка', 'Эпическое', 500000, 0, 0, 0.35, 'Ловушка из Ауры для мощных существ', 'C', 0)`);
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Ауральная клетка', 'Ловушка', 'Эпическое', 5000000, 0, 0, 0.35, 'Ловушка из Ауры для мощных существ', 'C', 0, 1)`);
 
     console.log('Hunting data seeded successfully!');
   } catch (error) {

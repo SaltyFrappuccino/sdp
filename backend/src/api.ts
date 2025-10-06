@@ -7030,6 +7030,28 @@ router.post('/fishing/catch', async (req: Request, res: Response) => {
         VALUES (?, ?, ?, ?)
       `, character_id, caughtFish.id, weight, location_id);
 
+      // Система поломки снаряжения и расходования приманки
+      if (gear_ids && gear_ids.length > 0) {
+        for (const gearId of gear_ids) {
+          const gearInfo = await db.get(`SELECT is_consumable FROM FishingGear WHERE id = ?`, gearId);
+          const characterGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+          
+          if (gearInfo.is_consumable) {
+            // Расходуем приманку
+            if (characterGear.quantity > 1) {
+              await db.run(`UPDATE CharacterFishingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            } else {
+              await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            }
+          } else {
+            // Проверяем поломку снаряжения (10% шанс)
+            if (Math.random() < 0.1) {
+              await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            }
+          }
+        }
+      }
+
       await db.close();
       res.json({ success: true, fish: { ...caughtFish, weight: weight.toFixed(2) } });
     } else {
@@ -7136,19 +7158,42 @@ router.get('/fishing/gear/:character_id', async (req: Request, res: Response) =>
 // Купить снаряжение для рыбалки
 router.post('/fishing/gear/buy', async (req: Request, res: Response) => {
   try {
-    const { character_id, gear_id } = req.body;
+    const { character_id, gear_id, quantity = 1 } = req.body;
     const db = await initDB();
 
+    // Получаем информацию о снаряжении
     const gear = await db.get(`SELECT * FROM FishingGear WHERE id = ?`, gear_id);
-    const character = await db.get(`SELECT currency FROM Characters WHERE id = ?`, character_id);
+    if (!gear) {
+      await db.close();
+      return res.status(404).json({ message: 'Снаряжение не найдено' });
+    }
 
-    if (character.currency < gear.price) {
+    // Получаем кредиты персонажа
+    const character = await db.get(`SELECT currency FROM Characters WHERE id = ?`, character_id);
+    if (!character) {
+      await db.close();
+      return res.status(404).json({ message: 'Персонаж не найден' });
+    }
+
+    const totalPrice = gear.price * quantity;
+    if (character.currency < totalPrice) {
       await db.close();
       return res.status(400).json({ message: 'Недостаточно кредитов' });
     }
 
-    await db.run(`UPDATE Characters SET currency = currency - ? WHERE id = ?`, gear.price, character_id);
-    await db.run(`INSERT INTO CharacterFishingGear (character_id, gear_id) VALUES (?, ?)`, character_id, gear_id);
+    // Проверяем, есть ли уже такое снаряжение у персонажа
+    const existingGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gear_id);
+    
+    if (existingGear) {
+      // Если снаряжение уже есть, увеличиваем количество
+      await db.run(`UPDATE CharacterFishingGear SET quantity = quantity + ? WHERE character_id = ? AND gear_id = ?`, quantity, character_id, gear_id);
+    } else {
+      // Если снаряжения нет, добавляем новое
+      await db.run(`INSERT INTO CharacterFishingGear (character_id, gear_id, is_equipped, quantity) VALUES (?, ?, 0, ?)`, character_id, gear_id, quantity);
+    }
+
+    // Списываем кредиты
+    await db.run(`UPDATE Characters SET currency = currency - ? WHERE id = ?`, totalPrice, character_id);
 
     await db.close();
     res.json({ success: true });
@@ -7215,6 +7260,28 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
         INSERT INTO CharacterHuntInventory (character_id, species_id, loot_items, location_id)
         VALUES (?, ?, ?, ?)
       `, character_id, huntedCreature.id, JSON.stringify(loot), location_id);
+
+      // Система поломки снаряжения и расходования ловушек
+      if (gear_ids && gear_ids.length > 0) {
+        for (const gearId of gear_ids) {
+          const gearInfo = await db.get(`SELECT is_consumable FROM HuntingGear WHERE id = ?`, gearId);
+          const characterGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+          
+          if (gearInfo.is_consumable) {
+            // Расходуем ловушку
+            if (characterGear.quantity > 1) {
+              await db.run(`UPDATE CharacterHuntingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            } else {
+              await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            }
+          } else {
+            // Проверяем поломку снаряжения (15% шанс для охоты)
+            if (Math.random() < 0.15) {
+              await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            }
+          }
+        }
+      }
 
       await db.close();
       res.json({ success: true, creature: huntedCreature, loot, credits });
@@ -7320,19 +7387,42 @@ router.get('/hunting/gear/:character_id', async (req: Request, res: Response) =>
 // Купить снаряжение для охоты
 router.post('/hunting/gear/buy', async (req: Request, res: Response) => {
   try {
-    const { character_id, gear_id } = req.body;
+    const { character_id, gear_id, quantity = 1 } = req.body;
     const db = await initDB();
 
+    // Получаем информацию о снаряжении
     const gear = await db.get(`SELECT * FROM HuntingGear WHERE id = ?`, gear_id);
-    const character = await db.get(`SELECT currency FROM Characters WHERE id = ?`, character_id);
+    if (!gear) {
+      await db.close();
+      return res.status(404).json({ message: 'Снаряжение не найдено' });
+    }
 
-    if (character.currency < gear.price) {
+    // Получаем кредиты персонажа
+    const character = await db.get(`SELECT currency FROM Characters WHERE id = ?`, character_id);
+    if (!character) {
+      await db.close();
+      return res.status(404).json({ message: 'Персонаж не найден' });
+    }
+
+    const totalPrice = gear.price * quantity;
+    if (character.currency < totalPrice) {
       await db.close();
       return res.status(400).json({ message: 'Недостаточно кредитов' });
     }
 
-    await db.run(`UPDATE Characters SET currency = currency - ? WHERE id = ?`, gear.price, character_id);
-    await db.run(`INSERT INTO CharacterHuntingGear (character_id, gear_id) VALUES (?, ?)`, character_id, gear_id);
+    // Проверяем, есть ли уже такое снаряжение у персонажа
+    const existingGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gear_id);
+    
+    if (existingGear) {
+      // Если снаряжение уже есть, увеличиваем количество
+      await db.run(`UPDATE CharacterHuntingGear SET quantity = quantity + ? WHERE character_id = ? AND gear_id = ?`, quantity, character_id, gear_id);
+    } else {
+      // Если снаряжения нет, добавляем новое
+      await db.run(`INSERT INTO CharacterHuntingGear (character_id, gear_id, is_equipped, quantity) VALUES (?, ?, 0, ?)`, character_id, gear_id, quantity);
+    }
+
+    // Списываем кредиты
+    await db.run(`UPDATE Characters SET currency = currency - ? WHERE id = ?`, totalPrice, character_id);
 
     await db.close();
     res.json({ success: true });
