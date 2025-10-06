@@ -45,6 +45,9 @@ export const DEFAULT_VIEW_PANELS = {
   ADMIN_COLLECTIONS: 'admin_collections',
   BESTIARY: 'bestiary',
   ADMIN_BESTIARY: 'admin_bestiary',
+  FISHING: 'fishing',
+  HUNTING: 'hunting',
+  ADMIN_ACTIVITIES: 'admin_activities',
 };
 
 export const routes = RoutesConfig.create([
@@ -84,6 +87,9 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_COLLECTIONS, `/${DEFAULT_VIEW_PANELS.ADMIN_COLLECTIONS}`, []),
       createPanel(DEFAULT_VIEW_PANELS.BESTIARY, `/${DEFAULT_VIEW_PANELS.BESTIARY}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_BESTIARY, `/${DEFAULT_VIEW_PANELS.ADMIN_BESTIARY}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.FISHING, `/${DEFAULT_VIEW_PANELS.FISHING}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.HUNTING, `/${DEFAULT_VIEW_PANELS.HUNTING}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_ACTIVITIES, `/${DEFAULT_VIEW_PANELS.ADMIN_ACTIVITIES}`, []),
     ]),
   ]),
 ]);

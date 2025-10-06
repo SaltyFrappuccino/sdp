@@ -32,3 +32,6 @@ export { PurchasesPanel } from './PurchasesPanel';
 export { CollectionsPanel } from './CollectionsPanel';
 export { default as BestiaryPanel } from './BestiaryPanel';
 export { default as AdminBestiaryPanel } from './AdminBestiaryPanel';
+export { default as FishingPanel } from './FishingPanel';
+export { default as HuntingPanel } from './HuntingPanel';
+export { default as AdminActivitiesPanel } from './AdminActivitiesPanel';

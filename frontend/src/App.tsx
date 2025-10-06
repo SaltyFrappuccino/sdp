@@ -3,7 +3,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { View, SplitLayout, SplitCol, ScreenSpinner, ModalRoot, ModalPage, ModalPageHeader, Div, Group, Panel } from '@vkontakte/vkui';
 import { useActiveVkuiLocation } from '@vkontakte/vk-mini-apps-router';
 
-import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, UserAnketaEditor, AdminAnketaEditor, Calculator, MarketPanel, MyAnketasPanel, ActivityRequestsPanel, AdminActivityRequestsPanel, Handbook, MarketExchangePanel, AdminMarketPanel, CasinoPanel, PokerPanel, HorseStatsPanel, NewEventsPanel, NewAdminEventsPanel, BulkCharacterManagement, CryptoExchangePanel, PurchasesPanel, CollectionsPanel, FactionsList, FactionsCreate, AdminFactions, AdminCryptoPanel, AdminPurchasesPanel, AdminCollectionsPanel, BestiaryPanel, AdminBestiaryPanel } from './panels';
+import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, UserAnketaEditor, AdminAnketaEditor, Calculator, MarketPanel, MyAnketasPanel, ActivityRequestsPanel, AdminActivityRequestsPanel, Handbook, MarketExchangePanel, AdminMarketPanel, CasinoPanel, PokerPanel, HorseStatsPanel, NewEventsPanel, NewAdminEventsPanel, BulkCharacterManagement, CryptoExchangePanel, PurchasesPanel, CollectionsPanel, FactionsList, FactionsCreate, AdminFactions, AdminCryptoPanel, AdminPurchasesPanel, AdminCollectionsPanel, BestiaryPanel, AdminBestiaryPanel, FishingPanel, HuntingPanel, AdminActivitiesPanel } from './panels';
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { API_URL } from './api';
 import UpdateViewer from './panels/UpdateViewer';
@@ -99,6 +99,9 @@ export const App = () => {
         <AdminCollectionsPanel id="admin_collections" />
         <BestiaryPanel id="bestiary" />
         <AdminBestiaryPanel id="admin_bestiary" />
+        <FishingPanel id="fishing" />
+        <HuntingPanel id="hunting" />
+        <AdminActivitiesPanel id="admin_activities" />
         <UpdateViewer id="update_viewer" />
           </View>
         ) : (

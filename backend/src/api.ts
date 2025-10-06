@@ -6955,4 +6955,347 @@ router.put('/admin/bestiary/characteristics/:species_id', async (req: Request, r
   }
 });
 
+// ============================================
+// Fishing & Hunting API
+// ============================================
+
+// Получить все локации рыбалки
+router.get('/fishing/locations', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const locations = await db.all(`SELECT * FROM FishingLocations WHERE is_active = 1 ORDER BY min_rank, island`);
+    await db.close();
+    res.json(locations);
+  } catch (error) {
+    console.error('Ошибка при получении локаций рыбалки:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Рыбалка - попытка поймать рыбу
+router.post('/fishing/catch', async (req: Request, res: Response) => {
+  try {
+    const { character_id, location_id, gear_ids } = req.body;
+    const db = await initDB();
+
+    // Получаем рыб из локации
+    const fish = await db.all(`
+      SELECT f.*, s.spawn_chance 
+      FROM FishSpecies f
+      JOIN FishLocationSpawns s ON f.id = s.fish_id
+      WHERE s.location_id = ? AND f.is_active = 1
+    `, location_id);
+
+    // Вычисляем бонусы от снаряжения
+    let bonusChance = 0;
+    let bonusRarity = 0;
+    if (gear_ids && gear_ids.length > 0) {
+      const gear = await db.all(`
+        SELECT bonus_chance, bonus_rarity FROM FishingGear WHERE id IN (${gear_ids.join(',')})
+      `);
+      gear.forEach((g: any) => {
+        bonusChance += g.bonus_chance || 0;
+        bonusRarity += g.bonus_rarity || 0;
+      });
+    }
+
+    // Рассчитываем улов
+    const roll = Math.random() + bonusChance;
+    let caughtFish = null;
+
+    // Сортируем по редкости с учётом бонуса
+    const sortedFish = fish.sort((a: any, b: any) => {
+      const rarityOrder: any = { 'Обычная': 1, 'Необычная': 2, 'Редкая': 3, 'Очень редкая': 4, 'Легендарная': 5 };
+      return rarityOrder[a.rarity] - rarityOrder[b.rarity];
+    });
+
+    for (const f of sortedFish) {
+      const chance = f.spawn_chance + (bonusRarity * 0.1);
+      if (roll >= chance) {
+        caughtFish = f;
+      }
+    }
+
+    if (!caughtFish && fish.length > 0) {
+      caughtFish = fish[0]; // Минимум обычная рыба
+    }
+
+    if (caughtFish) {
+      // Генерируем вес
+      const weight = caughtFish.weight_min + Math.random() * (caughtFish.weight_max - caughtFish.weight_min);
+      
+      // Сохраняем в инвентарь
+      await db.run(`
+        INSERT INTO CharacterFishInventory (character_id, fish_id, weight, location_id)
+        VALUES (?, ?, ?, ?)
+      `, character_id, caughtFish.id, weight, location_id);
+
+      await db.close();
+      res.json({ success: true, fish: { ...caughtFish, weight: weight.toFixed(2) } });
+    } else {
+      await db.close();
+      res.json({ success: false, message: 'Рыба не клюёт...' });
+    }
+  } catch (error) {
+    console.error('Ошибка при рыбалке:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Получить инвентарь рыбалки
+router.get('/fishing/inventory/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const inventory = await db.all(`
+      SELECT i.*, f.name, f.base_price, l.name as location_name
+      FROM CharacterFishInventory i
+      JOIN FishSpecies f ON i.fish_id = f.id
+      LEFT JOIN FishingLocations l ON i.location_id = l.id
+      WHERE i.character_id = ? AND i.is_sold = 0
+      ORDER BY i.caught_at DESC
+    `, character_id);
+    
+    await db.close();
+    res.json(inventory);
+  } catch (error) {
+    console.error('Ошибка при получении инвентаря:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Продать рыбу
+router.post('/fishing/sell', async (req: Request, res: Response) => {
+  try {
+    const { character_id, fish_ids } = req.body;
+    const db = await initDB();
+
+    // Получаем рыбу для продажи
+    const fish = await db.all(`
+      SELECT i.id, f.base_price, i.weight
+      FROM CharacterFishInventory i
+      JOIN FishSpecies f ON i.fish_id = f.id
+      WHERE i.id IN (${fish_ids.join(',')}) AND i.character_id = ?
+    `, character_id);
+
+    let totalPrice = 0;
+    fish.forEach((f: any) => {
+      totalPrice += Math.floor(f.base_price * f.weight);
+    });
+
+    // Обновляем кредиты персонажа
+    await db.run(`UPDATE Characters SET currency = currency + ? WHERE id = ?`, totalPrice, character_id);
+    
+    // Помечаем рыбу как проданную
+    await db.run(`UPDATE CharacterFishInventory SET is_sold = 1 WHERE id IN (${fish_ids.join(',')})`);
+
+    await db.close();
+    res.json({ success: true, credits: totalPrice });
+  } catch (error) {
+    console.error('Ошибка при продаже:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Получить снаряжение для рыбалки
+router.get('/fishing/gear', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const gear = await db.all(`SELECT * FROM FishingGear WHERE is_active = 1 ORDER BY type, quality`);
+    await db.close();
+    res.json(gear);
+  } catch (error) {
+    console.error('Ошибка при получении снаряжения:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Купить снаряжение для рыбалки
+router.post('/fishing/gear/buy', async (req: Request, res: Response) => {
+  try {
+    const { character_id, gear_id } = req.body;
+    const db = await initDB();
+
+    const gear = await db.get(`SELECT * FROM FishingGear WHERE id = ?`, gear_id);
+    const character = await db.get(`SELECT currency FROM Characters WHERE id = ?`, character_id);
+
+    if (character.currency < gear.price) {
+      await db.close();
+      return res.status(400).json({ message: 'Недостаточно кредитов' });
+    }
+
+    await db.run(`UPDATE Characters SET currency = currency - ? WHERE id = ?`, gear.price, character_id);
+    await db.run(`INSERT INTO CharacterFishingGear (character_id, gear_id) VALUES (?, ?)`, character_id, gear_id);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Ошибка при покупке снаряжения:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Получить все локации охоты
+router.get('/hunting/locations', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const locations = await db.all(`SELECT * FROM HuntingLocations WHERE is_active = 1 ORDER BY min_rank, island`);
+    await db.close();
+    res.json(locations);
+  } catch (error) {
+    console.error('Ошибка при получении локаций охоты:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Охота - попытка добыть зверя
+router.post('/hunting/hunt', async (req: Request, res: Response) => {
+  try {
+    const { character_id, location_id, gear_ids } = req.body;
+    const db = await initDB();
+
+    const creatures = await db.all(`
+      SELECT s.*, sp.spawn_chance, c.drop_items, c.credit_value_min, c.credit_value_max
+      FROM BestiarySpecies s
+      JOIN HuntingLocationSpawns sp ON s.id = sp.species_id
+      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+      WHERE sp.location_id = ? AND s.is_active = 1
+    `, location_id);
+
+    let bonusSuccess = 0;
+    if (gear_ids && gear_ids.length > 0) {
+      const gear = await db.all(`
+        SELECT bonus_success FROM HuntingGear WHERE id IN (${gear_ids.join(',')})
+      `);
+      gear.forEach((g: any) => {
+        bonusSuccess += g.bonus_success || 0;
+      });
+    }
+
+    const roll = Math.random() + bonusSuccess;
+    let huntedCreature = null;
+
+    for (const c of creatures) {
+      if (roll >= c.spawn_chance) {
+        huntedCreature = c;
+      }
+    }
+
+    if (huntedCreature) {
+      const loot = huntedCreature.drop_items ? JSON.parse(huntedCreature.drop_items) : [];
+      const credits = Math.floor(
+        huntedCreature.credit_value_min + 
+        Math.random() * (huntedCreature.credit_value_max - huntedCreature.credit_value_min)
+      );
+
+      await db.run(`
+        INSERT INTO CharacterHuntInventory (character_id, species_id, loot_items, location_id)
+        VALUES (?, ?, ?, ?)
+      `, character_id, huntedCreature.id, JSON.stringify(loot), location_id);
+
+      await db.close();
+      res.json({ success: true, creature: huntedCreature, loot, credits });
+    } else {
+      await db.close();
+      res.json({ success: false, message: 'Зверь ушёл...' });
+    }
+  } catch (error) {
+    console.error('Ошибка при охоте:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Получить инвентарь охоты
+router.get('/hunting/inventory/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const inventory = await db.all(`
+      SELECT i.*, s.name, s.danger_rank, c.credit_value_min, c.credit_value_max, l.name as location_name
+      FROM CharacterHuntInventory i
+      JOIN BestiarySpecies s ON i.species_id = s.id
+      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+      LEFT JOIN HuntingLocations l ON i.location_id = l.id
+      WHERE i.character_id = ? AND i.is_sold = 0
+      ORDER BY i.hunted_at DESC
+    `, character_id);
+    
+    await db.close();
+    res.json(inventory);
+  } catch (error) {
+    console.error('Ошибка при получении инвентаря охоты:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Продать добычу
+router.post('/hunting/sell', async (req: Request, res: Response) => {
+  try {
+    const { character_id, hunt_ids } = req.body;
+    const db = await initDB();
+
+    const hunts = await db.all(`
+      SELECT i.id, c.credit_value_min, c.credit_value_max
+      FROM CharacterHuntInventory i
+      JOIN BestiarySpecies s ON i.species_id = s.id
+      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+      WHERE i.id IN (${hunt_ids.join(',')}) AND i.character_id = ?
+    `, character_id);
+
+    let totalPrice = 0;
+    hunts.forEach((h: any) => {
+      totalPrice += Math.floor(h.credit_value_min + Math.random() * (h.credit_value_max - h.credit_value_min));
+    });
+
+    await db.run(`UPDATE Characters SET currency = currency + ? WHERE id = ?`, totalPrice, character_id);
+    await db.run(`UPDATE CharacterHuntInventory SET is_sold = 1 WHERE id IN (${hunt_ids.join(',')})`);
+
+    await db.close();
+    res.json({ success: true, credits: totalPrice });
+  } catch (error) {
+    console.error('Ошибка при продаже добычи:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Получить снаряжение для охоты
+router.get('/hunting/gear', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const gear = await db.all(`SELECT * FROM HuntingGear WHERE is_active = 1 ORDER BY type, quality`);
+    await db.close();
+    res.json(gear);
+  } catch (error) {
+    console.error('Ошибка при получении снаряжения:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Купить снаряжение для охоты
+router.post('/hunting/gear/buy', async (req: Request, res: Response) => {
+  try {
+    const { character_id, gear_id } = req.body;
+    const db = await initDB();
+
+    const gear = await db.get(`SELECT * FROM HuntingGear WHERE id = ?`, gear_id);
+    const character = await db.get(`SELECT currency FROM Characters WHERE id = ?`, character_id);
+
+    if (character.currency < gear.price) {
+      await db.close();
+      return res.status(400).json({ message: 'Недостаточно кредитов' });
+    }
+
+    await db.run(`UPDATE Characters SET currency = currency - ? WHERE id = ?`, gear.price, character_id);
+    await db.run(`INSERT INTO CharacterHuntingGear (character_id, gear_id) VALUES (?, ?)`, character_id, gear_id);
+
+    await db.close();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Ошибка при покупке снаряжения:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
 export default router;
