@@ -7111,6 +7111,28 @@ router.get('/fishing/gear', async (req: Request, res: Response) => {
   }
 });
 
+// Получить снаряжение персонажа для рыбалки
+router.get('/fishing/gear/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const gear = await db.all(`
+      SELECT fg.*, cfg.is_equipped
+      FROM CharacterFishingGear cfg
+      JOIN FishingGear fg ON cfg.gear_id = fg.id
+      WHERE cfg.character_id = ? AND fg.is_active = 1
+      ORDER BY fg.type, fg.quality
+    `, character_id);
+    
+    await db.close();
+    res.json(gear);
+  } catch (error) {
+    console.error('Ошибка при получении снаряжения персонажа:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
 // Купить снаряжение для рыбалки
 router.post('/fishing/gear/buy', async (req: Request, res: Response) => {
   try {
@@ -7269,6 +7291,28 @@ router.get('/hunting/gear', async (req: Request, res: Response) => {
     res.json(gear);
   } catch (error) {
     console.error('Ошибка при получении снаряжения:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Получить снаряжение персонажа для охоты
+router.get('/hunting/gear/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const gear = await db.all(`
+      SELECT hg.*, chg.is_equipped
+      FROM CharacterHuntingGear chg
+      JOIN HuntingGear hg ON chg.gear_id = hg.id
+      WHERE chg.character_id = ? AND hg.is_active = 1
+      ORDER BY hg.type, hg.quality
+    `, character_id);
+    
+    await db.close();
+    res.json(gear);
+  } catch (error) {
+    console.error('Ошибка при получении снаряжения персонажа:', error);
     res.status(500).json({ message: 'Ошибка сервера' });
   }
 });

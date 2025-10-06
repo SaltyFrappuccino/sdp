@@ -67,6 +67,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [activeTab, setActiveTab] = useState<'game' | 'inventory' | 'shop'>('game');
   const [locations, setLocations] = useState<FishingLocation[]>([]);
   const [gear, setGear] = useState<FishingGear[]>([]);
+  const [shopGear, setShopGear] = useState<FishingGear[]>([]);
   const [inventory, setInventory] = useState<Fish[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [selectedGear, setSelectedGear] = useState<number[]>([]);
@@ -81,8 +82,14 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   useEffect(() => {
     loadCharacters();
     loadLocations();
-    loadGear();
+    loadShopGear();
   }, []);
+
+  useEffect(() => {
+    if (characterId) {
+      loadGear();
+    }
+  }, [characterId]);
 
   useEffect(() => {
     if (selectedCharacter) {
@@ -121,12 +128,25 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   };
 
   const loadGear = async () => {
+    if (!characterId) return;
     try {
-      const response = await fetch(`${API_URL}/fishing/gear`);
+      const response = await fetch(`${API_URL}/fishing/gear/${characterId}`);
       const data = await response.json();
       setGear(data);
     } catch (error) {
       console.error('Ошибка при загрузке снаряжения:', error);
+    }
+  };
+
+  const loadShopGear = async () => {
+    try {
+      const response = await fetch(`${API_URL}/fishing/gear`);
+      const data = await response.json();
+      // Показываем только покупаемое снаряжение (не базовое)
+      const shopItems = data.filter((item: any) => !item.is_basic);
+      setShopGear(shopItems);
+    } catch (error) {
+      console.error('Ошибка при загрузке магазина:', error);
     }
   };
 
@@ -240,7 +260,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
           </Snackbar>
         );
         setCredits(credits - price);
-        loadCharacters();
+        loadGear();
       }
     } catch (error) {
       console.error('Ошибка при покупке:', error);
@@ -412,7 +432,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
       {activeTab === 'shop' && (
         <Group header={<Header>Магазин снаряжения</Header>}>
-          {gear.map(item => (
+          {shopGear.map(item => (
             <Cell
               key={item.id}
               subtitle={`${item.quality} • ${item.description}`}
