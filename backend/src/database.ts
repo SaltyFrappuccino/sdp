@@ -2392,7 +2392,7 @@ export async function forceSeedFishingData(db: any) {
       VALUES ('Побережье Хоши', 'Хоши', 'Восточный берег', 'Море', 'D', 'Скалистое побережье с сильными течениями')`);
 
     const kuroDepths = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
-      VALUES ('Глубины Куро', 'Куро', 'Абиссальная зона', 'Глубокое море', 'C', 'Тёмные глубины с неизведанными существами')`);
+      VALUES ('Глубины Куро', 'Куро', 'Абиссальная зона', 'Море', 'C', 'Тёмные глубины с неизведанными существами')`);
 
     console.log('Force seeding fish species...');
 
