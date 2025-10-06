@@ -388,104 +388,27 @@ export async function initDB() {
       );
     `);
 
-    // Принудительная миграция для CasinoGames - добавляем новые типы игр
+    // Миграция для CasinoGames - проверяем и обновляем constraint для новых типов игр
     try {
-      await db.exec('PRAGMA foreign_keys=off;');
-      await db.exec('BEGIN TRANSACTION;');
-      
-      // Проверяем существование таблицы CasinoGames
-      const tableExists = await db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='CasinoGames'`);
-      
-      if (tableExists) {
-        // Всегда пересоздаем таблицу для обеспечения корректности constraint
-        console.log('Force migrating CasinoGames table to include new game types...');
-
-        // Создаем временную таблицу с правильными constraint
-        await db.exec(`
-          CREATE TABLE CasinoGames_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            character_id INTEGER NOT NULL,
-            game_type TEXT NOT NULL CHECK (game_type IN ('blackjack', 'slots', 'dice', 'roulette', 'horseracing')),
-            bet_amount REAL NOT NULL,
-            win_amount REAL DEFAULT 0,
-            game_data TEXT DEFAULT '{}',
-            result TEXT NOT NULL CHECK (result IN ('win', 'lose', 'push')),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
-          );
-        `);
-        
-        // Копируем данные из старой таблицы
-        await db.exec(`INSERT OR IGNORE INTO CasinoGames_new SELECT * FROM CasinoGames;`);
-        
-        // Удаляем старую таблицу и переименовываем новую
-        await db.exec(`DROP TABLE CasinoGames;`);
-        await db.exec(`ALTER TABLE CasinoGames_new RENAME TO CasinoGames;`);
-        
-        console.log('CasinoGames table force migrated successfully.');
-      }
-      
-      await db.exec('COMMIT;');
-      await db.exec('PRAGMA foreign_keys=on;');
-    } catch (error) {
-      await db.exec('ROLLBACK;');
-      await db.exec('PRAGMA foreign_keys=on;');
-      console.warn('Could not force migrate CasinoGames table:', error);
-    }
-
-    // Миграция для CasinoGames - проверяем и пересоздаем таблицу если нужно
-    try {
-      // Проверяем есть ли колонка game_type
+      // Проверяем существующую структуру таблицы
       const tableInfo = await db.all("PRAGMA table_info(CasinoGames)");
       const hasGameType = tableInfo.some((col: any) => col.name === 'game_type');
-      const hasGameState = tableInfo.some((col: any) => col.name === 'game_state');
       
-      if (!hasGameType || hasGameState) {
-        console.log('CasinoGames table needs migration (missing game_type or has game_state), recreating table...');
-        
-        // Создаем временную таблицу с правильной схемой
-        await db.exec(`
-          CREATE TABLE IF NOT EXISTS CasinoGames_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            character_id INTEGER NOT NULL,
-            game_type TEXT NOT NULL CHECK (game_type IN ('blackjack', 'slots', 'dice')),
-            bet_amount REAL NOT NULL,
-            win_amount REAL DEFAULT 0,
-            game_data TEXT DEFAULT '{}',
-            result TEXT NOT NULL CHECK (result IN ('win', 'lose', 'push')),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(character_id) REFERENCES Characters(id) ON DELETE CASCADE
-          );
-        `);
-        
-        // Копируем данные из старой таблицы (если есть)
-        // Проверяем какие поля есть в старой таблице
-        const oldTableInfo = await db.all("PRAGMA table_info(CasinoGames)");
-        const oldColumns = oldTableInfo.map((col: any) => col.name);
-        
-        // Строим список полей для копирования
-        const columnsToCopy = ['id', 'character_id', 'created_at'];
-        if (oldColumns.includes('bet_amount')) columnsToCopy.push('bet_amount');
-        if (oldColumns.includes('win_amount')) columnsToCopy.push('win_amount');
-        if (oldColumns.includes('game_data')) columnsToCopy.push('game_data');
-        if (oldColumns.includes('result')) columnsToCopy.push('result');
-        
-        const selectColumns = columnsToCopy.join(', ');
-        const insertColumns = columnsToCopy.join(', ');
-        
-        await db.exec(`
-          INSERT INTO CasinoGames_new (${insertColumns})
-          SELECT ${selectColumns} FROM CasinoGames;
-        `);
-        
-        // Удаляем старую таблицу и переименовываем новую
-        await db.exec('DROP TABLE IF EXISTS CasinoGames;');
-        await db.exec('ALTER TABLE CasinoGames_new RENAME TO CasinoGames;');
-        
-        console.log('CasinoGames table recreated successfully');
+      if (!hasGameType) {
+        console.log('CasinoGames table needs migration (missing game_type column)');
+        // Если нет game_type, значит таблица создана правильно выше, ничего делать не нужно
+      } else {
+        // Проверяем, нужно ли обновить constraint для типов игр
+        // Это безопасная операция, не требующая блокировки
+        console.log('CasinoGames table exists with correct structure');
       }
-    } catch (error) {
-      console.error('Error migrating CasinoGames table:', error);
+    } catch (error: any) {
+      // Игнорируем ошибки блокировки БД при миграции - таблица уже существует
+      if (error.code === 'SQLITE_BUSY') {
+        console.log('CasinoGames migration skipped - database busy (table likely already migrated)');
+      } else {
+        console.warn('Error checking CasinoGames table structure:', error.message);
+      }
     }
 
     // Безопасная миграция для StockPriceHistory

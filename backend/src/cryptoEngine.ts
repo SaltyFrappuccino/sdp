@@ -36,10 +36,10 @@ async function updateCryptoPrices() {
     const db = dbInstance;
 
     // Получаем все активные криптовалюты
-    const cryptocurrencies = db.prepare(`
+    const cryptocurrencies = await db.all(`
       SELECT id, name, ticker_symbol, current_price, base_volatility, total_supply, circulating_supply
       FROM CryptoCurrencies
-    `).all() as CryptoCurrency[];
+    `) as CryptoCurrency[];
 
     if (cryptocurrencies.length === 0) {
       console.log('[CryptoEngine] Нет криптовалют для обновления');
@@ -47,11 +47,11 @@ async function updateCryptoPrices() {
     }
 
     // Получаем активные события
-    const activeEvents = db.prepare(`
+    const activeEvents = await db.all(`
       SELECT id, impacted_crypto_id, impact_strength, end_time
       FROM CryptoEvents
       WHERE datetime(end_time) > datetime('now')
-    `).all() as CryptoEvent[];
+    `) as CryptoEvent[];
 
     console.log(`[CryptoEngine] Активных событий: ${activeEvents.length}`);
 
@@ -90,17 +90,17 @@ async function updateCryptoPrices() {
       newPrice = Math.round(newPrice * 100) / 100;
 
       // Обновляем цену в базе данных
-      db.prepare(`
+      await db.run(`
         UPDATE CryptoCurrencies
         SET current_price = ?, updated_at = datetime('now')
         WHERE id = ?
-      `).run(newPrice, crypto.id);
+      `, newPrice, crypto.id);
 
       // Записываем в историю цен
-      db.prepare(`
+      await db.run(`
         INSERT INTO CryptoPriceHistory (crypto_id, price, timestamp)
         VALUES (?, ?, datetime('now'))
-      `).run(crypto.id, newPrice);
+      `, crypto.id, newPrice);
 
       const changePercent = ((newPrice - oldPrice) / oldPrice * 100).toFixed(2);
       const changeSymbol = newPrice > oldPrice ? '▲' : newPrice < oldPrice ? '▼' : '━';
@@ -108,10 +108,10 @@ async function updateCryptoPrices() {
     }
 
     // Очищаем старую историю цен (старше 30 дней)
-    const deleted = db.prepare(`
+    const deleted = await db.run(`
       DELETE FROM CryptoPriceHistory
       WHERE datetime(timestamp) < datetime('now', '-30 days')
-    `).run();
+    `);
 
     if (deleted.changes > 0) {
       console.log(`[CryptoEngine] Удалено ${deleted.changes} старых записей из истории цен`);
@@ -132,10 +132,10 @@ async function cleanupExpiredEvents() {
       dbInstance = await initDB();
     }
     const db = dbInstance;
-    const result = db.prepare(`
+    const result = await db.run(`
       DELETE FROM CryptoEvents
       WHERE datetime(end_time) < datetime('now')
-    `).run();
+    `);
 
     if (result.changes > 0) {
       console.log(`[CryptoEngine] Удалено ${result.changes} завершившихся событий`);
