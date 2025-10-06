@@ -9,13 +9,23 @@ def get_random_id():
     """Генерирует случайный ID для сообщения VK."""
     return random.getrandbits(31) * random.choice([-1, 1])
 
-def send_message(vk: VkApiMethod, peer_id: int, message: str, **kwargs):
+def send_message(vk: VkApiMethod, peer_id: int, message: str, reply_to: int = None, **kwargs):
     """
     Отправляет сообщение, автоматически разбивая его на части, если оно превышает лимит.
+    
+    Args:
+        vk: VK API объект
+        peer_id: ID чата/пользователя
+        message: Текст сообщения
+        reply_to: ID сообщения, на которое нужно ответить (опционально)
+        **kwargs: Дополнительные параметры для messages.send
     """
     try:
         if len(message) <= MAX_MESSAGE_LENGTH:
-            vk.messages.send(peer_id=peer_id, message=message, random_id=get_random_id(), **kwargs)
+            params = {'peer_id': peer_id, 'message': message, 'random_id': get_random_id()}
+            if reply_to:
+                params['reply_to'] = reply_to
+            vk.messages.send(**params, **kwargs)
             return
 
         logging.info(f"Сообщение для чата {peer_id} слишком длинное. Разбиваю на части.")
@@ -47,7 +57,11 @@ def send_message(vk: VkApiMethod, peer_id: int, message: str, **kwargs):
                 else:
                     final_message = header + part
                 
-                vk.messages.send(peer_id=peer_id, message=final_message, random_id=get_random_id(), **kwargs)
+                params = {'peer_id': peer_id, 'message': final_message, 'random_id': get_random_id()}
+                # Только первое сообщение отвечает на оригинал
+                if reply_to and i == 0:
+                    params['reply_to'] = reply_to
+                vk.messages.send(**params, **kwargs)
 
     except vk_api.exceptions.ApiError as e:
         logging.error(f"Ошибка VK API при отправке сообщения в чат {peer_id}: {e}")

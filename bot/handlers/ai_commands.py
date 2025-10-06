@@ -70,15 +70,20 @@ def _sglypa_ai_thread_target(vk, peer_id, user_text):
     response = ai_handler.query_sglypa_ai(user_text)
     utils.send_message(vk, peer_id, response)
 
-def _grok_ai_thread_target(vk, peer_id, user_text):
+def _grok_ai_thread_target(vk, peer_id, user_text, reply_to_message_id=None):
     """Целевая функция для потока, выполняющая запрос к Grok-AI."""
     response = ai_handler.query_grok_ai(user_text)
-    utils.send_message(vk, peer_id, response)
+    utils.send_message(vk, peer_id, response, reply_to=reply_to_message_id)
 
-def _does_he_know_thread_target(vk, peer_id, user_text):
+def _does_he_know_thread_target(vk, peer_id, user_text, reply_to_message_id=None):
     """Целевая функция для потока, выполняющая запрос к "Does he know?"-AI."""
     response = ai_handler.query_does_he_know_ai(user_text)
-    utils.send_message(vk, peer_id, response)
+    utils.send_message(vk, peer_id, response, reply_to=reply_to_message_id)
+
+def _gigachat_ai_thread_target(vk, peer_id, context, user_query, reply_to_message_id=None):
+    """Целевая функция для потока, выполняющая запрос к GigaChat-AI."""
+    response = ai_handler.query_gigachat_ai(context, user_query)
+    utils.send_message(vk, peer_id, response, reply_to=reply_to_message_id)
 
 def _image_generation_thread_target(vk, peer_id, prompt, vk_session):
     """Целевая функция для потока, генерирующая и отправляющая изображение."""
@@ -141,13 +146,16 @@ def grok_ai_command(vk, event, args):
     if not user_text:
         utils.send_message(vk, event['peer_id'], "📝 Эта команда работает только в ответ на сообщение (или с пересланными сообщениями).")
         return
-            
+    
+    # Получаем ID сообщения команды для ответа
+    message_id = event.get('id')
+    
     utils.send_message(vk, event['peer_id'], "⚡️ Grok анализирует правдивость...")
     
     # Запускаем тяжелую операцию в отдельном потоке
     thread = threading.Thread(
         target=_grok_ai_thread_target,
-        args=(vk, event['peer_id'], user_text)
+        args=(vk, event['peer_id'], user_text, message_id)
     )
     thread.start()
 
@@ -159,12 +167,45 @@ def does_he_know_command(vk, event, args):
         utils.send_message(vk, event['peer_id'], "📝 Эта команда работает только в ответ на сообщение (или с пересланными сообщениями).")
         return
 
+    # Получаем ID сообщения команды для ответа
+    message_id = event.get('id')
+
     utils.send_message(vk, event['peer_id'], "🤔...")
     
     # Запускаем тяжелую операцию в отдельном потоке
     thread = threading.Thread(
         target=_does_he_know_thread_target,
-        args=(vk, event['peer_id'], user_text)
+        args=(vk, event['peer_id'], user_text, message_id)
+    )
+    thread.start()
+
+
+def gigachat_ai_command(vk, event, args):
+    """Генерирует ответ GigaChat на основе контекста и запроса."""
+    # event - это полный объект сообщения (словарь)
+    # Извлекаем контекст из пересланных сообщений
+    context = _extract_text_from_event(vk, event)
+    
+    # Запрос берем из аргументов команды
+    if not args:
+        utils.send_message(vk, event['peer_id'], "📝 Укажите запрос. Формат: sdp гигачат \"ваш запрос\" (команда должна содержать пересланные сообщения для контекста)")
+        return
+    
+    user_query = ' '.join(args)
+    
+    if not context:
+        utils.send_message(vk, event['peer_id'], "📝 Не найден контекст. Перешлите сообщения или ответьте на сообщение, чтобы я мог учесть контекст.")
+        return
+    
+    # Получаем ID сообщения команды для ответа
+    message_id = event.get('id')
+    
+    utils.send_message(vk, event['peer_id'], "🤖 GigaChat анализирует контекст и готовит ответ...")
+    
+    # Запускаем тяжелую операцию в отдельном потоке
+    thread = threading.Thread(
+        target=_gigachat_ai_thread_target,
+        args=(vk, event['peer_id'], context, user_query, message_id)
     )
     thread.start()
 

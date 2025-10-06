@@ -110,3 +110,30 @@ def rp_ai_command(vk: VkApiMethod, vk_session: VkApi, event: VkBotMessageEvent, 
         args=(vk, event, text_to_analyze, extra_instructions, mode)
     )
     ai_thread.start()
+
+
+def rp_judge_command(vk: VkApiMethod, vk_session: VkApi, event: VkBotMessageEvent, command_args: list, full_message_object):
+    """
+    Обрабатывает команду 'sdp судья' - анализирует РП посты и выносит вердикт.
+    Доступна только админам.
+    """
+    if not is_admin(event.peer_id, event.user_id):
+        send_message(vk, event.peer_id, "🚫 У вас нет прав для использования этой команды.")
+        return
+
+    # Дополнительные инструкции - все аргументы команды
+    extra_instructions = ' '.join(command_args) if command_args else "Нет"
+
+    # Используем vk_session.get_api(), т.к. для vk.users.get нужен полный объект vk_api
+    text_to_analyze = _extract_text_from_event(vk_session.get_api(), full_message_object)
+
+    if not text_to_analyze:
+        send_message(vk, event.peer_id, "❌ Не найдены сообщения для анализа. Используйте команду в ответ на РП посты или перешлите их.")
+        return
+
+    # Запускаем тяжелую операцию в отдельном потоке с режимом 'вердикт'
+    ai_thread = threading.Thread(
+        target=_rp_ai_thread_target,
+        args=(vk, event, text_to_analyze, extra_instructions, 'вердикт')
+    )
+    ai_thread.start()

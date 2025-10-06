@@ -14,12 +14,12 @@ import time
 
 from database import get_or_create_user, init_db, set_user_role
 from core.utils import get_random_id, send_message
-from handlers import admin, general, dice, character, reminders, help, gifs, handbook, ai_commands, games
+from handlers import admin, general, dice, character, reminders, help, gifs, handbook, ai_commands, games, vote_ban
 from handlers.help import help_command, admin_help_command
 from handlers.gifs import get_gif
 from handlers.handbook import handbook_command
-from handlers.ai_commands import sglypa_ai_command, grok_ai_command, image_generation_command, does_he_know_command
-from handlers.rp_ai_commands import rp_ai_command
+from handlers.ai_commands import sglypa_ai_command, grok_ai_command, image_generation_command, does_he_know_command, gigachat_ai_command
+from handlers.rp_ai_commands import rp_ai_command, rp_judge_command
 import core.cooldowns as cooldowns
 import core.sglypa as sglypa
 from vkbottle import Bot
@@ -82,7 +82,9 @@ COMMANDS = {
     # Нейро-команды
     'нейронка': sglypa_ai_command,
     'шедевр': image_generation_command,
-    'rp': rp_ai_command
+    'rp': rp_ai_command,
+    'гигачат': gigachat_ai_command,
+    'судья': rp_judge_command
 }
 PREFIXES = ['sdp', '&']
 
@@ -157,6 +159,16 @@ def check_reminders(vk):
     except Exception as e:
         logging.error(f"Критическая ошибка при проверке напоминаний: {e}")
 
+
+def check_ban_votes(vk):
+    """Проверяет и завершает истекшие голосования за бан."""
+    try:
+        # Проверяем все активные голосования во всех чатах
+        for peer_id in list(vote_ban.ACTIVE_VOTES.keys()):
+            vote_ban.check_and_finalize_votes(vk, peer_id)
+    except Exception as e:
+        logging.error(f"Критическая ошибка при проверке голосований: {e}")
+
 def setup_admins(vk, group_id):
     """При запуске делает администраторами бота всех руководителей группы."""
     try:
@@ -215,11 +227,12 @@ def main():
     # Назначение админских прав руководителям группы
     setup_admins(vk, group_id)
 
-    # Запускаем планировщик для проверки напоминаний
+    # Запускаем планировщик для проверки напоминаний и голосований
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(check_reminders, 'interval', minutes=1, args=[vk])
+    scheduler.add_job(check_ban_votes, 'interval', seconds=10, args=[vk])  # Проверяем голосования каждые 10 секунд
     scheduler.start()
-    logging.info("Планировщик для напоминаний запущен.")
+    logging.info("Планировщик для напоминаний и голосований запущен.")
 
     logging.info("Бот запущен и слушает сообщения...")
 
@@ -254,8 +267,10 @@ def main():
                         # --- Обработка команд без префикса ---
                         lower_message = message_text.lower().strip()
 
-                        # GROK
-                        if lower_message in ["grok это правда?", "грок это правда?"]:
+                        # GROK - гибкий паттерн для разных вариантов написания
+                        # Паттерн: (грок|grok)[,]? (это правда|is this true|правда|true)[?]?
+                        grok_pattern = r'^(грок|grok)[,\s]+(это\s+правда|is\s+this\s+true|правда|true)\??$'
+                        if re.match(grok_pattern, lower_message):
                             command_name = "grok"
                             if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
                                 continue
@@ -269,6 +284,15 @@ def main():
                             if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
                                 continue
                             ai_commands.does_he_know_command(vk, event.obj.message, [])
+                            cooldowns.set_cooldown(user_id, command_name)
+                            continue
+
+                        # ГОЛОСОВАНИЕ ЗА БАН
+                        if lower_message == "этого баним нахуй":
+                            command_name = "ban_vote"
+                            if cooldowns.check_cooldown_and_notify(vk, user_id, event_for_handler.peer_id, command_name):
+                                continue
+                            vote_ban.ban_vote_command(vk, full_message_object, [])
                             cooldowns.set_cooldown(user_id, command_name)
                             continue
 
@@ -313,8 +337,11 @@ def main():
                                 # Команды с разными сигнатурами вызываются по-разному
                                 if command_name in ["шедевр", "gif"]:
                                     command_func(vk, event_for_handler, args, vk_session)
-                                elif command_name == "rp":
-                                    command_func(vk, vk_session, event_for_handler, args, event.message)
+                                elif command_name in ["rp", "судья"]:
+                                    command_func(vk, vk_session, event_for_handler, args, event.obj.message)
+                                elif command_name == "гигачат":
+                                    # Гигачат нужен полный объект сообщения для извлечения контекста
+                                    command_func(vk, event.obj.message, args)
                                 else: # Для 'нейронка' и всех остальных стандартных команд
                                     command_func(vk, event_for_handler, args)
 
