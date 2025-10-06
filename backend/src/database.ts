@@ -1065,199 +1065,223 @@ export async function initDB() {
       );
     `);
 
-    // Принудительная миграция: пересоздаем таблицы с новыми колонками
-    console.log('Starting forced migration for FishingGear and HuntingGear...');
-    
-    // Сохраняем данные из существующих таблиц
-    let existingFishingGear = [];
-    let existingHuntingGear = [];
+    // Проверяем, нужна ли миграция
+    let needsMigration = false;
     
     try {
-      existingFishingGear = await db.all(`SELECT * FROM FishingGear`);
-      console.log('Backed up FishingGear data:', existingFishingGear.length, 'items');
+      // Проверяем, есть ли колонка is_consumable в FishingGear
+      const fishingColumns = await db.all(`PRAGMA table_info(FishingGear)`);
+      const hasConsumableColumn = fishingColumns.some((col: any) => col.name === 'is_consumable');
+      
+      if (!hasConsumableColumn) {
+        console.log('FishingGear missing is_consumable column, migration needed');
+        needsMigration = true;
+      }
     } catch (error) {
-      console.log('No existing FishingGear data to backup');
-    }
-    
-    try {
-      existingHuntingGear = await db.all(`SELECT * FROM HuntingGear`);
-      console.log('Backed up HuntingGear data:', existingHuntingGear.length, 'items');
-    } catch (error) {
-      console.log('No existing HuntingGear data to backup');
-    }
-
-    // Удаляем старые таблицы
-    try {
-      await db.run(`DROP TABLE IF EXISTS FishingGear`);
-      await db.run(`DROP TABLE IF EXISTS HuntingGear`);
-      console.log('Dropped old tables');
-    } catch (error) {
-      console.log('Error dropping tables:', error);
+      console.log('FishingGear table does not exist, migration needed');
+      needsMigration = true;
     }
 
-    // Создаем новые таблицы с полной схемой
-    await db.run(`
-      CREATE TABLE FishingGear (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        type TEXT CHECK(type IN ('Удочка', 'Наживка')),
-        quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
-        price INTEGER,
-        bonus_chance REAL,
-        bonus_rarity REAL,
-        description TEXT,
-        min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
-        is_basic BOOLEAN DEFAULT 0,
-        is_consumable BOOLEAN DEFAULT 0,
-        is_active BOOLEAN DEFAULT 1
-      )
-    `);
+    if (needsMigration) {
+      console.log('Starting migration for FishingGear and HuntingGear...');
+      
+      // Сохраняем данные из существующих таблиц
+      let existingFishingGear = [];
+      let existingHuntingGear = [];
+      
+      try {
+        existingFishingGear = await db.all(`SELECT * FROM FishingGear`);
+        console.log('Backed up FishingGear data:', existingFishingGear.length, 'items');
+      } catch (error) {
+        console.log('No existing FishingGear data to backup');
+      }
+      
+      try {
+        existingHuntingGear = await db.all(`SELECT * FROM HuntingGear`);
+        console.log('Backed up HuntingGear data:', existingHuntingGear.length, 'items');
+      } catch (error) {
+        console.log('No existing HuntingGear data to backup');
+      }
 
-    await db.run(`
-      CREATE TABLE HuntingGear (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня', 'Наземная ловушка', 'Воздушная ловушка')),
-        quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
-        price INTEGER,
-        bonus_damage REAL,
-        bonus_defense REAL,
-        bonus_success REAL,
-        description TEXT,
-        min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
-        is_basic BOOLEAN DEFAULT 0,
-        is_consumable BOOLEAN DEFAULT 0,
-        is_active BOOLEAN DEFAULT 1
-      )
-    `);
+      // Удаляем старые таблицы
+      try {
+        await db.run(`DROP TABLE IF EXISTS FishingGear`);
+        await db.run(`DROP TABLE IF EXISTS HuntingGear`);
+        console.log('Dropped old tables');
+      } catch (error) {
+        console.log('Error dropping tables:', error);
+      }
 
-    console.log('Created new tables with full schema');
-
-    // Восстанавливаем данные
-    for (const item of existingFishingGear) {
+      // Создаем новые таблицы с полной схемой
       await db.run(`
-        INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        item.name, item.type, item.quality, item.price, 
-        item.bonus_chance || 0, item.bonus_rarity || 0, item.description, 
-        item.min_rank || 'F', item.is_basic || 0, item.is_consumable || 0, item.is_active || 1
-      ]);
-    }
+        CREATE TABLE FishingGear (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT CHECK(type IN ('Удочка', 'Наживка')),
+          quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
+          price INTEGER,
+          bonus_chance REAL,
+          bonus_rarity REAL,
+          description TEXT,
+          min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+          is_basic BOOLEAN DEFAULT 0,
+          is_consumable BOOLEAN DEFAULT 0,
+          is_active BOOLEAN DEFAULT 1
+        )
+      `);
 
-    for (const item of existingHuntingGear) {
       await db.run(`
-        INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        item.name, item.type, item.quality, item.price,
-        item.bonus_damage || 0, item.bonus_defense || 0, item.bonus_success || 0,
-        item.description, item.min_rank || 'F', item.is_basic || 0, item.is_consumable || 0, item.is_active || 1
-      ]);
-    }
+        CREATE TABLE HuntingGear (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня', 'Наземная ловушка', 'Воздушная ловушка')),
+          quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
+          price INTEGER,
+          bonus_damage REAL,
+          bonus_defense REAL,
+          bonus_success REAL,
+          description TEXT,
+          min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+          is_basic BOOLEAN DEFAULT 0,
+          is_consumable BOOLEAN DEFAULT 0,
+          is_active BOOLEAN DEFAULT 1
+        )
+      `);
 
-    console.log('Restored data to new tables');
+      console.log('Created new tables with full schema');
 
-    // Обновляем типы ловушек в существующих записях
-    try {
-      await db.run(`UPDATE HuntingGear SET type = 'Наземная ловушка' WHERE type = 'Ловушка'`);
-      console.log('Updated trap types in HuntingGear');
-    } catch (error) {
-      console.log('Could not update trap types:', error);
-    }
+      // Восстанавливаем данные только если они есть
+      if (existingFishingGear.length > 0) {
+        for (const item of existingFishingGear) {
+          await db.run(`
+            INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            item.name, item.type, item.quality, item.price, 
+            item.bonus_chance || 0, item.bonus_rarity || 0, item.description, 
+            item.min_rank || 'F', item.is_basic || 0, item.is_consumable || 0, item.is_active || 1
+          ]);
+        }
+        console.log('Restored FishingGear data');
+      }
 
-    // Принудительно пересоздаем таблицы CharacterFishingGear и CharacterHuntingGear
-    console.log('Recreating CharacterFishingGear and CharacterHuntingGear tables...');
-    
-    // Сохраняем данные
-    let existingCharacterFishingGear = [];
-    let existingCharacterHuntingGear = [];
-    
-    try {
-      existingCharacterFishingGear = await db.all(`SELECT * FROM CharacterFishingGear`);
-      console.log('Backed up CharacterFishingGear data:', existingCharacterFishingGear.length, 'items');
-    } catch (error) {
-      console.log('No existing CharacterFishingGear data to backup');
-    }
-    
-    try {
-      existingCharacterHuntingGear = await db.all(`SELECT * FROM CharacterHuntingGear`);
-      console.log('Backed up CharacterHuntingGear data:', existingCharacterHuntingGear.length, 'items');
-    } catch (error) {
-      console.log('No existing CharacterHuntingGear data to backup');
-    }
+      if (existingHuntingGear.length > 0) {
+        for (const item of existingHuntingGear) {
+          await db.run(`
+            INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            item.name, item.type, item.quality, item.price,
+            item.bonus_damage || 0, item.bonus_defense || 0, item.bonus_success || 0,
+            item.description, item.min_rank || 'F', item.is_basic || 0, item.is_consumable || 0, item.is_active || 1
+          ]);
+        }
+        console.log('Restored HuntingGear data');
+      }
 
-    // Удаляем старые таблицы
-    try {
-      await db.run(`DROP TABLE IF EXISTS CharacterFishingGear`);
-      await db.run(`DROP TABLE IF EXISTS CharacterHuntingGear`);
-      console.log('Dropped old character gear tables');
-    } catch (error) {
-      console.log('Error dropping character gear tables:', error);
-    }
+      // Обновляем типы ловушек в существующих записях
+      try {
+        await db.run(`UPDATE HuntingGear SET type = 'Наземная ловушка' WHERE type = 'Ловушка'`);
+        console.log('Updated trap types in HuntingGear');
+      } catch (error) {
+        console.log('Could not update trap types:', error);
+      }
 
-    // Создаем новые таблицы с полной схемой
-    await db.run(`
-      CREATE TABLE CharacterFishingGear (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        character_id INTEGER NOT NULL,
-        gear_id INTEGER NOT NULL,
-        is_equipped BOOLEAN DEFAULT 0,
-        quantity INTEGER DEFAULT 1,
-        condition REAL DEFAULT 1.0,
-        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
-        FOREIGN KEY (gear_id) REFERENCES FishingGear(id) ON DELETE CASCADE
-      )
-    `);
+      // Пересоздаем таблицы CharacterFishingGear и CharacterHuntingGear
+      console.log('Recreating CharacterFishingGear and CharacterHuntingGear tables...');
+      
+      // Сохраняем данные
+      let existingCharacterFishingGear = [];
+      let existingCharacterHuntingGear = [];
+      
+      try {
+        existingCharacterFishingGear = await db.all(`SELECT * FROM CharacterFishingGear`);
+        console.log('Backed up CharacterFishingGear data:', existingCharacterFishingGear.length, 'items');
+      } catch (error) {
+        console.log('No existing CharacterFishingGear data to backup');
+      }
+      
+      try {
+        existingCharacterHuntingGear = await db.all(`SELECT * FROM CharacterHuntingGear`);
+        console.log('Backed up CharacterHuntingGear data:', existingCharacterHuntingGear.length, 'items');
+      } catch (error) {
+        console.log('No existing CharacterHuntingGear data to backup');
+      }
 
-    await db.run(`
-      CREATE TABLE CharacterHuntingGear (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        character_id INTEGER NOT NULL,
-        gear_id INTEGER NOT NULL,
-        is_equipped BOOLEAN DEFAULT 0,
-        quantity INTEGER DEFAULT 1,
-        condition REAL DEFAULT 1.0,
-        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
-        FOREIGN KEY (gear_id) REFERENCES HuntingGear(id) ON DELETE CASCADE
-      )
-    `);
+      // Удаляем старые таблицы
+      try {
+        await db.run(`DROP TABLE IF EXISTS CharacterFishingGear`);
+        await db.run(`DROP TABLE IF EXISTS CharacterHuntingGear`);
+        console.log('Dropped old character gear tables');
+      } catch (error) {
+        console.log('Error dropping character gear tables:', error);
+      }
 
-    console.log('Created new character gear tables with full schema');
-
-    // Восстанавливаем данные
-    for (const item of existingCharacterFishingGear) {
+      // Создаем новые таблицы с полной схемой
       await db.run(`
-        INSERT INTO CharacterFishingGear (character_id, gear_id, is_equipped, quantity, condition)
-        VALUES (?, ?, ?, ?, ?)
-      `, [
-        item.character_id, item.gear_id, item.is_equipped || 0,
-        item.quantity || 1, item.condition || 1.0
-      ]);
-    }
+        CREATE TABLE CharacterFishingGear (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          character_id INTEGER NOT NULL,
+          gear_id INTEGER NOT NULL,
+          is_equipped BOOLEAN DEFAULT 0,
+          quantity INTEGER DEFAULT 1,
+          condition REAL DEFAULT 1.0,
+          FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+          FOREIGN KEY (gear_id) REFERENCES FishingGear(id) ON DELETE CASCADE
+        )
+      `);
 
-    for (const item of existingCharacterHuntingGear) {
       await db.run(`
-        INSERT INTO CharacterHuntingGear (character_id, gear_id, is_equipped, quantity, condition)
-        VALUES (?, ?, ?, ?, ?)
-      `, [
-        item.character_id, item.gear_id, item.is_equipped || 0,
-        item.quantity || 1, item.condition || 1.0
-      ]);
+        CREATE TABLE CharacterHuntingGear (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          character_id INTEGER NOT NULL,
+          gear_id INTEGER NOT NULL,
+          is_equipped BOOLEAN DEFAULT 0,
+          quantity INTEGER DEFAULT 1,
+          condition REAL DEFAULT 1.0,
+          FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+          FOREIGN KEY (gear_id) REFERENCES HuntingGear(id) ON DELETE CASCADE
+        )
+      `);
+
+      console.log('Created new character gear tables with full schema');
+
+      // Восстанавливаем данные
+      if (existingCharacterFishingGear.length > 0) {
+        for (const item of existingCharacterFishingGear) {
+          await db.run(`
+            INSERT INTO CharacterFishingGear (character_id, gear_id, is_equipped, quantity, condition)
+            VALUES (?, ?, ?, ?, ?)
+          `, [
+            item.character_id, item.gear_id, item.is_equipped || 0,
+            item.quantity || 1, item.condition || 1.0
+          ]);
+        }
+        console.log('Restored CharacterFishingGear data');
+      }
+
+      if (existingCharacterHuntingGear.length > 0) {
+        for (const item of existingCharacterHuntingGear) {
+          await db.run(`
+            INSERT INTO CharacterHuntingGear (character_id, gear_id, is_equipped, quantity, condition)
+            VALUES (?, ?, ?, ?, ?)
+          `, [
+            item.character_id, item.gear_id, item.is_equipped || 0,
+            item.quantity || 1, item.condition || 1.0
+          ]);
+        }
+        console.log('Restored CharacterHuntingGear data');
+      }
+
+      // Заполняем данные только если таблицы пустые
+      console.log('Seeding fishing and hunting data...');
+      await seedFishingData(db);
+      await seedHuntingData(db);
+      
+      console.log('Migration completed successfully');
+    } else {
+      console.log('No migration needed, tables are up to date');
     }
-
-    console.log('Restored character gear data to new tables');
-
-    // Принудительно заполняем данные, так как таблицы были пересозданы
-    console.log('Force seeding fishing and hunting data after table recreation...');
-    
-    // Принудительно заполняем данные рыбалки
-    console.log('Force seeding fishing data...');
-    await forceSeedFishingData(db);
-    
-    // Принудительно заполняем данные охоты
-    console.log('Force seeding hunting data...');
-    await forceSeedHuntingData(db);
 
     return db;
 
@@ -2409,176 +2433,6 @@ export async function seedHuntingData(db: any) {
   }
 }
 
-// Принудительное заполнение данных рыбалки (игнорирует проверки)
-export async function forceSeedFishingData(db: any) {
-  try {
-    console.log('Force seeding fishing locations...');
-
-    // Локации рыбалки по островам из лора
-    const kagaRiver = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
-      VALUES ('Река Кага', 'Кага', 'Центральная долина', 'Река', 'F', 'Спокойная река с чистой водой')`);
-
-    const kagaLake = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
-      VALUES ('Озеро Кага', 'Кага', 'Центральная долина', 'Озеро', 'E', 'Глубокое озеро с кристально чистой водой')`);
-
-    const hoshiCoast = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
-      VALUES ('Побережье Хоши', 'Хоши', 'Восточный берег', 'Море', 'D', 'Скалистое побережье с сильными течениями')`);
-
-    const kuroDepths = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
-      VALUES ('Глубины Куро', 'Куро', 'Абиссальная зона', 'Море', 'C', 'Тёмные глубины с неизведанными существами')`);
-
-    console.log('Force seeding fish species...');
-
-    // Виды рыб
-    const auraSalmon = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
-      VALUES ('Ауральный Лосось', 'Необычная', 2.0, 5.0, 5000, 'Лосось, впитавший Ауру из горных рек', 'Серебристая чешуя с золотистыми полосами', 'Затронутая', 1)`);
-
-    const metalBass = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
-      VALUES ('Металлический Окунь', 'Редкая', 1.5, 3.0, 15000, 'Окунь с укреплёнными костями', 'Чешуя с металлическим блеском', 'Затронутая', 1)`);
-
-    const phantomJellyfish = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
-      VALUES ('Фантомная Медуза', 'Очень редкая', 0.5, 2.0, 50000, 'Медуза, способная становиться невидимой', 'Прозрачное тело, мерцающее в воде', 'Искажённая', 1)`);
-
-    const crystalCrab = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
-      VALUES ('Кристальный Краб', 'Очень редкая', 1.0, 3.0, 75000, 'Краб с панцирем из живого кристалла', 'Прозрачный панцирь, переливающийся всеми цветами', 'Искажённая', 1)`);
-
-    const seaDragon = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
-      VALUES ('Морской Дракон', 'Легендарная', 10.0, 25.0, 500000, 'Древний морской дракон, повелитель глубин', 'Массивное существо с чешуёй цвета морской пены', 'Бестия', 1)`);
-
-    const auraWhale = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
-      VALUES ('Ауральный Кит', 'Легендарная', 50.0, 100.0, 1000000, 'Кит, воплощение чистой Ауры океана', 'Огромное существо, светящееся голубым светом', 'Бестия', 1)`);
-
-    // Связь рыб с локациями
-    const kagaRiverId = kagaRiver.lastInsertRowid || kagaRiver.lastID;
-    const kagaLakeId = kagaLake.lastInsertRowid || kagaLake.lastID;
-    const hoshiCoastId = hoshiCoast.lastInsertRowid || hoshiCoast.lastID;
-    const kuroDepthsId = kuroDepths.lastInsertRowid || kuroDepths.lastID;
-    
-    const auraSalmonId = auraSalmon.lastInsertRowid || auraSalmon.lastID;
-    const metalBassId = metalBass.lastInsertRowid || metalBass.lastID;
-    const phantomJellyfishId = phantomJellyfish.lastInsertRowid || phantomJellyfish.lastID;
-    const crystalCrabId = crystalCrab.lastInsertRowid || crystalCrab.lastID;
-    const seaDragonId = seaDragon.lastInsertRowid || seaDragon.lastID;
-    const auraWhaleId = auraWhale.lastInsertRowid || auraWhale.lastID;
-
-    console.log('Location IDs:', { kagaRiverId, kagaLakeId, hoshiCoastId, kuroDepthsId });
-    console.log('Fish IDs:', { auraSalmonId, metalBassId, phantomJellyfishId, crystalCrabId, seaDragonId, auraWhaleId });
-
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaRiverId, auraSalmonId, 0.3);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaLakeId, auraSalmonId, 0.4);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiCoastId, metalBassId, 0.25);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepthsId, phantomJellyfishId, 0.15);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepthsId, crystalCrabId, 0.1);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepthsId, seaDragonId, 0.02);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepthsId, auraWhaleId, 0.01);
-
-    console.log('Force seeding fishing gear...');
-
-    // Базовое снаряжение (бесплатное)
-    const basicRod = await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Палка с леской', 'Удочка', 'Базовое', 0, 0, 0, 'Примитивная удочка', 'F', 1)`);
-
-    const basicBait = await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
-      VALUES ('Кусок хлеба', 'Наживка', 'Базовое', 0, 0, 0, 'Простая наживка', 'F', 1, 1)`);
-
-    // Покупаемое снаряжение (цены согласно лору)
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Удочка новичка', 'Удочка', 'Обычное', 10000, 0.05, 0, 'Простая удочка для начинающих', 'F', 0)`);
-
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Ауральная удочка', 'Удочка', 'Эпическое', 1000000, 0.2, 0.1, 'Удочка, усиленная Аурой', 'C', 0)`);
-
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
-      VALUES ('Посох Повелителя Вод', 'Удочка', 'Легендарное', 50000000, 0.4, 0.35, 'Легендарная удочка из Эхо-Зон', 'A', 0)`);
-
-    // Наживки (расходуемые)
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
-      VALUES ('Червяк', 'Наживка', 'Обычное', 5000, 0.02, 0, 'Обычная наживка', 'F', 0, 1)`);
-
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
-      VALUES ('Светящаяся приманка', 'Наживка', 'Хорошее', 25000, 0.05, 0.03, 'Привлекает хищников', 'E', 0, 1)`);
-
-    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
-      VALUES ('Ауральная эссенция', 'Наживка', 'Эпическое', 500000, 0.1, 0.15, 'Приманка из концентрированной Ауры', 'C', 0, 1)`);
-
-    console.log('Force fishing data seeded successfully');
-  } catch (error) {
-    console.error('Error force seeding fishing data:', error);
-    throw error;
-  }
-}
-
-// Принудительное заполнение данных охоты (игнорирует проверки)
-export async function forceSeedHuntingData(db: any) {
-  try {
-    console.log('Force seeding hunting locations...');
-
-    // Охотничьи локации по островам
-    const kagaForest = await db.run(`INSERT INTO HuntingLocations (name, island, region, terrain_type, min_rank, description)
-      VALUES ('Лес Кага', 'Кага', 'Северные холмы', 'Лес', 'F', 'Густой лес с древними деревьями')`);
-
-    const hoshiEcho = await db.run(`INSERT INTO HuntingLocations (name, island, region, terrain_type, min_rank, description)
-      VALUES ('Эхо-Зона Хоши', 'Хоши', 'Центральная равнина', 'Равнина', 'D', 'Зона с искажённой Аурой')`);
-
-    const kuroEcho = await db.run(`INSERT INTO HuntingLocations (name, island, region, terrain_type, min_rank, description)
-      VALUES ('Эхо-Зона Куро', 'Куро', 'Южные горы', 'Горы', 'C', 'Опасная зона с мощными искажениями')`);
-
-    console.log('Force seeding hunting gear...');
-
-    // Базовое снаряжение (бесплатное)
-    const basicWeapon = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Деревянная дубина', 'Оружие', 'Базовое', 0, 0, 0, 0, 'Примитивное оружие', 'F', 1)`);
-
-    const basicArmor = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Тряпки', 'Броня', 'Базовое', 0, 0, 0, 0, 'Обычная одежда без защиты', 'F', 1)`);
-
-    // Базовые ловушки
-    const basicGroundTrap = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
-      VALUES ('Простая яма', 'Наземная ловушка', 'Базовое', 0, 0, 0, 0.05, 'Примитивная яма для наземных существ', 'F', 1, 1)`);
-
-    const basicAerialTrap = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
-      VALUES ('Простая сеть', 'Воздушная ловушка', 'Базовое', 0, 0, 0, 0.05, 'Примитивная сеть для воздушных существ', 'F', 1, 1)`);
-
-    // Покупаемое оружие (цены согласно лору)
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Охотничий нож', 'Оружие', 'Обычное', 250000, 0.1, 0, 0.05, 'Базовый нож охотника', 'F', 0)`);
-
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Ауральный меч', 'Оружие', 'Эпическое', 5000000, 0.3, 0, 0.15, 'Меч, усиленный Аурой', 'C', 0)`);
-
-    // Покупаемая броня
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Кожаная броня', 'Броня', 'Обычное', 100000, 0, 0.1, 0, 'Базовая защита', 'F', 0)`);
-
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
-      VALUES ('Ауральный щит', 'Броня', 'Эпическое', 50000000, 0, 0.4, 0.1, 'Щит из концентрированной Ауры', 'C', 0)`);
-
-    // Наземные ловушки (расходуемые)
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
-      VALUES ('Капкан', 'Наземная ловушка', 'Обычное', 50000, 0, 0, 0.1, 'Простая ловушка для наземных существ', 'F', 0, 1)`);
-
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
-      VALUES ('Шоковая сеть', 'Наземная ловушка', 'Хорошее', 250000, 0, 0, 0.2, 'Электрифицированная сеть для наземных существ', 'E', 0, 1)`);
-
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
-      VALUES ('Ауральная клетка', 'Наземная ловушка', 'Эпическое', 5000000, 0, 0, 0.35, 'Ловушка из Ауры для мощных наземных существ', 'C', 0, 1)`);
-
-    // Воздушные ловушки (расходуемые)
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
-      VALUES ('Воздушная сеть', 'Воздушная ловушка', 'Обычное', 75000, 0, 0, 0.1, 'Сеть для ловли воздушных существ', 'F', 0, 1)`);
-
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
-      VALUES ('Молниевая ловушка', 'Воздушная ловушка', 'Хорошее', 350000, 0, 0, 0.2, 'Электрическая ловушка для воздушных существ', 'E', 0, 1)`);
-
-    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
-      VALUES ('Ауральная ловушка', 'Воздушная ловушка', 'Эпическое', 7500000, 0, 0, 0.35, 'Ловушка из Ауры для мощных воздушных существ', 'C', 0, 1)`);
-
-    console.log('Force hunting data seeded successfully');
-  } catch (error) {
-    console.error('Error force seeding hunting data:', error);
-    throw error;
-  }
-}
 
 // Функция для выдачи базового снаряжения новому персонажу
 export async function giveBasicGear(db: any, characterId: number) {
