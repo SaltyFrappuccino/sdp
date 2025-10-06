@@ -148,6 +148,16 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
     }
   };
 
+  const fetchCryptoDetails = async (cryptoId: number) => {
+    try {
+      const response = await fetch(`${API_URL}/crypto/currencies/${cryptoId}`);
+      const data = await response.json();
+      setSelectedCrypto(data);
+    } catch (error) {
+      showSnackbar('Ошибка загрузки деталей криптовалюты', false);
+    }
+  };
+
   const fetchCharacters = async () => {
     if (!fetchedUser) return;
     try {
@@ -371,7 +381,7 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
                         mode="primary"
                         stretched
                         onClick={() => {
-                          setSelectedCrypto(crypto);
+                          fetchCryptoDetails(crypto.id);
                           setTradeAction('buy');
                           setActiveModal('trade');
                         }}
@@ -384,7 +394,7 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
                         mode="secondary"
                         stretched
                         onClick={() => {
-                          setSelectedCrypto(crypto);
+                          fetchCryptoDetails(crypto.id);
                           setTradeAction('sell');
                           setActiveModal('trade');
                         }}
