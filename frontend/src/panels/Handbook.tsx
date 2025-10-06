@@ -351,7 +351,7 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
 
       <Group>
         <Div
-          ref={contentRef}
+          getRootRef={contentRef}
           style={{
             padding: '16px',
             lineHeight: '1.7',
