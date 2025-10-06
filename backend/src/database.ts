@@ -1248,8 +1248,16 @@ export async function initDB() {
 
     console.log('Restored character gear data to new tables');
 
-    await seedFishingData(db);
-    await seedHuntingData(db);
+    // Принудительно заполняем данные, так как таблицы были пересозданы
+    console.log('Force seeding fishing and hunting data after table recreation...');
+    
+    // Принудительно заполняем данные рыбалки
+    console.log('Force seeding fishing data...');
+    await forceSeedFishingData(db);
+    
+    // Принудительно заполняем данные охоты
+    console.log('Force seeding hunting data...');
+    await forceSeedHuntingData(db);
 
     return db;
 
@@ -1931,9 +1939,9 @@ export async function seedBestiary(db: any) {
 
 export async function seedFishingData(db: any) {
   try {
-    const count = await db.get('SELECT COUNT(*) as count FROM FishingLocations');
-    if (count.count > 0) {
-      console.log('Fishing data already seeded, skipping...');
+    const gearCount = await db.get('SELECT COUNT(*) as count FROM FishingGear');
+    if (gearCount.count > 0) {
+      console.log('Fishing gear already seeded, skipping...');
       return;
     }
 
@@ -2092,9 +2100,9 @@ export async function seedFishingData(db: any) {
 
 export async function seedHuntingData(db: any) {
   try {
-    const count = await db.get('SELECT COUNT(*) as count FROM HuntingLocations');
-    if (count.count > 0) {
-      console.log('Hunting data already seeded, skipping...');
+    const gearCount = await db.get('SELECT COUNT(*) as count FROM HuntingGear');
+    if (gearCount.count > 0) {
+      console.log('Hunting gear already seeded, skipping...');
       return;
     }
 
@@ -2364,6 +2372,162 @@ export async function seedHuntingData(db: any) {
     console.log('Hunting data seeded successfully!');
   } catch (error) {
     console.error('Error seeding hunting data:', error);
+    throw error;
+  }
+}
+
+// Принудительное заполнение данных рыбалки (игнорирует проверки)
+export async function forceSeedFishingData(db: any) {
+  try {
+    console.log('Force seeding fishing locations...');
+
+    // Локации рыбалки по островам из лора
+    const kagaRiver = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
+      VALUES ('Река Кага', 'Кага', 'Центральная долина', 'Река', 'F', 'Спокойная река с чистой водой')`);
+
+    const kagaLake = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
+      VALUES ('Озеро Кага', 'Кага', 'Центральная долина', 'Озеро', 'E', 'Глубокое озеро с кристально чистой водой')`);
+
+    const hoshiCoast = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
+      VALUES ('Побережье Хоши', 'Хоши', 'Восточный берег', 'Море', 'D', 'Скалистое побережье с сильными течениями')`);
+
+    const kuroDepths = await db.run(`INSERT INTO FishingLocations (name, island, region, water_type, min_rank, description)
+      VALUES ('Глубины Куро', 'Куро', 'Абиссальная зона', 'Глубокое море', 'C', 'Тёмные глубины с неизведанными существами')`);
+
+    console.log('Force seeding fish species...');
+
+    // Виды рыб
+    const auraSalmon = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
+      VALUES ('Ауральный Лосось', 'Необычная', 2.0, 5.0, 5000, 'Лосось, впитавший Ауру из горных рек', 'Серебристая чешуя с золотистыми полосами', 'Затронутая', 1)`);
+
+    const metalBass = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
+      VALUES ('Металлический Окунь', 'Редкая', 1.5, 3.0, 15000, 'Окунь с укреплёнными костями', 'Чешуя с металлическим блеском', 'Затронутая', 1)`);
+
+    const phantomJellyfish = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
+      VALUES ('Фантомная Медуза', 'Очень редкая', 0.5, 2.0, 50000, 'Медуза, способная становиться невидимой', 'Прозрачное тело, мерцающее в воде', 'Искажённая', 1)`);
+
+    const crystalCrab = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
+      VALUES ('Кристальный Краб', 'Очень редкая', 1.0, 3.0, 75000, 'Краб с панцирем из живого кристалла', 'Прозрачный панцирь, переливающийся всеми цветами', 'Искажённая', 1)`);
+
+    const seaDragon = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
+      VALUES ('Морской Дракон', 'Легендарная', 10.0, 25.0, 500000, 'Древний морской дракон, повелитель глубин', 'Массивное существо с чешуёй цвета морской пены', 'Бестия', 1)`);
+
+    const auraWhale = await db.run(`INSERT INTO FishSpecies (name, rarity, weight_min, weight_max, base_price, description, appearance, mutation_type, is_active)
+      VALUES ('Ауральный Кит', 'Легендарная', 50.0, 100.0, 1000000, 'Кит, воплощение чистой Ауры океана', 'Огромное существо, светящееся голубым светом', 'Бестия', 1)`);
+
+    // Связь рыб с локациями
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaRiver.lastInsertRowid, auraSalmon.lastInsertRowid, 0.3);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaLake.lastInsertRowid, auraSalmon.lastInsertRowid, 0.4);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiCoast.lastInsertRowid, metalBass.lastInsertRowid, 0.25);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepths.lastInsertRowid, phantomJellyfish.lastInsertRowid, 0.15);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepths.lastInsertRowid, crystalCrab.lastInsertRowid, 0.1);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepths.lastInsertRowid, seaDragon.lastInsertRowid, 0.02);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepths.lastInsertRowid, auraWhale.lastInsertRowid, 0.01);
+
+    console.log('Force seeding fishing gear...');
+
+    // Базовое снаряжение (бесплатное)
+    const basicRod = await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
+      VALUES ('Палка с леской', 'Удочка', 'Базовое', 0, 0, 0, 'Примитивная удочка', 'F', 1)`);
+
+    const basicBait = await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
+      VALUES ('Кусок хлеба', 'Наживка', 'Базовое', 0, 0, 0, 'Простая наживка', 'F', 1, 1)`);
+
+    // Покупаемое снаряжение (цены согласно лору)
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
+      VALUES ('Удочка новичка', 'Удочка', 'Обычное', 10000, 0.05, 0, 'Простая удочка для начинающих', 'F', 0)`);
+
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
+      VALUES ('Ауральная удочка', 'Удочка', 'Эпическое', 1000000, 0.2, 0.1, 'Удочка, усиленная Аурой', 'C', 0)`);
+
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic)
+      VALUES ('Посох Повелителя Вод', 'Удочка', 'Легендарное', 50000000, 0.4, 0.35, 'Легендарная удочка из Эхо-Зон', 'A', 0)`);
+
+    // Наживки (расходуемые)
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
+      VALUES ('Червяк', 'Наживка', 'Обычное', 5000, 0.02, 0, 'Обычная наживка', 'F', 0, 1)`);
+
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
+      VALUES ('Светящаяся приманка', 'Наживка', 'Хорошее', 25000, 0.05, 0.03, 'Привлекает хищников', 'E', 0, 1)`);
+
+    await db.run(`INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable)
+      VALUES ('Ауральная эссенция', 'Наживка', 'Эпическое', 500000, 0.1, 0.15, 'Приманка из концентрированной Ауры', 'C', 0, 1)`);
+
+    console.log('Force fishing data seeded successfully');
+  } catch (error) {
+    console.error('Error force seeding fishing data:', error);
+    throw error;
+  }
+}
+
+// Принудительное заполнение данных охоты (игнорирует проверки)
+export async function forceSeedHuntingData(db: any) {
+  try {
+    console.log('Force seeding hunting locations...');
+
+    // Охотничьи локации по островам
+    const kagaForest = await db.run(`INSERT INTO HuntingLocations (name, island, region, terrain_type, min_rank, description)
+      VALUES ('Лес Кага', 'Кага', 'Северные холмы', 'Лес', 'F', 'Густой лес с древними деревьями')`);
+
+    const hoshiEcho = await db.run(`INSERT INTO HuntingLocations (name, island, region, terrain_type, min_rank, description)
+      VALUES ('Эхо-Зона Хоши', 'Хоши', 'Центральная равнина', 'Равнина', 'D', 'Зона с искажённой Аурой')`);
+
+    const kuroEcho = await db.run(`INSERT INTO HuntingLocations (name, island, region, terrain_type, min_rank, description)
+      VALUES ('Эхо-Зона Куро', 'Куро', 'Южные горы', 'Горы', 'C', 'Опасная зона с мощными искажениями')`);
+
+    console.log('Force seeding hunting gear...');
+
+    // Базовое снаряжение (бесплатное)
+    const basicWeapon = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
+      VALUES ('Деревянная дубина', 'Оружие', 'Базовое', 0, 0, 0, 0, 'Примитивное оружие', 'F', 1)`);
+
+    const basicArmor = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
+      VALUES ('Тряпки', 'Броня', 'Базовое', 0, 0, 0, 0, 'Обычная одежда без защиты', 'F', 1)`);
+
+    // Базовые ловушки
+    const basicGroundTrap = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Простая яма', 'Наземная ловушка', 'Базовое', 0, 0, 0, 0.05, 'Примитивная яма для наземных существ', 'F', 1, 1)`);
+
+    const basicAerialTrap = await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Простая сеть', 'Воздушная ловушка', 'Базовое', 0, 0, 0, 0.05, 'Примитивная сеть для воздушных существ', 'F', 1, 1)`);
+
+    // Покупаемое оружие (цены согласно лору)
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
+      VALUES ('Охотничий нож', 'Оружие', 'Обычное', 250000, 0.1, 0, 0.05, 'Базовый нож охотника', 'F', 0)`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
+      VALUES ('Ауральный меч', 'Оружие', 'Эпическое', 5000000, 0.3, 0, 0.15, 'Меч, усиленный Аурой', 'C', 0)`);
+
+    // Покупаемая броня
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
+      VALUES ('Кожаная броня', 'Броня', 'Обычное', 100000, 0, 0.1, 0, 'Базовая защита', 'F', 0)`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic)
+      VALUES ('Ауральный щит', 'Броня', 'Эпическое', 50000000, 0, 0.4, 0.1, 'Щит из концентрированной Ауры', 'C', 0)`);
+
+    // Наземные ловушки (расходуемые)
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Капкан', 'Наземная ловушка', 'Обычное', 50000, 0, 0, 0.1, 'Простая ловушка для наземных существ', 'F', 0, 1)`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Шоковая сеть', 'Наземная ловушка', 'Хорошее', 250000, 0, 0, 0.2, 'Электрифицированная сеть для наземных существ', 'E', 0, 1)`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Ауральная клетка', 'Наземная ловушка', 'Эпическое', 5000000, 0, 0, 0.35, 'Ловушка из Ауры для мощных наземных существ', 'C', 0, 1)`);
+
+    // Воздушные ловушки (расходуемые)
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Воздушная сеть', 'Воздушная ловушка', 'Обычное', 75000, 0, 0, 0.1, 'Сеть для ловли воздушных существ', 'F', 0, 1)`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Молниевая ловушка', 'Воздушная ловушка', 'Хорошее', 350000, 0, 0, 0.2, 'Электрическая ловушка для воздушных существ', 'E', 0, 1)`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable)
+      VALUES ('Ауральная ловушка', 'Воздушная ловушка', 'Эпическое', 7500000, 0, 0, 0.35, 'Ловушка из Ауры для мощных воздушных существ', 'C', 0, 1)`);
+
+    console.log('Force hunting data seeded successfully');
+  } catch (error) {
+    console.error('Error force seeding hunting data:', error);
     throw error;
   }
 }
