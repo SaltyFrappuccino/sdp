@@ -1136,10 +1136,10 @@ export async function initDB() {
     // Восстанавливаем данные
     for (const item of existingFishingGear) {
       await db.run(`
-        INSERT INTO FishingGear (id, name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO FishingGear (name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        item.id, item.name, item.type, item.quality, item.price, 
+        item.name, item.type, item.quality, item.price, 
         item.bonus_chance || 0, item.bonus_rarity || 0, item.description, 
         item.min_rank || 'F', item.is_basic || 0, item.is_consumable || 0, item.is_active || 1
       ]);
@@ -1147,10 +1147,10 @@ export async function initDB() {
 
     for (const item of existingHuntingGear) {
       await db.run(`
-        INSERT INTO HuntingGear (id, name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable, is_active)
+        INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable, is_active)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        item.id, item.name, item.type, item.quality, item.price,
+        item.name, item.type, item.quality, item.price,
         item.bonus_damage || 0, item.bonus_defense || 0, item.bonus_success || 0,
         item.description, item.min_rank || 'F', item.is_basic || 0, item.is_consumable || 0, item.is_active || 1
       ]);
@@ -1228,20 +1228,20 @@ export async function initDB() {
     // Восстанавливаем данные
     for (const item of existingCharacterFishingGear) {
       await db.run(`
-        INSERT INTO CharacterFishingGear (id, character_id, gear_id, is_equipped, quantity, condition)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO CharacterFishingGear (character_id, gear_id, is_equipped, quantity, condition)
+        VALUES (?, ?, ?, ?, ?)
       `, [
-        item.id, item.character_id, item.gear_id, item.is_equipped || 0,
+        item.character_id, item.gear_id, item.is_equipped || 0,
         item.quantity || 1, item.condition || 1.0
       ]);
     }
 
     for (const item of existingCharacterHuntingGear) {
       await db.run(`
-        INSERT INTO CharacterHuntingGear (id, character_id, gear_id, is_equipped, quantity, condition)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO CharacterHuntingGear (character_id, gear_id, is_equipped, quantity, condition)
+        VALUES (?, ?, ?, ?, ?)
       `, [
-        item.id, item.character_id, item.gear_id, item.is_equipped || 0,
+        item.character_id, item.gear_id, item.is_equipped || 0,
         item.quantity || 1, item.condition || 1.0
       ]);
     }
