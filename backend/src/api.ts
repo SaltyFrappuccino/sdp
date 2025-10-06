@@ -7033,18 +7033,26 @@ router.post('/fishing/catch', async (req: Request, res: Response) => {
       // Система поломки снаряжения и расходования приманки
       if (gear_ids && gear_ids.length > 0) {
         for (const gearId of gear_ids) {
-          const gearInfo = await db.get(`SELECT is_consumable FROM FishingGear WHERE id = ?`, gearId);
-          const characterGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
-          
-          if (gearInfo.is_consumable) {
-            // Расходуем приманку
-            if (characterGear.quantity > 1) {
-              await db.run(`UPDATE CharacterFishingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+          try {
+            const gearInfo = await db.get(`SELECT is_consumable FROM FishingGear WHERE id = ?`, gearId);
+            const characterGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            
+            if (gearInfo && gearInfo.is_consumable) {
+              // Расходуем приманку
+              if (characterGear.quantity > 1) {
+                await db.run(`UPDATE CharacterFishingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+              } else {
+                await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+              }
             } else {
-              await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+              // Проверяем поломку снаряжения (10% шанс)
+              if (Math.random() < 0.1) {
+                await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+              }
             }
-          } else {
-            // Проверяем поломку снаряжения (10% шанс)
+          } catch (error) {
+            console.log('Error processing fishing gear consumption:', error);
+            // Если колонка is_consumable не существует, просто ломаем снаряжение с шансом 10%
             if (Math.random() < 0.1) {
               await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
             }
@@ -7125,6 +7133,7 @@ router.get('/fishing/gear', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
     const gear = await db.all(`SELECT * FROM FishingGear WHERE is_active = 1 ORDER BY type, quality`);
+    console.log('Fishing gear from DB:', gear);
     await db.close();
     res.json(gear);
   } catch (error) {
@@ -7267,18 +7276,26 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
       // Система поломки снаряжения и расходования ловушек
       if (gear_ids && gear_ids.length > 0) {
         for (const gearId of gear_ids) {
-          const gearInfo = await db.get(`SELECT is_consumable FROM HuntingGear WHERE id = ?`, gearId);
-          const characterGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
-          
-          if (gearInfo.is_consumable) {
-            // Расходуем ловушку
-            if (characterGear.quantity > 1) {
-              await db.run(`UPDATE CharacterHuntingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+          try {
+            const gearInfo = await db.get(`SELECT is_consumable FROM HuntingGear WHERE id = ?`, gearId);
+            const characterGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            
+            if (gearInfo && gearInfo.is_consumable) {
+              // Расходуем ловушку
+              if (characterGear.quantity > 1) {
+                await db.run(`UPDATE CharacterHuntingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+              } else {
+                await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+              }
             } else {
-              await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+              // Проверяем поломку снаряжения (15% шанс для охоты)
+              if (Math.random() < 0.15) {
+                await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+              }
             }
-          } else {
-            // Проверяем поломку снаряжения (15% шанс для охоты)
+          } catch (error) {
+            console.log('Error processing hunting gear consumption:', error);
+            // Если колонка is_consumable не существует, просто ломаем снаряжение с шансом 15%
             if (Math.random() < 0.15) {
               await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
             }
@@ -7357,6 +7374,7 @@ router.get('/hunting/gear', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
     const gear = await db.all(`SELECT * FROM HuntingGear WHERE is_active = 1 ORDER BY type, quality`);
+    console.log('Hunting gear from DB:', gear);
     await db.close();
     res.json(gear);
   } catch (error) {

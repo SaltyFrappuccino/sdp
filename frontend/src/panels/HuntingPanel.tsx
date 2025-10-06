@@ -88,7 +88,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   useEffect(() => {
     loadCharacters();
     loadLocations();
-    loadShopGear();
+    loadShopGear(); // Загружаем магазин при инициализации
   }, []);
 
   useEffect(() => {
@@ -162,6 +162,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/hunting/gear`);
       const data = await response.json();
+      
       // Показываем только покупаемое снаряжение (не базовое) и фильтруем по типу охоты
       const shopItems = data.filter((item: any) => {
         if (item.is_basic) return false;

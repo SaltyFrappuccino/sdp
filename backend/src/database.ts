@@ -1067,24 +1067,45 @@ export async function initDB() {
 
     // Миграция: добавляем недостающие колонки если их нет
     try {
+      await db.run(`ALTER TABLE FishingGear ADD COLUMN is_consumable BOOLEAN DEFAULT 0`);
+      console.log('Added is_consumable column to FishingGear');
+    } catch (error) {
+      console.log('is_consumable column already exists in FishingGear or error:', error);
+    }
+
+    try {
       await db.run(`ALTER TABLE HuntingGear ADD COLUMN is_consumable BOOLEAN DEFAULT 0`);
       console.log('Added is_consumable column to HuntingGear');
     } catch (error) {
-      // Колонка уже существует, игнорируем ошибку
+      console.log('is_consumable column already exists in HuntingGear or error:', error);
+    }
+
+    try {
+      await db.run(`ALTER TABLE FishingGear ADD COLUMN quantity INTEGER DEFAULT 1`);
+      console.log('Added quantity column to FishingGear');
+    } catch (error) {
+      console.log('quantity column already exists in FishingGear or error:', error);
     }
 
     try {
       await db.run(`ALTER TABLE HuntingGear ADD COLUMN quantity INTEGER DEFAULT 1`);
       console.log('Added quantity column to HuntingGear');
     } catch (error) {
-      // Колонка уже существует, игнорируем ошибку
+      console.log('quantity column already exists in HuntingGear or error:', error);
+    }
+
+    try {
+      await db.run(`ALTER TABLE FishingGear ADD COLUMN condition REAL DEFAULT 1.0`);
+      console.log('Added condition column to FishingGear');
+    } catch (error) {
+      console.log('condition column already exists in FishingGear or error:', error);
     }
 
     try {
       await db.run(`ALTER TABLE HuntingGear ADD COLUMN condition REAL DEFAULT 1.0`);
       console.log('Added condition column to HuntingGear');
     } catch (error) {
-      // Колонка уже существует, игнорируем ошибку
+      console.log('condition column already exists in HuntingGear or error:', error);
     }
 
     // Обновляем типы ловушек в существующих записях
