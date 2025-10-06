@@ -315,19 +315,52 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
             <Spinner size="m" style={{ margin: '20px 0' }} />
           ) : (
             filteredCharacters.map((character) => (
-              <RichCell
-                key={character.id}
-                before={<Avatar size={40} />}
-                after={
-                  <Badge mode="new">
-                    {character.status}
-                  </Badge>
-                }
-                multiline
-                subtitle={`Ранг: ${character.rank} • Фракция: ${character.faction}`}
-              >
-                {character.character_name}
-              </RichCell>
+              <Card key={character.id} style={{ marginBottom: '12px' }}>
+                <RichCell
+                  before={<Avatar size={40} />}
+                  after={
+                    <Badge mode="new">
+                      {character.status}
+                    </Badge>
+                  }
+                  multiline
+                  subtitle={`Ранг: ${character.rank} • Фракция: ${character.faction}`}
+                >
+                  {character.character_name}
+                </RichCell>
+                <ButtonGroup stretched>
+                  <Button
+                    size="m"
+                    mode="secondary"
+                    onClick={() => routeNavigator.push(`/admin-anketa-editor/${character.id}`)}
+                  >
+                    Редактировать
+                  </Button>
+                  <Button
+                    size="m"
+                    mode="secondary"
+                    onClick={() => {
+                      const anketaData = {
+                        character_name: character.character_name,
+                        rank: character.rank,
+                        faction: character.faction,
+                        ...character
+                      };
+                      const dataStr = JSON.stringify(anketaData, null, 2);
+                      const blob = new Blob([dataStr], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `${character.character_name}_${character.id}.json`;
+                      link.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    before={<Icon24Download />}
+                  >
+                    Экспорт
+                  </Button>
+                </ButtonGroup>
+              </Card>
             ))
           )}
         </Div>
@@ -501,16 +534,16 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     <Group header={<Header>⚡ Массовые операции</Header>}>
       <Div>
         <ButtonGroup stretched mode="vertical" gap="m">
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('bulk_characters')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/bulk_characters')}>
             👑 Массовое управление персонажами
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('admin_market')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_market')}>
             📈 Управление Биржей
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('admin_events')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_events')}>
             🎪 Управление Ивентами
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('admin_activity_requests')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_activity_requests')}>
             📋 Управление заявками на активности
           </Button>
           <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_factions')}>
