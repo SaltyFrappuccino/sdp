@@ -2070,24 +2070,36 @@ export async function seedFishingData(db: any) {
       VALUES ('Ауральный Кит', 'Cetus Aura', 'Легендарная', 'Трофейная', 100, 200, 'Гигантский кит, пропитанный чистой Аурой', 'Огромное существо, светящееся изнутри мягким золотым светом', 'Бестия', 5000000)`);
 
     // Привязываем водных существ к локациям
-    const aquaticFishIds = [aquaticTouched1.lastInsertRowid, aquaticTouched2.lastInsertRowid, aquaticDistorted1.lastInsertRowid, aquaticDistorted2.lastInsertRowid, aquaticBeast1.lastInsertRowid, aquaticBeast2.lastInsertRowid];
+    const aquaticTouched1Id = aquaticTouched1.lastInsertRowid || aquaticTouched1.lastID;
+    const aquaticTouched2Id = aquaticTouched2.lastInsertRowid || aquaticTouched2.lastID;
+    const aquaticDistorted1Id = aquaticDistorted1.lastInsertRowid || aquaticDistorted1.lastID;
+    const aquaticDistorted2Id = aquaticDistorted2.lastInsertRowid || aquaticDistorted2.lastID;
+    const aquaticBeast1Id = aquaticBeast1.lastInsertRowid || aquaticBeast1.lastID;
+    const aquaticBeast2Id = aquaticBeast2.lastInsertRowid || aquaticBeast2.lastID;
+    
+    const kagaRiverId = kagaRiver.lastInsertRowid || kagaRiver.lastID;
+    const hoshiLakeId = hoshiLake.lastInsertRowid || hoshiLake.lastID;
+    const soraLakeId = soraLake.lastInsertRowid || soraLake.lastID;
+    const hoshiEchoId = hoshiEcho.lastInsertRowid || hoshiEcho.lastID;
+    
+    const aquaticFishIds = [aquaticTouched1Id, aquaticTouched2Id, aquaticDistorted1Id, aquaticDistorted2Id, aquaticBeast1Id, aquaticBeast2Id];
     
     for (const fishId of aquaticFishIds) {
       // Обычные локации для затронутых
-      if (fishId <= aquaticTouched2.lastInsertRowid) {
-        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaRiver.lastInsertRowid, fishId, 0.3);
-        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiLake.lastInsertRowid, fishId, 0.4);
-        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, soraLake.lastInsertRowid, fishId, 0.2);
+      if (fishId <= aquaticTouched2Id) {
+        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaRiverId, fishId, 0.3);
+        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiLakeId, fishId, 0.4);
+        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, soraLakeId, fishId, 0.2);
       }
       // Редкие локации для искажённых
-      else if (fishId <= aquaticDistorted2.lastInsertRowid) {
-        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, fishId, 0.2);
-        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, soraLake.lastInsertRowid, fishId, 0.1);
+      else if (fishId <= aquaticDistorted2Id) {
+        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, fishId, 0.2);
+        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, soraLakeId, fishId, 0.1);
       }
       // Легендарные локации для бестий
       else {
-        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, fishId, 0.05);
-        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, soraLake.lastInsertRowid, fishId, 0.03);
+        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, fishId, 0.05);
+        await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, soraLakeId, fishId, 0.03);
       }
     }
 
@@ -2268,41 +2280,67 @@ export async function seedHuntingData(db: any) {
     const terrestrialBeast2 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
       VALUES ('Ауральный Единорог', 'Unicornis Aura', 'Бестия', 'S', 'Земля', 'Благородное существо, воплощение чистой Ауры', 'Белоснежное тело с золотым рогом', 'Исцеляет раненых и очищает загрязнённые места', 'Легендарная', 1)`);
 
-    // Привязываем существ к охотничьим локациям
-    const aerialCreatures = [aerialTouched1.lastInsertRowid, aerialTouched2.lastInsertRowid, aerialDistorted1.lastInsertRowid, aerialDistorted2.lastInsertRowid, aerialBeast1.lastInsertRowid, aerialBeast2.lastInsertRowid];
-    const terrestrialCreatures = [terrestrialTouched1.lastInsertRowid, terrestrialTouched2.lastInsertRowid, terrestrialDistorted1.lastInsertRowid, terrestrialDistorted2.lastInsertRowid, terrestrialBeast1.lastInsertRowid, terrestrialBeast2.lastInsertRowid];
+    // Получаем ID существ
+    const aerialTouched1Id = aerialTouched1.lastInsertRowid || aerialTouched1.lastID;
+    const aerialTouched2Id = aerialTouched2.lastInsertRowid || aerialTouched2.lastID;
+    const aerialDistorted1Id = aerialDistorted1.lastInsertRowid || aerialDistorted1.lastID;
+    const aerialDistorted2Id = aerialDistorted2.lastInsertRowid || aerialDistorted2.lastID;
+    const aerialBeast1Id = aerialBeast1.lastInsertRowid || aerialBeast1.lastID;
+    const aerialBeast2Id = aerialBeast2.lastInsertRowid || aerialBeast2.lastID;
     
+    const terrestrialTouched1Id = terrestrialTouched1.lastInsertRowid || terrestrialTouched1.lastID;
+    const terrestrialTouched2Id = terrestrialTouched2.lastInsertRowid || terrestrialTouched2.lastID;
+    const terrestrialDistorted1Id = terrestrialDistorted1.lastInsertRowid || terrestrialDistorted1.lastID;
+    const terrestrialDistorted2Id = terrestrialDistorted2.lastInsertRowid || terrestrialDistorted2.lastID;
+    const terrestrialBeast1Id = terrestrialBeast1.lastInsertRowid || terrestrialBeast1.lastID;
+    const terrestrialBeast2Id = terrestrialBeast2.lastInsertRowid || terrestrialBeast2.lastID;
+
+    // Привязываем существ к охотничьим локациям
+    const aerialCreatures = [aerialTouched1Id, aerialTouched2Id, aerialDistorted1Id, aerialDistorted2Id, aerialBeast1Id, aerialBeast2Id];
+    const terrestrialCreatures = [terrestrialTouched1Id, terrestrialTouched2Id, terrestrialDistorted1Id, terrestrialDistorted2Id, terrestrialBeast1Id, terrestrialBeast2Id];
+    
+    // Получаем ID локаций
+    const kagaForestId = kagaForest.lastInsertRowid || kagaForest.lastID;
+    const hoshiForestId = hoshiForest.lastInsertRowid || hoshiForest.lastID;
+    const hoshiEchoId = hoshiEcho.lastInsertRowid || hoshiEcho.lastID;
+    const kuroEchoId = kuroEcho.lastInsertRowid || kuroEcho.lastID;
+    
+    const aerialTouched2Id = aerialTouched2.lastInsertRowid || aerialTouched2.lastID;
+    const aerialDistorted2Id = aerialDistorted2.lastInsertRowid || aerialDistorted2.lastID;
+    const terrestrialTouched2Id = terrestrialTouched2.lastInsertRowid || terrestrialTouched2.lastID;
+    const terrestrialDistorted2Id = terrestrialDistorted2.lastInsertRowid || terrestrialDistorted2.lastID;
+
     // Привязываем воздушных существ к локациям
     for (const creatureId of aerialCreatures) {
-      if (creatureId <= aerialTouched2.lastInsertRowid) {
+      if (creatureId <= aerialTouched2Id) {
         // Обычные локации для затронутых
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kagaForest.lastInsertRowid, creatureId, 0.3);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiForest.lastInsertRowid, creatureId, 0.4);
-      } else if (creatureId <= aerialDistorted2.lastInsertRowid) {
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kagaForestId, creatureId, 0.3);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiForestId, creatureId, 0.4);
+      } else if (creatureId <= aerialDistorted2Id) {
         // Редкие локации для искажённых
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.2);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEcho.lastInsertRowid, creatureId, 0.15);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.2);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.15);
       } else {
         // Легендарные локации для бестий
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.05);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEcho.lastInsertRowid, creatureId, 0.03);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.05);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.03);
       }
     }
 
     // Привязываем земных существ к локациям
     for (const creatureId of terrestrialCreatures) {
-      if (creatureId <= terrestrialTouched2.lastInsertRowid) {
+      if (creatureId <= terrestrialTouched2Id) {
         // Обычные локации для затронутых
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kagaForest.lastInsertRowid, creatureId, 0.4);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiForest.lastInsertRowid, creatureId, 0.5);
-      } else if (creatureId <= terrestrialDistorted2.lastInsertRowid) {
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kagaForestId, creatureId, 0.4);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiForestId, creatureId, 0.5);
+      } else if (creatureId <= terrestrialDistorted2Id) {
         // Редкие локации для искажённых
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.25);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEcho.lastInsertRowid, creatureId, 0.2);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.25);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.2);
       } else {
         // Легендарные локации для бестий
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.08);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEcho.lastInsertRowid, creatureId, 0.05);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.08);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.05);
       }
     }
 
@@ -2416,13 +2454,28 @@ export async function forceSeedFishingData(db: any) {
       VALUES ('Ауральный Кит', 'Легендарная', 50.0, 100.0, 1000000, 'Кит, воплощение чистой Ауры океана', 'Огромное существо, светящееся голубым светом', 'Бестия', 1)`);
 
     // Связь рыб с локациями
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaRiver.lastInsertRowid, auraSalmon.lastInsertRowid, 0.3);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaLake.lastInsertRowid, auraSalmon.lastInsertRowid, 0.4);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiCoast.lastInsertRowid, metalBass.lastInsertRowid, 0.25);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepths.lastInsertRowid, phantomJellyfish.lastInsertRowid, 0.15);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepths.lastInsertRowid, crystalCrab.lastInsertRowid, 0.1);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepths.lastInsertRowid, seaDragon.lastInsertRowid, 0.02);
-    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepths.lastInsertRowid, auraWhale.lastInsertRowid, 0.01);
+    const kagaRiverId = kagaRiver.lastInsertRowid || kagaRiver.lastID;
+    const kagaLakeId = kagaLake.lastInsertRowid || kagaLake.lastID;
+    const hoshiCoastId = hoshiCoast.lastInsertRowid || hoshiCoast.lastID;
+    const kuroDepthsId = kuroDepths.lastInsertRowid || kuroDepths.lastID;
+    
+    const auraSalmonId = auraSalmon.lastInsertRowid || auraSalmon.lastID;
+    const metalBassId = metalBass.lastInsertRowid || metalBass.lastID;
+    const phantomJellyfishId = phantomJellyfish.lastInsertRowid || phantomJellyfish.lastID;
+    const crystalCrabId = crystalCrab.lastInsertRowid || crystalCrab.lastID;
+    const seaDragonId = seaDragon.lastInsertRowid || seaDragon.lastID;
+    const auraWhaleId = auraWhale.lastInsertRowid || auraWhale.lastID;
+
+    console.log('Location IDs:', { kagaRiverId, kagaLakeId, hoshiCoastId, kuroDepthsId });
+    console.log('Fish IDs:', { auraSalmonId, metalBassId, phantomJellyfishId, crystalCrabId, seaDragonId, auraWhaleId });
+
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaRiverId, auraSalmonId, 0.3);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kagaLakeId, auraSalmonId, 0.4);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, hoshiCoastId, metalBassId, 0.25);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepthsId, phantomJellyfishId, 0.15);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepthsId, crystalCrabId, 0.1);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepthsId, seaDragonId, 0.02);
+    await db.run(`INSERT INTO FishLocationSpawns (location_id, fish_id, spawn_chance) VALUES (?, ?, ?)`, kuroDepthsId, auraWhaleId, 0.01);
 
     console.log('Force seeding fishing gear...');
 
