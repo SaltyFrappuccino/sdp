@@ -40,6 +40,9 @@ export const DEFAULT_VIEW_PANELS = {
   FACTIONS_LIST: 'factions_list',
   FACTIONS_CREATE: 'factions_create',
   ADMIN_FACTIONS: 'admin_factions',
+  ADMIN_CRYPTO: 'admin_crypto',
+  ADMIN_PURCHASES: 'admin_purchases',
+  ADMIN_COLLECTIONS: 'admin_collections',
 };
 
 export const routes = RoutesConfig.create([
@@ -74,6 +77,9 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.FACTIONS_LIST, `/${DEFAULT_VIEW_PANELS.FACTIONS_LIST}`, []),
       createPanel(DEFAULT_VIEW_PANELS.FACTIONS_CREATE, `/${DEFAULT_VIEW_PANELS.FACTIONS_CREATE}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_FACTIONS, `/${DEFAULT_VIEW_PANELS.ADMIN_FACTIONS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_CRYPTO, `/${DEFAULT_VIEW_PANELS.ADMIN_CRYPTO}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_PURCHASES, `/${DEFAULT_VIEW_PANELS.ADMIN_PURCHASES}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_COLLECTIONS, `/${DEFAULT_VIEW_PANELS.ADMIN_COLLECTIONS}`, []),
     ]),
   ]),
 ]);

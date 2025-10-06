@@ -8,6 +8,7 @@ import {
   Button,
   Select,
   CustomSelect,
+  CustomSelectOption,
   PanelHeaderBack,
   Snackbar,
   ScreenSpinner,
@@ -412,13 +413,20 @@ export const AnketaEditor: FC<NavIdProps & {
                 placeholder="Выберите или начните вводить название"
                 options={factionOptions}
                 value={character.faction}
-                onInputChange={(e) => fetchFactions(e.target.value)}
+                searchable
+                onInputChange={(e) => {
+                  const query = e.target.value;
+                  fetchFactions(query);
+                }}
                 onChange={(e) => handleChange({
                   target: {
                     name: 'faction',
                     value: e.target.value
                   }
                 } as any)}
+                renderOption={({ option, ...restProps }) => (
+                  <CustomSelectOption {...restProps} />
+                )}
                 />
             </FormItem>
             <FormItem top="Позиция во фракции">

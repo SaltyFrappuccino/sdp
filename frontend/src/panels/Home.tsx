@@ -33,74 +33,87 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
         </Group>
       )}
 
-      <Group header={<Header size="s">Salty's Dream Project</Header>}>
+      <Group header={<Header>📋 Персонажи</Header>}>
         <Div>
-          <ButtonGroup stretched mode="horizontal">
-            <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('anketa')}>
+          <ButtonGroup stretched mode="vertical" gap="m">
+            <Button size="l" mode="primary" onClick={() => routeNavigator.push('anketa')} before={<span>➕</span>}>
               Создать анкету
             </Button>
-            <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('my_anketas')}>
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('my_anketas')} before={<span>📝</span>}>
               Мои анкеты
             </Button>
-          </ButtonGroup>
-        </Div>
-        <Div>
-          <ButtonGroup stretched mode="horizontal">
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('anketa_list')}>
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('anketa_list')} before={<span>📖</span>}>
               Реестр анкет
             </Button>
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('calculator')}>
-              Калькулятор
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('factions_list')} before={<span>🔰</span>}>
+              Реестр фракций
             </Button>
           </ButtonGroup>
         </Div>
+      </Group>
+
+      <Group header={<Header>💰 Экономика</Header>}>
         <Div>
-          <ButtonGroup stretched mode="horizontal">
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('market')}>
+          <ButtonGroup stretched mode="vertical" gap="m">
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('market')} before={<span>🛒</span>}>
               Рынок
             </Button>
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('market_exchange')}>
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('market_exchange')} before={<span>📈</span>}>
               Биржа
+            </Button>
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('crypto_exchange')} before={<span>₿</span>}>
+              Криптовалюты
             </Button>
           </ButtonGroup>
         </Div>
+      </Group>
+
+      <Group header={<Header>🎮 Развлечения</Header>}>
         <Div>
-          <ButtonGroup stretched mode="horizontal">
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('activity_requests')}>
-              Заявки на Активности
+          <ButtonGroup stretched mode="vertical" gap="m">
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('casino')} before={<span>🎰</span>}>
+              Казино
             </Button>
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('events')}>
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('events')} before={<span>🎪</span>}>
               Ивенты
             </Button>
           </ButtonGroup>
         </Div>
+      </Group>
+
+      <Group header={<Header>🎁 Личное</Header>}>
         <Div>
-          <ButtonGroup stretched mode="horizontal">
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('handbook')}>
-              Справочник
+          <ButtonGroup stretched mode="vertical" gap="m">
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('purchases')} before={<span>🛍️</span>}>
+              Мои покупки
             </Button>
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('factions_list')}>
-              Реестр фракций
-            </Button>
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('casino')}>
-              Казино
-            </Button>
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('crypto_exchange')}>
-              Криптовалюты
-            </Button>
-            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('purchases')}>
-              Покупки
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('collections')} before={<span>💎</span>}>
+              Коллекции
             </Button>
           </ButtonGroup>
         </Div>
+      </Group>
+
+      <Group header={<Header>⚙️ Управление</Header>}>
         <Div>
-          <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('collections')}>
-            Коллекции
-          </Button>
+          <ButtonGroup stretched mode="vertical" gap="m">
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('activity_requests')} before={<span>📋</span>}>
+              Заявки на активности
+            </Button>
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('calculator')} before={<span>🧮</span>}>
+              Калькулятор
+            </Button>
+            <Button size="l" mode="secondary" onClick={() => routeNavigator.push('handbook')} before={<span>📚</span>}>
+              Справочник
+            </Button>
+          </ButtonGroup>
         </Div>
+      </Group>
+
+      <Group>
         <Div>
           <Button stretched size="l" mode="tertiary" onClick={() => routeNavigator.push('admin_login')}>
-            Админ-панель
+            🔐 Админ-панель
           </Button>
         </Div>
       </Group>

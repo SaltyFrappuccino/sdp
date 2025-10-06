@@ -419,24 +419,21 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const renderCryptoTab = () => (
     <Group header={<Header>💰 Управление криптовалютами</Header>}>
       <Div>
-        <Text style={{ marginBottom: 16, color: 'var(--vkui--color_text_secondary)' }}>
-          Управление криптовалютами доступно через API. Используйте Swagger UI для полного функционала.
-        </Text>
         <ButtonGroup stretched mode="vertical" gap="m">
           <Button 
             size="l" 
-            mode="secondary" 
-            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            mode="primary" 
+            onClick={() => routeNavigator.replace('/admin_crypto')}
             before={<Icon24MoneyCircle />}
           >
-            📈 Управление криптовалютами
+            ₿ Управление криптовалютами (CRUD)
           </Button>
           <Button 
             size="l" 
             mode="secondary" 
-            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            onClick={() => routeNavigator.push('/crypto_exchange')}
           >
-            📊 События и волатильность
+            📊 Открыть биржу криптовалют
           </Button>
         </ButtonGroup>
       </Div>
@@ -446,24 +443,21 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const renderPurchasesTab = () => (
     <Group header={<Header>🛍️ Управление покупками</Header>}>
       <Div>
-        <Text style={{ marginBottom: 16, color: 'var(--vkui--color_text_secondary)' }}>
-          Управление категориями и предметами для покупки доступно через API.
-        </Text>
         <ButtonGroup stretched mode="vertical" gap="m">
           <Button 
             size="l" 
-            mode="secondary" 
-            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            mode="primary" 
+            onClick={() => routeNavigator.replace('/admin_purchases')}
+            before={<Icon24Gift />}
           >
-            🏷️ Категории покупок
+            🛍️ Управление покупками (CRUD)
           </Button>
           <Button 
             size="l" 
             mode="secondary" 
-            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
-            before={<Icon24Gift />}
+            onClick={() => routeNavigator.push('/purchases')}
           >
-            🎁 Предметы для покупки
+            🛒 Открыть магазин покупок
           </Button>
         </ButtonGroup>
       </Div>
@@ -473,33 +467,21 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const renderCollectionsTab = () => (
     <Group header={<Header>🎴 Управление коллекциями</Header>}>
       <Div>
-        <Text style={{ marginBottom: 16, color: 'var(--vkui--color_text_secondary)' }}>
-          Управление сериями, предметами и паками коллекций доступно через API.
-        </Text>
         <ButtonGroup stretched mode="vertical" gap="m">
           <Button 
             size="l" 
-            mode="secondary" 
-            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
+            mode="primary" 
+            onClick={() => routeNavigator.replace('/admin_collections')}
             before={<Icon24Gift />}
           >
-            📚 Серии коллекций
+            💎 Управление коллекциями (CRUD)
           </Button>
           <Button 
             size="l" 
             mode="secondary" 
-            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
-            before={<Icon24Add />}
+            onClick={() => routeNavigator.push('/collections')}
           >
-            🎁 Предметы коллекций
-          </Button>
-          <Button 
-            size="l" 
-            mode="secondary" 
-            onClick={() => window.open(`${API_URL.replace('/api', '')}/api-docs`, '_blank')}
-            before={<Icon24Gift />}
-          >
-            📦 Паки коллекций
+            🎴 Открыть коллекции
           </Button>
         </ButtonGroup>
       </Div>
@@ -547,6 +529,24 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           </Button>
           <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_factions')}>
             🔰 Управление фракциями
+          </Button>
+        </ButtonGroup>
+      </Div>
+    </Group>
+  );
+
+  const renderEconomyTab = () => (
+    <Group header={<Header>💰 Управление экономикой</Header>}>
+      <Div>
+        <ButtonGroup stretched mode="vertical" gap="m">
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_crypto')}>
+            ₿ Управление криптовалютами
+          </Button>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_purchases')}>
+            🛍️ Управление покупками
+          </Button>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_collections')}>
+            💎 Управление коллекциями
           </Button>
         </ButtonGroup>
       </Div>
