@@ -20,13 +20,15 @@ import {
   SimpleCell,
   Avatar,
   Progress,
-  Checkbox
+  Checkbox,
+  NativeSelect
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
 
 interface NavIdProps {
   id: string;
+  fetchedUser?: any;
 }
 
 interface FishingLocation {
@@ -60,7 +62,7 @@ interface Fish {
   caught_at: string;
 }
 
-const FishingPanel: React.FC<NavIdProps> = ({ id }) => {
+const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
   const [activeTab, setActiveTab] = useState<'game' | 'inventory' | 'shop'>('game');
   const [locations, setLocations] = useState<FishingLocation[]>([]);
@@ -71,32 +73,37 @@ const FishingPanel: React.FC<NavIdProps> = ({ id }) => {
   const [loading, setLoading] = useState(false);
   const [isFishing, setIsFishing] = useState(false);
   const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
+  const [characters, setCharacters] = useState<any[]>([]);
+  const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
   const [characterId, setCharacterId] = useState<number | null>(null);
   const [credits, setCredits] = useState<number>(0);
 
   useEffect(() => {
-    loadCharacter();
+    loadCharacters();
     loadLocations();
     loadGear();
   }, []);
 
   useEffect(() => {
-    if (characterId) {
+    if (selectedCharacter) {
+      setCharacterId(selectedCharacter.id);
+      setCredits(selectedCharacter.currency);
       loadInventory();
     }
-  }, [characterId, activeTab]);
+  }, [selectedCharacter, activeTab]);
 
-  const loadCharacter = async () => {
+  const loadCharacters = async () => {
+    if (!fetchedUser) return;
     try {
-      const vkUserInfo = await (window as any).bridge.send('VKWebAppGetUserInfo');
-      const response = await fetch(`${API_URL}/characters/user/${vkUserInfo.id}`);
-      const characters = await response.json();
-      if (characters.length > 0) {
-        setCharacterId(characters[0].id);
-        setCredits(characters[0].currency);
+      const response = await fetch(`${API_URL}/my-anketas/${fetchedUser.id}`);
+      const data = await response.json();
+      const acceptedChars = data.filter((char: any) => char.status === 'Принято' && (char.life_status === 'Жив' || char.life_status === 'Жива'));
+      setCharacters(acceptedChars);
+      if (acceptedChars.length > 0) {
+        setSelectedCharacter(acceptedChars[0]);
       }
     } catch (error) {
-      console.error('Ошибка при загрузке персонажа:', error);
+      console.error('Ошибка при загрузке персонажей:', error);
     }
   };
 
@@ -233,7 +240,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id }) => {
           </Snackbar>
         );
         setCredits(credits - price);
-        loadCharacter();
+        loadCharacters();
       }
     } catch (error) {
       console.error('Ошибка при покупке:', error);
@@ -259,8 +266,26 @@ const FishingPanel: React.FC<NavIdProps> = ({ id }) => {
 
       <Group>
         <Div>
-          <Text weight="2">💰 Кредиты: {credits.toLocaleString()}</Text>
+          <Text weight="2">💰 Кредиты: {credits.toLocaleString()} ₭</Text>
         </Div>
+        {characters.length > 1 && (
+          <Div>
+            <Text weight="2">Персонаж:</Text>
+            <NativeSelect
+              value={selectedCharacter?.id || ''}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                const char = characters.find(c => c.id === parseInt(e.target.value));
+                setSelectedCharacter(char);
+              }}
+            >
+              {characters.map(char => (
+                <option key={char.id} value={char.id}>
+                  {char.character_name} - {char.currency.toLocaleString()} ₭
+                </option>
+              ))}
+            </NativeSelect>
+          </Div>
+        )}
       </Group>
 
       <Tabs>
@@ -298,19 +323,43 @@ const FishingPanel: React.FC<NavIdProps> = ({ id }) => {
           {selectedLocation && (
             <>
               <Group header={<Header>Экипировка (опционально)</Header>}>
-                {gear.filter(g => g.type === 'Удочка').slice(0, 3).map(g => (
-                  <Checkbox
-                    key={g.id}
-                    checked={selectedGear.includes(g.id)}
-                    onChange={() => {
-                      setSelectedGear(prev =>
-                        prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]
-                      );
+                <Div>
+                  <Text weight="2">Удочки:</Text>
+                  <NativeSelect
+                    value={selectedGear[0] || ''}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                      const gearId = parseInt(e.target.value);
+                      setSelectedGear(gearId ? [gearId] : []);
                     }}
                   >
-                    {g.name} (+{(g.bonus_chance * 100).toFixed(0)}%)
-                  </Checkbox>
-                ))}
+                    <option value="">Без удочки</option>
+                    {gear.filter(g => g.type === 'Удочка').map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} (+{(g.bonus_chance * 100).toFixed(0)}%)
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Div>
+                <Div>
+                  <Text weight="2">Наживка:</Text>
+                  <NativeSelect
+                    value={selectedGear[1] || ''}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                      const gearId = parseInt(e.target.value);
+                      setSelectedGear(prev => {
+                        const newGear = prev.filter(id => gear.find(g => g.id === id)?.type !== 'Наживка');
+                        return gearId ? [...newGear, gearId] : newGear;
+                      });
+                    }}
+                  >
+                    <option value="">Без наживки</option>
+                    {gear.filter(g => g.type === 'Наживка').map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} (+{(g.bonus_rarity * 100).toFixed(0)}%)
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Div>
               </Group>
 
               <Group>
@@ -340,7 +389,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id }) => {
               {inventory.map(fish => (
                 <Cell
                   key={fish.id}
-                  subtitle={`${fish.weight} кг • ${(fish.base_price * fish.weight).toLocaleString()} ₽ • ${fish.location_name}`}
+                  subtitle={`${fish.weight} кг • ${(fish.base_price * fish.weight).toLocaleString()} ₭ • ${fish.location_name}`}
                   before={
                     <Avatar size={48} style={{ background: getRarityColor(fish.rarity) }}>
                       🐟
@@ -353,7 +402,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id }) => {
               ))}
               <Div>
                 <Button size="l" stretched mode="primary" onClick={handleSell}>
-                  💰 Продать всё за {inventory.reduce((sum, f) => sum + f.base_price * f.weight, 0).toLocaleString()} ₽
+                  💰 Продать всё за {inventory.reduce((sum, f) => sum + f.base_price * f.weight, 0).toLocaleString()} ₭
                 </Button>
               </Div>
             </>
@@ -369,7 +418,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id }) => {
               subtitle={`${item.quality} • ${item.description}`}
               after={
                 <Button size="s" onClick={() => handleBuyGear(item.id, item.price)}>
-                  {item.price.toLocaleString()} ₽
+                  {item.price.toLocaleString()} ₭
                 </Button>
               }
               multiline

@@ -117,7 +117,7 @@ const AdminActivitiesPanel: React.FC<NavIdProps> = ({ id }) => {
                 <Div>
                   <Text>Всего предметов: {fishingGear.length}</Text>
                   {fishingGear.slice(0, 5).map(g => (
-                    <Cell key={g.id} subtitle={`${g.type} • ${g.quality} • ${g.price} ₽`}>
+                    <Cell key={g.id} subtitle={`${g.type} • ${g.quality} • ${g.price} ₭`}>
                       {g.name}
                     </Cell>
                   ))}
@@ -143,7 +143,7 @@ const AdminActivitiesPanel: React.FC<NavIdProps> = ({ id }) => {
                 <Div>
                   <Text>Всего предметов: {huntingGear.length}</Text>
                   {huntingGear.slice(0, 5).map(g => (
-                    <Cell key={g.id} subtitle={`${g.type} • ${g.quality} • ${g.price} ₽`}>
+                    <Cell key={g.id} subtitle={`${g.type} • ${g.quality} • ${g.price} ₭`}>
                       {g.name}
                     </Cell>
                   ))}

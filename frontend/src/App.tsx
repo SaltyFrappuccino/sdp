@@ -99,9 +99,9 @@ export const App = () => {
         <AdminCollectionsPanel id="admin_collections" />
         <BestiaryPanel id="bestiary" />
         <AdminBestiaryPanel id="admin_bestiary" />
-        <FishingPanel id="fishing" />
-        <HuntingPanel id="hunting" />
-        <AdminActivitiesPanel id="admin_activities" />
+            <FishingPanel id="fishing" fetchedUser={fetchedUser} />
+            <HuntingPanel id="hunting" fetchedUser={fetchedUser} />
+            <AdminActivitiesPanel id="admin_activities" />
         <UpdateViewer id="update_viewer" />
           </View>
         ) : (
