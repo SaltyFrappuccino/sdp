@@ -6456,4 +6456,168 @@ router.get('/admin/backup', async (req, res) => {
   }
 });
 
+// ==================== ФРАКЦИИ ====================
+
+// GET /factions - Получить список всех одобренных фракций
+router.get('/factions', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const factions = await db.all("SELECT id, name, description FROM Factions WHERE status = 'approved' OR is_canon = 1 ORDER BY name ASC");
+    await db.close();
+    res.json(factions);
+  } catch (error) {
+    console.error('Ошибка при получении фракций:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// POST /factions - Создать новую фракцию
+router.post('/factions', async (req: Request, res: Response) => {
+  const { name, description } = req.body;
+  const vk_id = req.headers['x-user-vk-id'];
+
+  if (!name || !description) {
+    return res.status(400).json({ message: 'Название и описание обязательны' });
+  }
+
+  try {
+    const db = await initDB();
+    const existingFaction = await db.get('SELECT id FROM Factions WHERE name = ?', [name]);
+    if (existingFaction) {
+      await db.close();
+      return res.status(409).json({ message: 'Фракция с таким названием уже существует' });
+    }
+
+    await db.run(
+      'INSERT INTO Factions (name, description, creator_vk_id, status) VALUES (?, ?, ?, ?)',
+      [name, description, vk_id, 'pending']
+    );
+
+    await db.close();
+    res.status(201).json({ message: 'Фракция успешно создана и отправлена на рассмотрение' });
+  } catch (error) {
+    console.error('Ошибка при создании фракции:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// GET /admin/factions - Получить список всех фракций (для админов)
+router.get('/admin/factions', async (req: Request, res: Response) => {
+  const { status } = req.query;
+  let query = 'SELECT * FROM Factions';
+  const params = [];
+
+  if (status) {
+    query += ' WHERE status = ?';
+    params.push(status);
+  }
+  
+  query += ' ORDER BY created_at DESC';
+
+  try {
+    const db = await initDB();
+    const factions = await db.all(query, params);
+    await db.close();
+    res.json(factions);
+  } catch (error) {
+    console.error('Ошибка при получении списка фракций для админа:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// PUT /admin/factions/:id - Обновить статус фракции (для админов)
+router.put('/admin/factions/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status, name, description } = req.body;
+
+  if (status && !['approved', 'rejected'].includes(status)) {
+    return res.status(400).json({ message: 'Неверный статус' });
+  }
+
+  try {
+    const db = await initDB();
+    const faction = await db.get('SELECT * FROM Factions WHERE id = ?', [id]);
+    if (!faction) {
+      await db.close();
+      return res.status(404).json({ message: 'Фракция не найдена' });
+    }
+
+    let query = 'UPDATE Factions SET';
+    const params = [];
+    if (name) {
+      query += ' name = ?,';
+      params.push(name);
+    }
+    if (description) {
+      query += ' description = ?,';
+      params.push(description);
+    }
+    if (status) {
+      query += ' status = ?,';
+      params.push(status);
+    }
+    
+    query = query.slice(0, -1); // remove last comma
+    query += ' WHERE id = ?';
+    params.push(id);
+
+    await db.run(query, params);
+    await db.close();
+
+    res.json({ message: 'Фракция обновлена' });
+  } catch (error) {
+    console.error(`Ошибка при обновлении фракции ${id}:`, error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// DELETE /admin/factions/:id - Удалить фракцию (для админов)
+router.delete('/admin/factions/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const db = await initDB();
+    const result = await db.run('DELETE FROM Factions WHERE id = ?', [id]);
+    await db.close();
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ message: 'Фракция не найдена' });
+    }
+    res.json({ message: 'Фракция удалена' });
+  } catch (error) {
+    console.error(`Ошибка при удалении фракции ${id}:`, error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// GET /factions/search - Поиск фракций по названию
+router.get('/factions/search', async (req: Request, res: Response) => {
+  const { q } = req.query;
+
+  if (!q) {
+    try {
+      const db = await initDB();
+      const factions = await db.all("SELECT id, name, description FROM Factions WHERE status = 'approved' OR is_canon = 1 ORDER BY name ASC");
+      await db.close();
+      return res.json(factions);
+    } catch (error) {
+      console.error('Ошибка при получении всех фракций:', error);
+      return res.status(500).json({ message: 'Ошибка сервера' });
+    }
+  }
+
+  try {
+    const db = await initDB();
+    const factions = await db.all(
+      "SELECT id, name, description FROM Factions WHERE (status = 'approved' OR is_canon = 1) AND name LIKE ? ORDER BY name ASC",
+      [`%${q}%`]
+    );
+    await db.close();
+    res.json(factions);
+  } catch (error) {
+    console.error('Ошибка при поиске фракций:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
 export default router;
