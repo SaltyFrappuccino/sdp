@@ -1065,48 +1065,98 @@ export async function initDB() {
       );
     `);
 
-    // Миграция: добавляем недостающие колонки если их нет
+    // Принудительная миграция: пересоздаем таблицы с новыми колонками
+    console.log('Starting forced migration for FishingGear and HuntingGear...');
+    
+    // Сохраняем данные из существующих таблиц
+    let existingFishingGear = [];
+    let existingHuntingGear = [];
+    
     try {
-      await db.run(`ALTER TABLE FishingGear ADD COLUMN is_consumable BOOLEAN DEFAULT 0`);
-      console.log('Added is_consumable column to FishingGear');
+      existingFishingGear = await db.all(`SELECT * FROM FishingGear`);
+      console.log('Backed up FishingGear data:', existingFishingGear.length, 'items');
     } catch (error) {
-      console.log('is_consumable column already exists in FishingGear or error:', error);
+      console.log('No existing FishingGear data to backup');
+    }
+    
+    try {
+      existingHuntingGear = await db.all(`SELECT * FROM HuntingGear`);
+      console.log('Backed up HuntingGear data:', existingHuntingGear.length, 'items');
+    } catch (error) {
+      console.log('No existing HuntingGear data to backup');
     }
 
+    // Удаляем старые таблицы
     try {
-      await db.run(`ALTER TABLE HuntingGear ADD COLUMN is_consumable BOOLEAN DEFAULT 0`);
-      console.log('Added is_consumable column to HuntingGear');
+      await db.run(`DROP TABLE IF EXISTS FishingGear`);
+      await db.run(`DROP TABLE IF EXISTS HuntingGear`);
+      console.log('Dropped old tables');
     } catch (error) {
-      console.log('is_consumable column already exists in HuntingGear or error:', error);
+      console.log('Error dropping tables:', error);
     }
 
-    try {
-      await db.run(`ALTER TABLE FishingGear ADD COLUMN quantity INTEGER DEFAULT 1`);
-      console.log('Added quantity column to FishingGear');
-    } catch (error) {
-      console.log('quantity column already exists in FishingGear or error:', error);
+    // Создаем новые таблицы с полной схемой
+    await db.run(`
+      CREATE TABLE FishingGear (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        type TEXT CHECK(type IN ('Удочка', 'Наживка')),
+        quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
+        price INTEGER,
+        bonus_chance REAL,
+        bonus_rarity REAL,
+        description TEXT,
+        min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+        is_basic BOOLEAN DEFAULT 0,
+        is_consumable BOOLEAN DEFAULT 0,
+        is_active BOOLEAN DEFAULT 1
+      )
+    `);
+
+    await db.run(`
+      CREATE TABLE HuntingGear (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня', 'Наземная ловушка', 'Воздушная ловушка')),
+        quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
+        price INTEGER,
+        bonus_damage REAL,
+        bonus_defense REAL,
+        bonus_success REAL,
+        description TEXT,
+        min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+        is_basic BOOLEAN DEFAULT 0,
+        is_consumable BOOLEAN DEFAULT 0,
+        is_active BOOLEAN DEFAULT 1
+      )
+    `);
+
+    console.log('Created new tables with full schema');
+
+    // Восстанавливаем данные
+    for (const item of existingFishingGear) {
+      await db.run(`
+        INSERT INTO FishingGear (id, name, type, quality, price, bonus_chance, bonus_rarity, description, min_rank, is_basic, is_consumable, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        item.id, item.name, item.type, item.quality, item.price, 
+        item.bonus_chance || 0, item.bonus_rarity || 0, item.description, 
+        item.min_rank || 'F', item.is_basic || 0, item.is_consumable || 0, item.is_active || 1
+      ]);
     }
 
-    try {
-      await db.run(`ALTER TABLE HuntingGear ADD COLUMN quantity INTEGER DEFAULT 1`);
-      console.log('Added quantity column to HuntingGear');
-    } catch (error) {
-      console.log('quantity column already exists in HuntingGear or error:', error);
+    for (const item of existingHuntingGear) {
+      await db.run(`
+        INSERT INTO HuntingGear (id, name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        item.id, item.name, item.type, item.quality, item.price,
+        item.bonus_damage || 0, item.bonus_defense || 0, item.bonus_success || 0,
+        item.description, item.min_rank || 'F', item.is_basic || 0, item.is_consumable || 0, item.is_active || 1
+      ]);
     }
 
-    try {
-      await db.run(`ALTER TABLE FishingGear ADD COLUMN condition REAL DEFAULT 1.0`);
-      console.log('Added condition column to FishingGear');
-    } catch (error) {
-      console.log('condition column already exists in FishingGear or error:', error);
-    }
-
-    try {
-      await db.run(`ALTER TABLE HuntingGear ADD COLUMN condition REAL DEFAULT 1.0`);
-      console.log('Added condition column to HuntingGear');
-    } catch (error) {
-      console.log('condition column already exists in HuntingGear or error:', error);
-    }
+    console.log('Restored data to new tables');
 
     // Обновляем типы ловушек в существующих записях
     try {
@@ -1116,47 +1166,87 @@ export async function initDB() {
       console.log('Could not update trap types:', error);
     }
 
-    // Принудительно пересоздаем таблицу HuntingGear с новой схемой
+    // Принудительно пересоздаем таблицы CharacterFishingGear и CharacterHuntingGear
+    console.log('Recreating CharacterFishingGear and CharacterHuntingGear tables...');
+    
+    // Сохраняем данные
+    let existingCharacterFishingGear = [];
+    let existingCharacterHuntingGear = [];
+    
     try {
-      console.log('Recreating HuntingGear table with new schema...');
-      await db.run(`DROP TABLE IF EXISTS HuntingGear`);
-      await db.run(`
-        CREATE TABLE HuntingGear (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня', 'Наземная ловушка', 'Воздушная ловушка')),
-          quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
-          price INTEGER,
-          bonus_damage REAL,
-          bonus_defense REAL,
-          bonus_success REAL,
-          description TEXT,
-          min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
-          is_basic BOOLEAN DEFAULT 0,
-          is_consumable BOOLEAN DEFAULT 0,
-          is_active BOOLEAN DEFAULT 1
-        )
-      `);
-      console.log('HuntingGear table recreated successfully');
-      
-      // Пересоздаем CharacterHuntingGear
-      await db.run(`DROP TABLE IF EXISTS CharacterHuntingGear`);
-      await db.run(`
-        CREATE TABLE CharacterHuntingGear (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          character_id INTEGER NOT NULL,
-          gear_id INTEGER NOT NULL,
-          quantity INTEGER DEFAULT 1,
-          is_equipped BOOLEAN DEFAULT 0,
-          condition REAL DEFAULT 1.0,
-          FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
-          FOREIGN KEY (gear_id) REFERENCES HuntingGear(id) ON DELETE CASCADE
-        )
-      `);
-      console.log('CharacterHuntingGear table recreated successfully');
+      existingCharacterFishingGear = await db.all(`SELECT * FROM CharacterFishingGear`);
+      console.log('Backed up CharacterFishingGear data:', existingCharacterFishingGear.length, 'items');
     } catch (error) {
-      console.log('Could not recreate HuntingGear table:', error);
+      console.log('No existing CharacterFishingGear data to backup');
     }
+    
+    try {
+      existingCharacterHuntingGear = await db.all(`SELECT * FROM CharacterHuntingGear`);
+      console.log('Backed up CharacterHuntingGear data:', existingCharacterHuntingGear.length, 'items');
+    } catch (error) {
+      console.log('No existing CharacterHuntingGear data to backup');
+    }
+
+    // Удаляем старые таблицы
+    try {
+      await db.run(`DROP TABLE IF EXISTS CharacterFishingGear`);
+      await db.run(`DROP TABLE IF EXISTS CharacterHuntingGear`);
+      console.log('Dropped old character gear tables');
+    } catch (error) {
+      console.log('Error dropping character gear tables:', error);
+    }
+
+    // Создаем новые таблицы с полной схемой
+    await db.run(`
+      CREATE TABLE CharacterFishingGear (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        gear_id INTEGER NOT NULL,
+        is_equipped BOOLEAN DEFAULT 0,
+        quantity INTEGER DEFAULT 1,
+        condition REAL DEFAULT 1.0,
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY (gear_id) REFERENCES FishingGear(id) ON DELETE CASCADE
+      )
+    `);
+
+    await db.run(`
+      CREATE TABLE CharacterHuntingGear (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        character_id INTEGER NOT NULL,
+        gear_id INTEGER NOT NULL,
+        is_equipped BOOLEAN DEFAULT 0,
+        quantity INTEGER DEFAULT 1,
+        condition REAL DEFAULT 1.0,
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+        FOREIGN KEY (gear_id) REFERENCES HuntingGear(id) ON DELETE CASCADE
+      )
+    `);
+
+    console.log('Created new character gear tables with full schema');
+
+    // Восстанавливаем данные
+    for (const item of existingCharacterFishingGear) {
+      await db.run(`
+        INSERT INTO CharacterFishingGear (id, character_id, gear_id, is_equipped, quantity, condition)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [
+        item.id, item.character_id, item.gear_id, item.is_equipped || 0,
+        item.quantity || 1, item.condition || 1.0
+      ]);
+    }
+
+    for (const item of existingCharacterHuntingGear) {
+      await db.run(`
+        INSERT INTO CharacterHuntingGear (id, character_id, gear_id, is_equipped, quantity, condition)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [
+        item.id, item.character_id, item.gear_id, item.is_equipped || 0,
+        item.quantity || 1, item.condition || 1.0
+      ]);
+    }
+
+    console.log('Restored character gear data to new tables');
 
     await seedFishingData(db);
     await seedHuntingData(db);
