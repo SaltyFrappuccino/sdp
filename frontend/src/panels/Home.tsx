@@ -97,6 +97,12 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
                   <span>Криптовалюты</span>
                 </div>
               </Button>
+              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('purchases')} stretched style={{ minHeight: '80px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '24px' }}>🛍️</span>
+                  <span>Покупки</span>
+                </div>
+              </Button>
             </Div>
           </Accordion.Content>
         </Accordion>
@@ -116,31 +122,6 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
                   <span>Казино</span>
                 </div>
               </Button>
-              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('events')} stretched style={{ minHeight: '80px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ fontSize: '24px' }}>🎪</span>
-                  <span>Ивенты</span>
-                </div>
-              </Button>
-            </Div>
-          </Accordion.Content>
-        </Accordion>
-      </Group>
-
-      <Group>
-        <Accordion
-          expanded={expanded.includes('personal')}
-          onChange={(e) => setExpanded(e ? [...expanded.filter(i => i !== 'personal'), 'personal'] : expanded.filter(i => i !== 'personal'))}
-        >
-          <Accordion.Summary>🎁 Личное</Accordion.Summary>
-          <Accordion.Content>
-            <Div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px' }}>
-              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('purchases')} stretched style={{ minHeight: '80px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ fontSize: '24px' }}>🛍️</span>
-                  <span>Мои покупки</span>
-                </div>
-              </Button>
               <Button size="l" mode="secondary" onClick={() => routeNavigator.push('collections')} stretched style={{ minHeight: '80px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '24px' }}>💎</span>
@@ -154,10 +135,10 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
 
       <Group>
         <Accordion
-          expanded={expanded.includes('management')}
-          onChange={(e) => setExpanded(e ? [...expanded.filter(i => i !== 'management'), 'management'] : expanded.filter(i => i !== 'management'))}
+          expanded={expanded.includes('rp')}
+          onChange={(e) => setExpanded(e ? [...expanded.filter(i => i !== 'rp'), 'rp'] : expanded.filter(i => i !== 'rp'))}
         >
-          <Accordion.Summary>⚙️ Управление</Accordion.Summary>
+          <Accordion.Summary>🎭 РП-Составляющая</Accordion.Summary>
           <Accordion.Content>
             <Div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '12px' }}>
               <Button size="l" mode="secondary" onClick={() => routeNavigator.push('activity_requests')} stretched style={{ minHeight: '80px' }}>
@@ -176,6 +157,12 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '24px' }}>📚</span>
                   <span>Справочник</span>
+                </div>
+              </Button>
+              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('events')} stretched style={{ minHeight: '80px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '24px' }}>🎪</span>
+                  <span>Ивенты</span>
                 </div>
               </Button>
             </Div>
