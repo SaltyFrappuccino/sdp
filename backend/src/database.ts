@@ -2166,7 +2166,7 @@ export async function seedHuntingData(db: any) {
       } else {
         // Легендарные локации для бестий
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.05);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, soraEcho.lastInsertRowid, creatureId, 0.03);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEcho.lastInsertRowid, creatureId, 0.03);
       }
     }
 
@@ -2179,11 +2179,11 @@ export async function seedHuntingData(db: any) {
       } else if (creatureId <= terrestrialDistorted2.lastInsertRowid) {
         // Редкие локации для искажённых
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.25);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, soraEcho.lastInsertRowid, creatureId, 0.2);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEcho.lastInsertRowid, creatureId, 0.2);
       } else {
         // Легендарные локации для бестий
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.08);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, soraEcho.lastInsertRowid, creatureId, 0.05);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEcho.lastInsertRowid, creatureId, 0.05);
       }
     }
 
