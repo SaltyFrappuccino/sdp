@@ -999,7 +999,7 @@ export async function initDB() {
       CREATE TABLE IF NOT EXISTS HuntingGear (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня')),
+        type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня', 'Наземная ловушка', 'Воздушная ловушка')),
         quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
         price INTEGER,
         bonus_damage REAL,
@@ -1064,6 +1064,78 @@ export async function initDB() {
         FOREIGN KEY (gear_id) REFERENCES HuntingGear(id) ON DELETE CASCADE
       );
     `);
+
+    // Миграция: добавляем недостающие колонки если их нет
+    try {
+      await db.run(`ALTER TABLE HuntingGear ADD COLUMN is_consumable BOOLEAN DEFAULT 0`);
+      console.log('Added is_consumable column to HuntingGear');
+    } catch (error) {
+      // Колонка уже существует, игнорируем ошибку
+    }
+
+    try {
+      await db.run(`ALTER TABLE HuntingGear ADD COLUMN quantity INTEGER DEFAULT 1`);
+      console.log('Added quantity column to HuntingGear');
+    } catch (error) {
+      // Колонка уже существует, игнорируем ошибку
+    }
+
+    try {
+      await db.run(`ALTER TABLE HuntingGear ADD COLUMN condition REAL DEFAULT 1.0`);
+      console.log('Added condition column to HuntingGear');
+    } catch (error) {
+      // Колонка уже существует, игнорируем ошибку
+    }
+
+    // Обновляем типы ловушек в существующих записях
+    try {
+      await db.run(`UPDATE HuntingGear SET type = 'Наземная ловушка' WHERE type = 'Ловушка'`);
+      console.log('Updated trap types in HuntingGear');
+    } catch (error) {
+      console.log('Could not update trap types:', error);
+    }
+
+    // Принудительно пересоздаем таблицу HuntingGear с новой схемой
+    try {
+      console.log('Recreating HuntingGear table with new schema...');
+      await db.run(`DROP TABLE IF EXISTS HuntingGear`);
+      await db.run(`
+        CREATE TABLE HuntingGear (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня', 'Наземная ловушка', 'Воздушная ловушка')),
+          quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
+          price INTEGER,
+          bonus_damage REAL,
+          bonus_defense REAL,
+          bonus_success REAL,
+          description TEXT,
+          min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+          is_basic BOOLEAN DEFAULT 0,
+          is_consumable BOOLEAN DEFAULT 0,
+          is_active BOOLEAN DEFAULT 1
+        )
+      `);
+      console.log('HuntingGear table recreated successfully');
+      
+      // Пересоздаем CharacterHuntingGear
+      await db.run(`DROP TABLE IF EXISTS CharacterHuntingGear`);
+      await db.run(`
+        CREATE TABLE CharacterHuntingGear (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          character_id INTEGER NOT NULL,
+          gear_id INTEGER NOT NULL,
+          quantity INTEGER DEFAULT 1,
+          is_equipped BOOLEAN DEFAULT 0,
+          condition REAL DEFAULT 1.0,
+          FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+          FOREIGN KEY (gear_id) REFERENCES HuntingGear(id) ON DELETE CASCADE
+        )
+      `);
+      console.log('CharacterHuntingGear table recreated successfully');
+    } catch (error) {
+      console.log('Could not recreate HuntingGear table:', error);
+    }
 
     await seedFishingData(db);
     await seedHuntingData(db);
