@@ -838,6 +838,83 @@ export async function initDB() {
     await seedCollectionSeries(db);
     await seedFactions(db);
 
+    // Создание таблиц для Бестиария
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS BestiaryTaxonomy (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        parent_id INTEGER,
+        level TEXT NOT NULL CHECK(level IN ('kingdom', 'type', 'class', 'family')),
+        name TEXT NOT NULL,
+        name_latin TEXT,
+        description TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (parent_id) REFERENCES BestiaryTaxonomy(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS BestiarySpecies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        family_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        name_latin TEXT,
+        mutation_class TEXT NOT NULL CHECK(mutation_class IN ('Затронутые', 'Искажённые', 'Бестии')),
+        danger_rank TEXT NOT NULL CHECK(danger_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+        habitat_type TEXT NOT NULL CHECK(habitat_type IN ('Наземные', 'Водные', 'Воздушные', 'Подземные', 'Амфибии')),
+        description TEXT,
+        appearance TEXT,
+        behavior TEXT,
+        abilities TEXT,
+        size_category TEXT CHECK(size_category IN ('Мелкие', 'Средние', 'Крупные', 'Гигантские')),
+        weight_min REAL,
+        weight_max REAL,
+        tags TEXT,
+        image_url TEXT,
+        is_hostile BOOLEAN DEFAULT 1,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (family_id) REFERENCES BestiaryTaxonomy(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS BestiaryLocations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        species_id INTEGER NOT NULL,
+        island TEXT NOT NULL CHECK(island IN ('Кага', 'Хоши', 'Ичи', 'Куро', 'Мидзу', 'Сора')),
+        region TEXT,
+        biome TEXT,
+        is_echo_zone BOOLEAN DEFAULT 0,
+        rarity TEXT CHECK(rarity IN ('Обычный', 'Необычный', 'Редкий', 'Очень редкий', 'Легендарный')),
+        population_density TEXT CHECK(population_density IN ('Единичные', 'Малая', 'Средняя', 'Высокая', 'Массовая')),
+        seasonal_availability TEXT,
+        FOREIGN KEY (species_id) REFERENCES BestiarySpecies(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS BestiaryCharacteristics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        species_id INTEGER NOT NULL,
+        strength_tag TEXT,
+        speed_tag TEXT,
+        defense_tag TEXT,
+        special_tag TEXT,
+        aura_signature TEXT,
+        drop_items TEXT,
+        credit_value_min INTEGER,
+        credit_value_max INTEGER,
+        FOREIGN KEY (species_id) REFERENCES BestiarySpecies(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS BestiaryResearchNotes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        species_id INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        note_text TEXT,
+        discovery_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (species_id) REFERENCES BestiarySpecies(id) ON DELETE CASCADE,
+        FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE
+      );
+    `);
+
+    await seedBestiary(db);
+
     return db;
 
   } catch (error) {
@@ -1132,4 +1209,386 @@ export async function seedFactions(db: any) {
   
   await stmt.finalize();
   console.log('Factions seeded successfully');
+}
+
+export async function seedBestiary(db: any) {
+  try {
+    const count = await db.get('SELECT COUNT(*) as count FROM BestiaryTaxonomy');
+    if (count.count > 0) {
+      console.log('Bestiary already seeded, skipping...');
+      return;
+    }
+
+    console.log('Seeding bestiary taxonomy...');
+
+    // Царства (Kingdoms)
+    const kingdomAnimalia = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description) 
+      VALUES (NULL, 'kingdom', 'Животные', 'Animalia', 'Искажённая фауна - все животные мира, подвергшиеся мутации из-за Ауры')`);
+    
+    // Типы (Types) - по среде обитания
+    const typeTerrestrial = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${kingdomAnimalia.lastID}, 'type', 'Наземные', 'Terrestria', 'Существа, обитающие на суше')`);
+    
+    const typeAquatic = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${kingdomAnimalia.lastID}, 'type', 'Водные', 'Aquatica', 'Существа, обитающие в водной среде')`);
+    
+    const typeAerial = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${kingdomAnimalia.lastID}, 'type', 'Воздушные', 'Aeria', 'Крылатые и летающие существа')`);
+
+    // Классы (Classes) - по уровню мутации
+    const classTouched = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeTerrestrial.lastID}, 'class', 'Затронутые Наземные', 'Terrestria Tactus', 'Наземные животные с незначительными мутациями')`);
+    
+    const classDistorted = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeTerrestrial.lastID}, 'class', 'Искажённые Наземные', 'Terrestria Distortus', 'Наземные животные со средними мутациями и способностями')`);
+    
+    const classBeasts = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeTerrestrial.lastID}, 'class', 'Бестии Наземные', 'Terrestria Bestia', 'Высшие наземные хищники из Эхо-Зон')`);
+
+    // Водные классы
+    const classAquaTouched = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeAquatic.lastID}, 'class', 'Затронутые Водные', 'Aquatica Tactus', 'Водные животные с незначительными мутациями')`);
+    
+    const classAquaDistorted = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeAquatic.lastID}, 'class', 'Искажённые Водные', 'Aquatica Distortus', 'Водные животные со средними мутациями')`);
+    
+    const classAquaBeasts = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeAquatic.lastID}, 'class', 'Бестии Водные', 'Aquatica Bestia', 'Высшие водные хищники из Эхо-Зон')`);
+
+    // Воздушные классы
+    const classAerialTouched = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeAerial.lastID}, 'class', 'Затронутые Воздушные', 'Aeria Tactus', 'Крылатые существа с незначительными мутациями')`);
+    
+    const classAerialDistorted = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeAerial.lastID}, 'class', 'Искажённые Воздушные', 'Aeria Distortus', 'Крылатые существа со средними мутациями')`);
+    
+    const classAerialBeasts = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${typeAerial.lastID}, 'class', 'Бестии Воздушные', 'Aeria Bestia', 'Высшие воздушные хищники')`);
+
+    // Семейства (Families) - конкретные группы
+    // Наземные Затронутые
+    const familyBoar = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classTouched.lastID}, 'family', 'Каменные Кабаны', 'Sus Petraeus', 'Кабаны с укреплённой шкурой')`);
+    
+    const familyWolf = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classTouched.lastID}, 'family', 'Стальные Волки', 'Lupus Ferreus', 'Волки с металлизированными когтями')`);
+
+    // Наземные Искажённые
+    const familyVoltFox = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classDistorted.lastID}, 'family', 'Вольт-Лисы', 'Vulpes Electricus', 'Лисы с электрическими способностями')`);
+    
+    const familyMirrorCrab = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classDistorted.lastID}, 'family', 'Зеркальные Крабы', 'Cancer Reflectus', 'Крабы с отражающим панцирем')`);
+
+    // Наземные Бестии
+    const familyCrystalWolf = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classBeasts.lastID}, 'family', 'Кристальные Волки', 'Lupus Crystallis', 'Волки покрытые кристаллами')`);
+    
+    const familyRootStrangle = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classBeasts.lastID}, 'family', 'Корневики-Душители', 'Radix Strangulans', 'Растительные хищники')`);
+
+    // Водные
+    const familyDeepPike = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classAquaTouched.lastID}, 'family', 'Глубоководные Щуки', 'Esox Profundus', 'Щуки с металлическими зубами')`);
+    
+    const familyMistEel = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classAquaBeasts.lastID}, 'family', 'Туманные Угри', 'Anguilla Nebula', 'Гигантские угри, источающие токсичный туман')`);
+
+    // Воздушные
+    const familyRazorFalcon = await db.run(`INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (${classAerialTouched.lastID}, 'family', 'Бритвенные Соколы', 'Falco Novacula', 'Соколы с острыми как бритва перьями')`);
+
+    console.log('Seeding bestiary species...');
+
+    // Виды - Каменные Кабаны
+    await db.run(`INSERT INTO BestiarySpecies (family_id, name, name_latin, mutation_class, danger_rank, habitat_type, description, appearance, behavior, abilities, size_category, weight_min, weight_max, tags, is_hostile, is_active)
+      VALUES (
+        ${familyBoar.lastID},
+        'Каменный Кабан',
+        'Sus Petraeus Vulgaris',
+        'Затронутые',
+        'D',
+        'Наземные',
+        'Кабан, чья щетина и кожа приобрели прочность твёрдой древесины. Обитает в лесных зонах всех островов.',
+        'Массивный кабан с серо-коричневой шкурой, покрытой твёрдыми шипами вместо обычной щетины. Клыки имеют каменный оттенок.',
+        'Территориальное животное. Агрессивно при угрозе. Передвигается небольшими группами до 5 особей.',
+        'Усиленная защита, таран',
+        'Средние',
+        150,
+        250,
+        '[{"tag": "Защитный", "rank": "D"}]',
+        1,
+        1
+      )`);
+
+    await db.run(`INSERT INTO BestiarySpecies (family_id, name, name_latin, mutation_class, danger_rank, habitat_type, description, appearance, behavior, abilities, size_category, weight_min, weight_max, tags, is_hostile, is_active)
+      VALUES (
+        ${familyBoar.lastID},
+        'Горный Каменный Кабан',
+        'Sus Petraeus Montanus',
+        'Затронутые',
+        'C',
+        'Наземные',
+        'Подвид каменного кабана, адаптированный к горной местности. Более агрессивен и крупнее.',
+        'Крупнее обычного каменного кабана, с более тёмной, почти чёрной шкурой. Клыки длиннее и острее.',
+        'Одиночка или пары. Крайне территориален. Способен сбросить противника со скалы.',
+        'Усиленный таран, прыжок на 3-4 метра',
+        'Крупные',
+        250,
+        400,
+        '[{"tag": "Защитный", "rank": "C"}, {"tag": "Пробивающий", "rank": "D"}]',
+        1,
+        1
+      )`);
+
+    // Виды - Вольт-Лисы
+    await db.run(`INSERT INTO BestiarySpecies (family_id, name, name_latin, mutation_class, danger_rank, habitat_type, description, appearance, behavior, abilities, size_category, weight_min, weight_max, tags, is_hostile, is_active)
+      VALUES (
+        ${familyVoltFox.lastID},
+        'Вольт-Лиса',
+        'Vulpes Electricus',
+        'Искажённые',
+        'C',
+        'Наземные',
+        'Лиса, чей мех накапливает статическое электричество, позволяя выпускать разряды для оглушения добычи.',
+        'Изящная лиса с серебристо-синим мехом, который слегка искрится. Глаза светятся голубым.',
+        'Хитрый охотник. Использует засады. Избегает прямого боя, предпочитая оглушать цель.',
+        'Электрический разряд (оглушение), ускорение',
+        'Мелкие',
+        8,
+        15,
+        '[{"tag": "Контроль", "rank": "C"}, {"tag": "Неотвратимый", "rank": "D"}]',
+        1,
+        1
+      )`);
+
+    // Виды - Кристальные Волки (Бестия)
+    await db.run(`INSERT INTO BestiarySpecies (family_id, name, name_latin, mutation_class, danger_rank, habitat_type, description, appearance, behavior, abilities, size_category, weight_min, weight_max, tags, is_hostile, is_active)
+      VALUES (
+        ${familyCrystalWolf.lastID},
+        'Кристальный Волк',
+        'Lupus Crystallis',
+        'Бестии',
+        'B',
+        'Наземные',
+        'Хищник размером с медведя, чья шкура покрыта острыми кристаллическими наростами. Способен на короткое время становиться невидимым.',
+        'Огромный волк с прозрачно-белой шкурой, усеянной острыми кристаллами. Глаза светятся ледяным светом.',
+        'Верховный хищник. Охотится стаями до 3 особей. Использует невидимость для засад.',
+        'Камуфляж (невидимость), кристальные клыки, ледяное дыхание',
+        'Крупные',
+        300,
+        500,
+        '[{"tag": "Пробивающий", "rank": "B"}, {"tag": "Контроль", "rank": "C"}, {"tag": "Неотвратимый", "rank": "C"}]',
+        1,
+        1
+      )`);
+
+    // Водные виды
+    await db.run(`INSERT INTO BestiarySpecies (family_id, name, name_latin, mutation_class, danger_rank, habitat_type, description, appearance, behavior, abilities, size_category, weight_min, weight_max, tags, is_hostile, is_active)
+      VALUES (
+        ${familyDeepPike.lastID},
+        'Глубоководная Щука',
+        'Esox Profundus',
+        'Затронутые',
+        'D',
+        'Водные',
+        'Щука, чьи зубы способны прокусить тонкий листовой металл. Обитает в глубоких водах.',
+        'Крупная щука с металлическим отливом чешуи. Зубы блестят как сталь.',
+        'Агрессивный хищник. Атакует из засады. Способна перекусить стальной трос.',
+        'Металлические зубы, быстрый рывок',
+        'Средние',
+        20,
+        40,
+        '[{"tag": "Пробивающий", "rank": "D"}, {"tag": "Неотвратимый", "rank": "D"}]',
+        1,
+        1
+      )`);
+
+    await db.run(`INSERT INTO BestiarySpecies (family_id, name, name_latin, mutation_class, danger_rank, habitat_type, description, appearance, behavior, abilities, size_category, weight_min, weight_max, tags, is_hostile, is_active)
+      VALUES (
+        ${familyMistEel.lastID},
+        'Туманный Угорь',
+        'Anguilla Nebula',
+        'Бестии',
+        'A',
+        'Водные',
+        'Гигантский змей, обитающий в болотах и реках Эхо-Зон. Его тело источает густой едкий туман.',
+        'Змееподобное существо длиной до 15 метров. Чёрная чешуя постоянно источает серый туман.',
+        'Территориальный хищник. Использует туман для дезориентации жертвы перед атакой.',
+        'Токсичный туман, сжимающие кольца, регенерация',
+        'Гигантские',
+        800,
+        1500,
+        '[{"tag": "Контроль", "rank": "A"}, {"tag": "Пробивающий", "rank": "B"}, {"tag": "Область", "rank": "C"}]',
+        1,
+        1
+      )`);
+
+    // Воздушные виды
+    await db.run(`INSERT INTO BestiarySpecies (family_id, name, name_latin, mutation_class, danger_rank, habitat_type, description, appearance, behavior, abilities, size_category, weight_min, weight_max, tags, is_hostile, is_active)
+      VALUES (
+        ${familyRazorFalcon.lastID},
+        'Бритвенный Сокол',
+        'Falco Novacula',
+        'Затронутые',
+        'E',
+        'Воздушные',
+        'Сокол, чьи маховые перья на крыльях остры как лезвия. Способен рассекать цели в полёте.',
+        'Элегантный сокол с серебристым оперением. Перья крыльев блестят как отполированные клинки.',
+        'Быстрый охотник. Атакует на высокой скорости, рассекая жертву крыльями.',
+        'Режущие перья, пикирование',
+        'Мелкие',
+        3,
+        6,
+        '[{"tag": "Пробивающий", "rank": "E"}, {"tag": "Неотвратимый", "rank": "E"}]',
+        1,
+        1
+      )`);
+
+    console.log('Seeding bestiary locations...');
+
+    // Получаем ID видов для привязки локаций
+    const stoneBoar = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Каменный Кабан'`);
+    const mountainBoar = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Горный Каменный Кабан'`);
+    const voltFox = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Вольт-Лиса'`);
+    const crystalWolf = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Кристальный Волк'`);
+    const deepPike = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Глубоководная Щука'`);
+    const mistEel = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Туманный Угорь'`);
+    const razorFalcon = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Бритвенный Сокол'`);
+
+    // Локации для Каменного Кабана (повсеместный)
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${stoneBoar.id}, 'Хоши', 'Заповедник Муши', 'Лес', 0, 'Обычный', 'Высокая')`);
+    
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${stoneBoar.id}, 'Мидзу', 'Сердце Леса', 'Древний лес', 0, 'Обычный', 'Средняя')`);
+
+    // Горный Кабан
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${mountainBoar.id}, 'Хоши', 'Обитель Тихого Ветра', 'Горы', 0, 'Необычный', 'Малая')`);
+    
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${mountainBoar.id}, 'Мидзу', 'Горы Каменного Кулака', 'Горы', 0, 'Редкий', 'Малая')`);
+
+    // Вольт-Лиса (Искажённые - нужна Резидуальная Аура)
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${voltFox.id}, 'Куро', 'Ржавый Пояс', 'Промзона', 0, 'Необычный', 'Средняя')`);
+    
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${voltFox.id}, 'Кага', 'Фронтир', 'Промзона', 0, 'Редкий', 'Малая')`);
+
+    // Кристальный Волк (Бестия - только Эхо-Зоны)
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${crystalWolf.id}, 'Куро', 'Тёмный Континент', 'Аномальная зона', 1, 'Очень редкий', 'Единичные')`);
+    
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${crystalWolf.id}, 'Хоши', 'Долина Хэйан', 'Аномальная зона', 1, 'Легендарный', 'Единичные')`);
+
+    // Глубоководная Щука
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${deepPike.id}, 'Ичи', 'Порт-де-Люн', 'Морские воды', 0, 'Обычный', 'Средняя')`);
+
+    // Туманный Угорь (Бестия)
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${mistEel.id}, 'Мидзу', 'Болота у Сердца Леса', 'Болото', 1, 'Легендарный', 'Единичные')`);
+
+    // Бритвенный Сокол
+    await db.run(`INSERT INTO BestiaryLocations (species_id, island, region, biome, is_echo_zone, rarity, population_density)
+      VALUES (${razorFalcon.id}, 'Хоши', 'Горные пики', 'Горы', 0, 'Обычный', 'Средняя')`);
+
+    console.log('Seeding bestiary characteristics...');
+
+    // Характеристики для видов
+    await db.run(`INSERT INTO BestiaryCharacteristics (species_id, strength_tag, speed_tag, defense_tag, special_tag, drop_items, credit_value_min, credit_value_max)
+      VALUES (
+        ${stoneBoar.id},
+        'D',
+        'E',
+        'D',
+        NULL,
+        '["Каменная шкура", "Твёрдая щетина", "Мясо кабана"]',
+        50000,
+        150000
+      )`);
+
+    await db.run(`INSERT INTO BestiaryCharacteristics (species_id, strength_tag, speed_tag, defense_tag, special_tag, drop_items, credit_value_min, credit_value_max)
+      VALUES (
+        ${mountainBoar.id},
+        'C',
+        'D',
+        'C',
+        NULL,
+        '["Горная шкура", "Каменные клыки", "Редкое мясо"]',
+        200000,
+        500000
+      )`);
+
+    await db.run(`INSERT INTO BestiaryCharacteristics (species_id, strength_tag, speed_tag, defense_tag, special_tag, aura_signature, drop_items, credit_value_min, credit_value_max)
+      VALUES (
+        ${voltFox.id},
+        'D',
+        'C',
+        'E',
+        'Электричество',
+        'Статический заряд',
+        '["Электромех", "Заряженный хвост", "Искажённое мясо"]',
+        500000,
+        1500000
+      )`);
+
+    await db.run(`INSERT INTO BestiaryCharacteristics (species_id, strength_tag, speed_tag, defense_tag, special_tag, aura_signature, drop_items, credit_value_min, credit_value_max)
+      VALUES (
+        ${crystalWolf.id},
+        'B',
+        'B',
+        'B',
+        'Камуфляж, Лёд',
+        'Кристаллическая Аура',
+        '["Кристалл невидимости", "Ледяное сердце", "Шкура Бестии"]',
+        50000000,
+        150000000
+      )`);
+
+    await db.run(`INSERT INTO BestiaryCharacteristics (species_id, strength_tag, speed_tag, defense_tag, special_tag, drop_items, credit_value_min, credit_value_max)
+      VALUES (
+        ${deepPike.id},
+        'D',
+        'D',
+        'E',
+        NULL,
+        '["Металлические зубы", "Рыбье мясо", "Прочная чешуя"]',
+        100000,
+        300000
+      )`);
+
+    await db.run(`INSERT INTO BestiaryCharacteristics (species_id, strength_tag, speed_tag, defense_tag, special_tag, aura_signature, drop_items, credit_value_min, credit_value_max)
+      VALUES (
+        ${mistEel.id},
+        'A',
+        'B',
+        'A',
+        'Туман, Регенерация',
+        'Токсичная Аура',
+        '["Туманное сердце", "Ядовитая чешуя", "Эссенция регенерации"]',
+        200000000,
+        500000000
+      )`);
+
+    await db.run(`INSERT INTO BestiaryCharacteristics (species_id, strength_tag, speed_tag, defense_tag, special_tag, drop_items, credit_value_min, credit_value_max)
+      VALUES (
+        ${razorFalcon.id},
+        'E',
+        'D',
+        'F',
+        NULL,
+        '["Режущие перья", "Лёгкие кости", "Мясо птицы"]',
+        30000,
+        80000
+      )`);
+
+    console.log('Bestiary seeded successfully!');
+  } catch (error) {
+    console.error('Error seeding bestiary:', error);
+    throw error;
+  }
 }

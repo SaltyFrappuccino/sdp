@@ -30,3 +30,5 @@ export { AdminCollectionsPanel } from './AdminCollectionsPanel';
 export { CryptoExchangePanel } from './CryptoExchangePanel';
 export { PurchasesPanel } from './PurchasesPanel';
 export { CollectionsPanel } from './CollectionsPanel';
+export { default as BestiaryPanel } from './BestiaryPanel';
+export { default as AdminBestiaryPanel } from './AdminBestiaryPanel';

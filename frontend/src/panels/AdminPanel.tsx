@@ -530,6 +530,9 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_factions')}>
             🔰 Управление фракциями
           </Button>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_bestiary')}>
+            🐾 Управление бестиарием
+          </Button>
         </ButtonGroup>
       </Div>
     </Group>

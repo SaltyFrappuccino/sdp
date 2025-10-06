@@ -6620,4 +6620,339 @@ router.get('/factions/search', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================
+// Bestiary API
+// ============================================
+
+// Получить всю таксономию (иерархию)
+router.get('/bestiary/taxonomy', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const taxonomy = await db.all(`
+      SELECT * FROM BestiaryTaxonomy ORDER BY id
+    `);
+    await db.close();
+    res.json(taxonomy);
+  } catch (error) {
+    console.error('Ошибка при получении таксономии:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Получить все виды с полной информацией
+router.get('/bestiary/species', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const species = await db.all(`
+      SELECT 
+        s.*,
+        GROUP_CONCAT(DISTINCT l.island) as islands,
+        c.strength_tag,
+        c.speed_tag,
+        c.defense_tag,
+        c.special_tag,
+        c.aura_signature,
+        c.drop_items,
+        c.credit_value_min,
+        c.credit_value_max
+      FROM BestiarySpecies s
+      LEFT JOIN BestiaryLocations l ON s.id = l.species_id
+      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+      WHERE s.is_active = 1
+      GROUP BY s.id
+      ORDER BY s.danger_rank DESC, s.name
+    `);
+    await db.close();
+    res.json(species);
+  } catch (error) {
+    console.error('Ошибка при получении видов:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Получить один вид по ID с полной информацией
+router.get('/bestiary/species/:id', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const { id } = req.params;
+    
+    const species = await db.get(`
+      SELECT s.* FROM BestiarySpecies s WHERE s.id = ?
+    `, id);
+    
+    if (!species) {
+      await db.close();
+      return res.status(404).json({ message: 'Вид не найден' });
+    }
+    
+    const locations = await db.all(`
+      SELECT * FROM BestiaryLocations WHERE species_id = ?
+    `, id);
+    
+    const characteristics = await db.get(`
+      SELECT * FROM BestiaryCharacteristics WHERE species_id = ?
+    `, id);
+    
+    const family = await db.get(`
+      SELECT * FROM BestiaryTaxonomy WHERE id = ?
+    `, species.family_id);
+    
+    await db.close();
+    res.json({ ...species, locations, characteristics, family });
+  } catch (error) {
+    console.error('Ошибка при получении вида:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Фильтрация видов (для игроков)
+router.get('/bestiary/filter', async (req: Request, res: Response) => {
+  try {
+    const { island, mutation_class, danger_rank, habitat_type } = req.query;
+    const db = await initDB();
+    
+    let query = `
+      SELECT DISTINCT
+        s.*,
+        GROUP_CONCAT(DISTINCT l.island) as islands
+      FROM BestiarySpecies s
+      LEFT JOIN BestiaryLocations l ON s.id = l.species_id
+      WHERE s.is_active = 1
+    `;
+    
+    const params: any[] = [];
+    
+    if (island) {
+      query += ` AND l.island = ?`;
+      params.push(island);
+    }
+    if (mutation_class) {
+      query += ` AND s.mutation_class = ?`;
+      params.push(mutation_class);
+    }
+    if (danger_rank) {
+      query += ` AND s.danger_rank = ?`;
+      params.push(danger_rank);
+    }
+    if (habitat_type) {
+      query += ` AND s.habitat_type = ?`;
+      params.push(habitat_type);
+    }
+    
+    query += ` GROUP BY s.id ORDER BY s.danger_rank DESC, s.name`;
+    
+    const species = await db.all(query, ...params);
+    await db.close();
+    res.json(species);
+  } catch (error) {
+    console.error('Ошибка при фильтрации видов:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// ============================================
+// Admin Bestiary API
+// ============================================
+
+// Создать новую таксономическую единицу
+router.post('/admin/bestiary/taxonomy', async (req: Request, res: Response) => {
+  try {
+    const { parent_id, level, name, name_latin, description } = req.body;
+    const db = await initDB();
+    
+    const result = await db.run(`
+      INSERT INTO BestiaryTaxonomy (parent_id, level, name, name_latin, description)
+      VALUES (?, ?, ?, ?, ?)
+    `, parent_id || null, level, name, name_latin, description);
+    
+    await db.close();
+    res.json({ id: result.lastID, message: 'Таксон создан успешно' });
+  } catch (error) {
+    console.error('Ошибка при создании таксона:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Обновить таксономическую единицу
+router.put('/admin/bestiary/taxonomy/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { parent_id, level, name, name_latin, description } = req.body;
+    const db = await initDB();
+    
+    await db.run(`
+      UPDATE BestiaryTaxonomy
+      SET parent_id = ?, level = ?, name = ?, name_latin = ?, description = ?
+      WHERE id = ?
+    `, parent_id || null, level, name, name_latin, description, id);
+    
+    await db.close();
+    res.json({ message: 'Таксон обновлён успешно' });
+  } catch (error) {
+    console.error('Ошибка при обновлении таксона:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Удалить таксономическую единицу
+router.delete('/admin/bestiary/taxonomy/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const db = await initDB();
+    
+    await db.run(`DELETE FROM BestiaryTaxonomy WHERE id = ?`, id);
+    
+    await db.close();
+    res.json({ message: 'Таксон удалён успешно' });
+  } catch (error) {
+    console.error('Ошибка при удалении таксона:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Создать новый вид
+router.post('/admin/bestiary/species', async (req: Request, res: Response) => {
+  try {
+    const {
+      family_id, name, name_latin, mutation_class, danger_rank, habitat_type,
+      description, appearance, behavior, abilities, size_category,
+      weight_min, weight_max, tags, image_url, is_hostile, is_active
+    } = req.body;
+    
+    const db = await initDB();
+    
+    const result = await db.run(`
+      INSERT INTO BestiarySpecies (
+        family_id, name, name_latin, mutation_class, danger_rank, habitat_type,
+        description, appearance, behavior, abilities, size_category,
+        weight_min, weight_max, tags, image_url, is_hostile, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, family_id, name, name_latin, mutation_class, danger_rank, habitat_type,
+       description, appearance, behavior, abilities, size_category,
+       weight_min, weight_max, tags, image_url, is_hostile ? 1 : 0, is_active ? 1 : 0);
+    
+    await db.close();
+    res.json({ id: result.lastID, message: 'Вид создан успешно' });
+  } catch (error) {
+    console.error('Ошибка при создании вида:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Обновить вид
+router.put('/admin/bestiary/species/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      family_id, name, name_latin, mutation_class, danger_rank, habitat_type,
+      description, appearance, behavior, abilities, size_category,
+      weight_min, weight_max, tags, image_url, is_hostile, is_active
+    } = req.body;
+    
+    const db = await initDB();
+    
+    await db.run(`
+      UPDATE BestiarySpecies SET
+        family_id = ?, name = ?, name_latin = ?, mutation_class = ?, 
+        danger_rank = ?, habitat_type = ?, description = ?, appearance = ?,
+        behavior = ?, abilities = ?, size_category = ?, weight_min = ?,
+        weight_max = ?, tags = ?, image_url = ?, is_hostile = ?, is_active = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, family_id, name, name_latin, mutation_class, danger_rank, habitat_type,
+       description, appearance, behavior, abilities, size_category,
+       weight_min, weight_max, tags, image_url, is_hostile ? 1 : 0, is_active ? 1 : 0, id);
+    
+    await db.close();
+    res.json({ message: 'Вид обновлён успешно' });
+  } catch (error) {
+    console.error('Ошибка при обновлении вида:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Удалить вид
+router.delete('/admin/bestiary/species/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const db = await initDB();
+    
+    await db.run(`DELETE FROM BestiarySpecies WHERE id = ?`, id);
+    
+    await db.close();
+    res.json({ message: 'Вид удалён успешно' });
+  } catch (error) {
+    console.error('Ошибка при удалении вида:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Добавить локацию для вида
+router.post('/admin/bestiary/locations', async (req: Request, res: Response) => {
+  try {
+    const {
+      species_id, island, region, biome, is_echo_zone,
+      rarity, population_density, seasonal_availability
+    } = req.body;
+    
+    const db = await initDB();
+    
+    const result = await db.run(`
+      INSERT INTO BestiaryLocations (
+        species_id, island, region, biome, is_echo_zone,
+        rarity, population_density, seasonal_availability
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, species_id, island, region, biome, is_echo_zone ? 1 : 0,
+       rarity, population_density, seasonal_availability);
+    
+    await db.close();
+    res.json({ id: result.lastID, message: 'Локация добавлена успешно' });
+  } catch (error) {
+    console.error('Ошибка при добавлении локации:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Обновить характеристики вида
+router.put('/admin/bestiary/characteristics/:species_id', async (req: Request, res: Response) => {
+  try {
+    const { species_id } = req.params;
+    const {
+      strength_tag, speed_tag, defense_tag, special_tag,
+      aura_signature, drop_items, credit_value_min, credit_value_max
+    } = req.body;
+    
+    const db = await initDB();
+    
+    // Проверяем существуют ли характеристики
+    const existing = await db.get(`
+      SELECT id FROM BestiaryCharacteristics WHERE species_id = ?
+    `, species_id);
+    
+    if (existing) {
+      await db.run(`
+        UPDATE BestiaryCharacteristics SET
+          strength_tag = ?, speed_tag = ?, defense_tag = ?, special_tag = ?,
+          aura_signature = ?, drop_items = ?, credit_value_min = ?, credit_value_max = ?
+        WHERE species_id = ?
+      `, strength_tag, speed_tag, defense_tag, special_tag,
+         aura_signature, drop_items, credit_value_min, credit_value_max, species_id);
+    } else {
+      await db.run(`
+        INSERT INTO BestiaryCharacteristics (
+          species_id, strength_tag, speed_tag, defense_tag, special_tag,
+          aura_signature, drop_items, credit_value_min, credit_value_max
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, species_id, strength_tag, speed_tag, defense_tag, special_tag,
+         aura_signature, drop_items, credit_value_min, credit_value_max);
+    }
+    
+    await db.close();
+    res.json({ message: 'Характеристики обновлены успешно' });
+  } catch (error) {
+    console.error('Ошибка при обновлении характеристик:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
 export default router;

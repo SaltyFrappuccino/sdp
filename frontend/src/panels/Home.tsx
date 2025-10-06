@@ -159,6 +159,12 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
                   <span>Справочник</span>
                 </div>
               </Button>
+              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('bestiary')} stretched style={{ minHeight: '80px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '24px' }}>🐾</span>
+                  <span>Бестиарий</span>
+                </div>
+              </Button>
               <Button size="l" mode="secondary" onClick={() => routeNavigator.push('events')} stretched style={{ minHeight: '80px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '24px' }}>🎪</span>

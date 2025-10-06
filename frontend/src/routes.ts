@@ -43,6 +43,8 @@ export const DEFAULT_VIEW_PANELS = {
   ADMIN_CRYPTO: 'admin_crypto',
   ADMIN_PURCHASES: 'admin_purchases',
   ADMIN_COLLECTIONS: 'admin_collections',
+  BESTIARY: 'bestiary',
+  ADMIN_BESTIARY: 'admin_bestiary',
 };
 
 export const routes = RoutesConfig.create([
@@ -80,6 +82,8 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_CRYPTO, `/${DEFAULT_VIEW_PANELS.ADMIN_CRYPTO}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_PURCHASES, `/${DEFAULT_VIEW_PANELS.ADMIN_PURCHASES}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_COLLECTIONS, `/${DEFAULT_VIEW_PANELS.ADMIN_COLLECTIONS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.BESTIARY, `/${DEFAULT_VIEW_PANELS.BESTIARY}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_BESTIARY, `/${DEFAULT_VIEW_PANELS.ADMIN_BESTIARY}`, []),
     ]),
   ]),
 ]);
