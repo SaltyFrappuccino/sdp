@@ -2304,11 +2304,6 @@ export async function seedHuntingData(db: any) {
     const hoshiForestId = hoshiForest.lastInsertRowid || hoshiForest.lastID;
     const hoshiEchoId = hoshiEcho.lastInsertRowid || hoshiEcho.lastID;
     const kuroEchoId = kuroEcho.lastInsertRowid || kuroEcho.lastID;
-    
-    const aerialTouched2Id = aerialTouched2.lastInsertRowid || aerialTouched2.lastID;
-    const aerialDistorted2Id = aerialDistorted2.lastInsertRowid || aerialDistorted2.lastID;
-    const terrestrialTouched2Id = terrestrialTouched2.lastInsertRowid || terrestrialTouched2.lastID;
-    const terrestrialDistorted2Id = terrestrialDistorted2.lastInsertRowid || terrestrialDistorted2.lastID;
 
     // Привязываем воздушных существ к локациям
     for (const creatureId of aerialCreatures) {
