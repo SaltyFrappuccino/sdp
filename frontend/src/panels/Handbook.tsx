@@ -10,11 +10,9 @@ import {
   Spinner,
   Accordion,
   Title,
-  Text,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import ReactMarkdown from 'react-markdown';
-import { Icon28BookOutline, Icon28ListOutline } from '@vkontakte/icons';
 
 interface NavIdProps {
   id: string;
@@ -24,7 +22,7 @@ interface TOCItem {
   id: string;
   title: string;
   level: number;
-  children?: TOCItem[];
+  children: TOCItem[];
 }
 
 const STORAGE_KEY = 'handbook_scroll_position';
@@ -36,17 +34,18 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [toc, setToc] = useState<TOCItem[]>([]);
   const [activeSection, setActiveSection] = useState<string>('');
-  const [showTOC, setShowTOC] = useState(true);
 
   // Загрузка markdown файла
   useEffect(() => {
     fetch('/Основная Статья.md')
       .then((response) => response.text())
       .then((text) => {
-        setMarkdownContent(text);
+        // Очищаем markdown от якорей в тексте
+        const cleanedText = text.replace(/<a name="[^"]+"><\/a>/g, '');
+        setMarkdownContent(cleanedText);
         setLoading(false);
         
-        // Парсим оглавление из markdown
+        // Парсим оглавление из оригинального текста (с якорями)
         const tocItems = parseTableOfContents(text);
         setToc(tocItems);
         
@@ -59,7 +58,7 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
               element.scrollIntoView({ behavior: 'smooth' });
               setActiveSection(savedPosition);
             }
-          }, 100);
+          }, 300);
         }
       })
       .catch((error) => {
@@ -71,43 +70,66 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
   // Парсинг оглавления из markdown
   const parseTableOfContents = (content: string): TOCItem[] => {
     const lines = content.split('\n');
-    const tocItems: TOCItem[] = [];
-    const stack: TOCItem[] = [];
+    const flatItems: TOCItem[] = [];
 
     lines.forEach((line) => {
-      // Ищем заголовки (###, ####, #####)
-      const match = line.match(/^(#{1,6})\s+(.+)$/);
+      // Ищем заголовки (от ### до ######, игнорируем # и ##)
+      const match = line.match(/^(#{3,6})\s+(.+)$/);
       if (match) {
         const level = match[1].length;
-        const title = match[2].replace(/<a name="[^"]+"><\/a>/, '').trim();
+        let title = match[2];
         
-        // Извлекаем ID из якоря или создаем из заголовка
+        // Извлекаем ID из якоря
         const anchorMatch = line.match(/<a name="([^"]+)"><\/a>/);
-        const anchorId = anchorMatch ? anchorMatch[1] : slugify(title);
+        let anchorId = '';
+        
+        if (anchorMatch) {
+          anchorId = anchorMatch[1];
+          // Удаляем якорь из заголовка
+          title = title.replace(/<a name="[^"]+"><\/a>,?/, '').trim();
+        } else {
+          // Создаем slug из заголовка
+          anchorId = slugify(title);
+        }
 
-        const item: TOCItem = {
+        flatItems.push({
           id: anchorId,
           title,
           level,
           children: [],
-        };
-
-        // Строим иерархию
-        while (stack.length > 0 && stack[stack.length - 1].level >= level) {
-          stack.pop();
-        }
-
-        if (stack.length === 0) {
-          tocItems.push(item);
-        } else {
-          stack[stack.length - 1].children!.push(item);
-        }
-
-        stack.push(item);
+        });
       }
     });
 
-    return tocItems;
+    // Строим иерархию
+    return buildHierarchy(flatItems);
+  };
+
+  // Построение иерархической структуры
+  const buildHierarchy = (items: TOCItem[]): TOCItem[] => {
+    const root: TOCItem[] = [];
+    const stack: TOCItem[] = [];
+
+    items.forEach((item) => {
+      const newItem = { ...item, children: [] };
+
+      // Убираем из стека все элементы того же или более высокого уровня
+      while (stack.length > 0 && stack[stack.length - 1].level >= newItem.level) {
+        stack.pop();
+      }
+
+      if (stack.length === 0) {
+        // Это элемент верхнего уровня
+        root.push(newItem);
+      } else {
+        // Добавляем как дочерний к последнему в стеке
+        stack[stack.length - 1].children.push(newItem);
+      }
+
+      stack.push(newItem);
+    });
+
+    return root;
   };
 
   // Создание slug из заголовка
@@ -162,25 +184,39 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
     }
   };
 
-  // Рендер элемента оглавления
-  const renderTOCItem = (item: TOCItem, depth: number = 0) => {
+  // Рендер элемента оглавления (рекурсивный)
+  const renderTOCItem = (item: TOCItem, depth: number = 0): React.ReactNode => {
     const hasChildren = item.children && item.children.length > 0;
     const isActive = activeSection === item.id;
 
-    if (hasChildren && depth === 0) {
-      // Главы - используем Accordion
+    if (hasChildren) {
+      // Элемент с детьми - используем Accordion
       return (
-        <Accordion key={item.id}>
-          <Accordion.Summary>
-            <Text weight="2">{item.title}</Text>
-          </Accordion.Summary>
-          <Accordion.Content>
-            {item.children!.map((child) => renderTOCItem(child, depth + 1))}
-          </Accordion.Content>
-        </Accordion>
-      );
+        <div key={item.id} style={{ marginLeft: `${depth * 8}px` }}>
+          <Accordion>
+            <Accordion.Summary>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  scrollToSection(item.id);
+                }}
+                style={{
+                  fontWeight: isActive ? 'bold' : depth === 0 ? '600' : 'normal',
+                  color: isActive ? 'var(--vkui--color_text_accent)' : undefined,
+                  cursor: 'pointer',
+                }}
+              >
+                {item.title}
+                </div>
+            </Accordion.Summary>
+            <Accordion.Content>
+              {item.children.map((child) => renderTOCItem(child, depth + 1))}
+            </Accordion.Content>
+          </Accordion>
+            </div>
+          );
     } else {
-      // Обычные секции - используем Cell
+      // Элемент без детей - обычная ячейка
       return (
         <Cell
           key={item.id}
@@ -188,8 +224,9 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
           style={{
             paddingLeft: `${depth * 16 + 12}px`,
             cursor: 'pointer',
-            backgroundColor: isActive ? 'var(--vkui--color_background_accent)' : undefined,
+            backgroundColor: isActive ? 'var(--vkui--color_background_accent_themed)' : undefined,
             fontWeight: isActive ? 'bold' : 'normal',
+            fontSize: depth > 2 ? '14px' : '15px',
           }}
         >
           {item.title}
@@ -200,23 +237,22 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
 
   // Кастомный рендерер для заголовков с якорями
   const renderHeading = ({ level, children }: any) => {
-    const text = children.toString();
-    const anchorMatch = text.match(/<a name="([^"]+)"><\/a>/);
-    const anchorId = anchorMatch ? anchorMatch[1] : slugify(text);
-    const cleanText = text.replace(/<a name="[^"]+"><\/a>/, '').trim();
+    const text = String(children);
+    const anchorId = slugify(text);
 
     const HeadingTag = `h${level}` as keyof JSX.IntrinsicElements;
 
+    const styles: React.CSSProperties = {
+      scrollMarginTop: '80px',
+      marginTop: level === 1 ? '32px' : level === 2 ? '28px' : level === 3 ? '24px' : level === 4 ? '20px' : '16px',
+      marginBottom: level <= 3 ? '16px' : '12px',
+      fontWeight: level <= 3 ? 'bold' : level === 4 ? '600' : '500',
+      fontSize: level === 1 ? '28px' : level === 2 ? '24px' : level === 3 ? '20px' : level === 4 ? '18px' : level === 5 ? '16px' : '14px',
+    };
+
     return (
-      <HeadingTag
-        id={anchorId}
-        style={{
-          scrollMarginTop: '70px',
-          marginTop: level === 1 ? '24px' : level === 2 ? '20px' : '16px',
-          marginBottom: '12px',
-        }}
-      >
-        {cleanText}
+      <HeadingTag id={anchorId} style={styles}>
+        {text}
       </HeadingTag>
     );
   };
@@ -239,28 +275,20 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
         Справочник
       </PanelHeader>
-
+      
       <Group>
-        <Search
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Поиск по справочнику..."
+          <Search
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск по справочнику..."
         />
       </Group>
 
-      <Group>
-        <Cell
-          before={showTOC ? <Icon28ListOutline /> : <Icon28BookOutline />}
-          onClick={() => setShowTOC(!showTOC)}
-          style={{ cursor: 'pointer', fontWeight: 'bold' }}
-        >
-          {showTOC ? 'Скрыть оглавление' : 'Показать оглавление'}
-        </Cell>
-      </Group>
-
-      {showTOC && !searchQuery && (
-        <Group header={<Title level="2" style={{ padding: '12px' }}>Оглавление</Title>}>
-          {toc.map((item) => renderTOCItem(item))}
+      {!searchQuery && (
+        <Group header={<Title level="2" style={{ padding: '12px 16px' }}>📑 Оглавление</Title>}>
+          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            {toc.map((item) => renderTOCItem(item, 0))}
+            </div>
         </Group>
       )}
 
@@ -268,7 +296,7 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
         <Div
           style={{
             padding: '16px',
-            lineHeight: '1.6',
+            lineHeight: '1.7',
           }}
           className="markdown-content"
         >
@@ -282,24 +310,30 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
               h6: renderHeading,
               // Стилизация таблиц
               table: ({ children }) => (
-                <div style={{ overflowX: 'auto', margin: '16px 0' }}>
+                <div style={{ overflowX: 'auto', margin: '20px 0' }}>
                   <table
                     style={{
                       width: '100%',
                       borderCollapse: 'collapse',
                       border: '1px solid var(--vkui--color_separator_primary)',
+                      fontSize: '14px',
                     }}
                   >
                     {children}
                   </table>
-                </div>
+              </div>
+              ),
+              thead: ({ children }) => (
+                <thead style={{ backgroundColor: 'var(--vkui--color_background_secondary)' }}>
+                  {children}
+                </thead>
               ),
               th: ({ children }) => (
                 <th
                   style={{
-                    padding: '8px',
+                    padding: '12px 8px',
                     borderBottom: '2px solid var(--vkui--color_separator_primary)',
-                    backgroundColor: 'var(--vkui--color_background_secondary)',
+                    border: '1px solid var(--vkui--color_separator_primary)',
                     textAlign: 'left',
                     fontWeight: 'bold',
                   }}
@@ -310,8 +344,8 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
               td: ({ children }) => (
                 <td
                   style={{
-                    padding: '8px',
-                    borderBottom: '1px solid var(--vkui--color_separator_primary)',
+                    padding: '10px 8px',
+                    border: '1px solid var(--vkui--color_separator_primary)',
                   }}
                 >
                   {children}
@@ -326,6 +360,7 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
                       padding: '2px 6px',
                       borderRadius: '4px',
                       fontSize: '0.9em',
+                      fontFamily: 'monospace',
                     }}
                   >
                     {children}
@@ -334,30 +369,34 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
                   <pre
                     style={{
                       backgroundColor: 'var(--vkui--color_background_secondary)',
-                      padding: '12px',
+                      padding: '16px',
                       borderRadius: '8px',
                       overflow: 'auto',
-                      margin: '12px 0',
+                      margin: '16px 0',
+                      fontSize: '14px',
+                      lineHeight: '1.5',
                     }}
                   >
-                    <code>{children}</code>
+                    <code style={{ fontFamily: 'monospace' }}>{children}</code>
                   </pre>
                 ),
               // Стилизация списков
               ul: ({ children }) => (
-                <ul style={{ paddingLeft: '24px', margin: '8px 0' }}>{children}</ul>
+                <ul style={{ paddingLeft: '24px', margin: '12px 0' }}>{children}</ul>
               ),
               ol: ({ children }) => (
-                <ol style={{ paddingLeft: '24px', margin: '8px 0' }}>{children}</ol>
+                <ol style={{ paddingLeft: '24px', margin: '12px 0' }}>{children}</ol>
               ),
-              li: ({ children }) => <li style={{ marginBottom: '4px' }}>{children}</li>,
+              li: ({ children }) => <li style={{ marginBottom: '6px' }}>{children}</li>,
+              // Стилизация параграфов
+              p: ({ children }) => <p style={{ margin: '12px 0', lineHeight: '1.7' }}>{children}</p>,
               // Стилизация цитат
               blockquote: ({ children }) => (
                 <blockquote
-                  style={{
+                          style={{ 
                     borderLeft: '4px solid var(--vkui--color_accent_blue)',
                     paddingLeft: '16px',
-                    margin: '16px 0',
+                    margin: '20px 0',
                     fontStyle: 'italic',
                     color: 'var(--vkui--color_text_secondary)',
                   }}
@@ -370,10 +409,18 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
                 <hr
                   style={{
                     border: 'none',
-                    borderTop: '1px solid var(--vkui--color_separator_primary)',
-                    margin: '24px 0',
+                    borderTop: '2px solid var(--vkui--color_separator_primary)',
+                    margin: '32px 0',
                   }}
                 />
+              ),
+              // Жирный текст
+              strong: ({ children }) => (
+                <strong style={{ fontWeight: 'bold' }}>{children}</strong>
+              ),
+              // Курсив
+              em: ({ children }) => (
+                <em style={{ fontStyle: 'italic' }}>{children}</em>
               ),
             }}
           >
@@ -387,15 +434,19 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
           font-size: 28px;
           font-weight: bold;
           color: var(--vkui--color_text_primary);
+          border-bottom: 2px solid var(--vkui--color_separator_primary);
+          padding-bottom: 8px;
         }
         .markdown-content h2 {
           font-size: 24px;
           font-weight: bold;
           color: var(--vkui--color_text_primary);
+          border-bottom: 1px solid var(--vkui--color_separator_primary);
+          padding-bottom: 6px;
         }
         .markdown-content h3 {
           font-size: 20px;
-          font-weight: 600;
+          font-weight: bold;
           color: var(--vkui--color_text_primary);
         }
         .markdown-content h4 {
@@ -405,16 +456,13 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
         }
         .markdown-content h5 {
           font-size: 16px;
-          font-weight: 600;
-          color: var(--vkui--color_text_secondary);
+          font-weight: 500;
+          color: var(--vkui--color_text_primary);
         }
         .markdown-content h6 {
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 500;
           color: var(--vkui--color_text_secondary);
-        }
-        .markdown-content p {
-          margin: 12px 0;
         }
         .markdown-content a {
           color: var(--vkui--color_accent_blue);
@@ -423,14 +471,7 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
         .markdown-content a:hover {
           text-decoration: underline;
         }
-        .markdown-content strong {
-          font-weight: bold;
-        }
-        .markdown-content em {
-          font-style: italic;
-        }
       `}</style>
     </Panel>
   );
 };
-
