@@ -21,7 +21,10 @@ import {
   Avatar,
   Progress,
   Checkbox,
-  NativeSelect
+  NativeSelect,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
@@ -80,6 +83,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
   const [characterId, setCharacterId] = useState<number | null>(null);
   const [credits, setCredits] = useState<number>(0);
+  const [catchModal, setCatchModal] = useState<{ show: boolean; fish?: any }>({ show: false });
 
   useEffect(() => {
     loadCharacters();
@@ -188,11 +192,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
       const result = await response.json();
       if (result.success) {
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)}>
-            🎣 Поймана {result.fish.name}! Вес: {result.fish.weight} кг
-          </Snackbar>
-        );
+        setCatchModal({ show: true, fish: result.fish });
         loadInventory();
       } else {
         setSnackbar(
@@ -450,26 +450,81 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             }, {})
           ).map(([type, items]: [string, any]) => (
             <Group key={type} header={<Header>{type}</Header>}>
-              {items.map((item: any) => (
-                <Cell
-                  key={item.id}
-                  subtitle={`${item.quality} • ${item.description}`}
-                  after={
-                    <Button size="s" onClick={() => handleBuyGear(item.id, item.price)}>
-                      {item.price.toLocaleString()} ₭
-                    </Button>
-                  }
-                  multiline
-                >
-                  {item.name}
-                </Cell>
-              ))}
+              {items.map((item: any) => {
+                const ownedGear = gear.find(g => g.id === item.id);
+                const isOwned = !!ownedGear;
+                const isConsumable = item.is_consumable;
+                
+                return (
+                  <Cell
+                    key={item.id}
+                    subtitle={`${item.quality} • ${item.description}`}
+                    after={
+                      isOwned && !isConsumable ? (
+                        <Button size="s" mode="secondary" disabled>
+                          Присутствует
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="s" 
+                          onClick={() => handleBuyGear(item.id, item.price)}
+                          disabled={credits < item.price}
+                        >
+                          {item.price.toLocaleString()} ₭
+                        </Button>
+                      )
+                    }
+                    multiline
+                  >
+                    {item.name}
+                  </Cell>
+                );
+              })}
             </Group>
           ))}
         </Group>
       )}
 
       {snackbar}
+      
+      {catchModal.show && (
+        <ModalRoot activeModal="catch">
+          <ModalPage
+            id="catch"
+            onClose={() => setCatchModal({ show: false })}
+            header={
+              <ModalPageHeader>
+                🎣 Улов!
+              </ModalPageHeader>
+            }
+          >
+            <Group>
+              <Card>
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🐟</div>
+                  <Title level="2" style={{ marginBottom: '8px' }}>
+                    {catchModal.fish?.name}
+                  </Title>
+                  <Text weight="2" style={{ marginBottom: '8px' }}>
+                    Вес: {catchModal.fish?.weight} кг
+                  </Text>
+                  <Text style={{ marginBottom: '16px', color: 'var(--text_secondary)' }}>
+                    {catchModal.fish?.description}
+                  </Text>
+                  <Button 
+                    size="l" 
+                    mode="primary" 
+                    onClick={() => setCatchModal({ show: false })}
+                    stretched
+                  >
+                    Отлично!
+                  </Button>
+                </div>
+              </Card>
+            </Group>
+          </ModalPage>
+        </ModalRoot>
+      )}
     </Panel>
   );
 };

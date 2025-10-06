@@ -16,7 +16,12 @@ import {
   Snackbar,
   Avatar,
   Checkbox,
-  NativeSelect
+  NativeSelect,
+  ModalRoot,
+  ModalPage,
+  ModalPageHeader,
+  Card,
+  ButtonGroup
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
@@ -70,6 +75,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [inventory, setInventory] = useState<Hunt[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [selectedGear, setSelectedGear] = useState<number[]>([]);
+  const [huntType, setHuntType] = useState<'aerial' | 'terrestrial'>('terrestrial');
   const [loading, setLoading] = useState(false);
   const [isHunting, setIsHunting] = useState(false);
   const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
@@ -77,12 +83,19 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
   const [characterId, setCharacterId] = useState<number | null>(null);
   const [credits, setCredits] = useState<number>(0);
+  const [huntModal, setHuntModal] = useState<{ show: boolean; creature?: any; loot?: any[]; credits?: number }>({ show: false });
 
   useEffect(() => {
     loadCharacters();
     loadLocations();
     loadShopGear();
   }, []);
+
+  useEffect(() => {
+    loadGear();
+    loadShopGear();
+    setSelectedGear([]); // Сбрасываем выбранное снаряжение при смене типа охоты
+  }, [huntType, characterId]);
 
   useEffect(() => {
     if (characterId) {
@@ -131,7 +144,15 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/hunting/gear/${characterId}`);
       const data = await response.json();
-      setGear(data);
+      // Фильтруем снаряжение по типу охоты
+      const filteredGear = data.filter((item: any) => {
+        if (huntType === 'aerial') {
+          return item.type === 'Оружие' || item.type === 'Броня' || item.type === 'Воздушная ловушка';
+        } else {
+          return item.type === 'Оружие' || item.type === 'Броня' || item.type === 'Наземная ловушка';
+        }
+      });
+      setGear(filteredGear);
     } catch (error) {
       console.error('Ошибка при загрузке снаряжения:', error);
     }
@@ -141,8 +162,15 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/hunting/gear`);
       const data = await response.json();
-      // Показываем только покупаемое снаряжение (не базовое)
-      const shopItems = data.filter((item: any) => !item.is_basic);
+      // Показываем только покупаемое снаряжение (не базовое) и фильтруем по типу охоты
+      const shopItems = data.filter((item: any) => {
+        if (item.is_basic) return false;
+        if (huntType === 'aerial') {
+          return item.type === 'Оружие' || item.type === 'Броня' || item.type === 'Воздушная ловушка';
+        } else {
+          return item.type === 'Оружие' || item.type === 'Броня' || item.type === 'Наземная ловушка';
+        }
+      });
       
       // Сортируем по типу и качеству (от худшего к лучшему)
       const qualityOrder: { [key: string]: number } = { 'Обычное': 1, 'Хорошее': 2, 'Отличное': 3, 'Эпическое': 4, 'Легендарное': 5 };
@@ -179,17 +207,19 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
         body: JSON.stringify({
           character_id: characterId,
           location_id: selectedLocation,
-          gear_ids: selectedGear
+          gear_ids: selectedGear,
+          hunt_type: huntType
         })
       });
 
       const result = await response.json();
       if (result.success) {
-        setSnackbar(
-          <Snackbar onClose={() => setSnackbar(null)}>
-            🏹 Добыча: {result.creature.name} (Ранг {result.creature.danger_rank})!
-          </Snackbar>
-        );
+        setHuntModal({ 
+          show: true, 
+          creature: result.creature, 
+          loot: result.loot, 
+          credits: result.credits 
+        });
         loadInventory();
       } else {
         setSnackbar(
@@ -333,6 +363,28 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
       {activeTab === 'game' && (
         <>
+          <Group header={<Header>Тип охоты</Header>}>
+            <Div>
+              <Text weight="2" style={{ marginBottom: '8px' }}>Выберите тип охоты:</Text>
+              <ButtonGroup mode="horizontal" stretched>
+                <Button
+                  mode={huntType === 'terrestrial' ? 'primary' : 'secondary'}
+                  onClick={() => setHuntType('terrestrial')}
+                  stretched
+                >
+                  🐺 Наземная охота
+                </Button>
+                <Button
+                  mode={huntType === 'aerial' ? 'primary' : 'secondary'}
+                  onClick={() => setHuntType('aerial')}
+                  stretched
+                >
+                  🦅 Воздушная охота
+                </Button>
+              </ButtonGroup>
+            </Div>
+          </Group>
+
           <Group header={<Header>Выберите локацию</Header>}>
             {loading ? (
               <Div><Spinner size="m" /></Div>
@@ -387,6 +439,27 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                     {gear.filter(g => g.type === 'Броня').map(g => (
                       <option key={g.id} value={g.id}>
                         {g.name} (+{(g.bonus_defense * 100).toFixed(0)}%) {g.quantity && g.quantity > 1 ? `[${g.quantity}]` : ''}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Div>
+                <Div>
+                  <Text weight="2">{huntType === 'aerial' ? 'Воздушная ловушка:' : 'Наземная ловушка:'}</Text>
+                  <NativeSelect
+                    value={selectedGear[2] || ''}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                      const gearId = parseInt(e.target.value);
+                      setSelectedGear(prev => {
+                        const trapType = huntType === 'aerial' ? 'Воздушная ловушка' : 'Наземная ловушка';
+                        const newGear = prev.filter(id => gear.find(g => g.id === id)?.type !== trapType);
+                        return gearId ? [...newGear, gearId] : newGear;
+                      });
+                    }}
+                  >
+                    <option value="">Без ловушки</option>
+                    {gear.filter(g => g.type === (huntType === 'aerial' ? 'Воздушная ловушка' : 'Наземная ловушка')).map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} (+{(g.bonus_success * 100).toFixed(0)}%) {g.quantity && g.quantity > 1 ? `[${g.quantity}]` : ''}
                       </option>
                     ))}
                   </NativeSelect>
@@ -451,26 +524,93 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             }, {})
           ).map(([type, items]: [string, any]) => (
             <Group key={type} header={<Header>{type}</Header>}>
-              {items.map((item: any) => (
-                <Cell
-                  key={item.id}
-                  subtitle={`${item.quality} • ${item.description}`}
-                  after={
-                    <Button size="s" onClick={() => handleBuyGear(item.id, item.price)}>
-                      {item.price.toLocaleString()} ₭
-                    </Button>
-                  }
-                  multiline
-                >
-                  {item.name}
-                </Cell>
-              ))}
+              {items.map((item: any) => {
+                const ownedGear = gear.find(g => g.id === item.id);
+                const isOwned = !!ownedGear;
+                const isConsumable = item.is_consumable;
+                
+                return (
+                  <Cell
+                    key={item.id}
+                    subtitle={`${item.quality} • ${item.description}`}
+                    after={
+                      isOwned && !isConsumable ? (
+                        <Button size="s" mode="secondary" disabled>
+                          Присутствует
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="s" 
+                          onClick={() => handleBuyGear(item.id, item.price)}
+                          disabled={credits < item.price}
+                        >
+                          {item.price.toLocaleString()} ₭
+                        </Button>
+                      )
+                    }
+                    multiline
+                  >
+                    {item.name}
+                  </Cell>
+                );
+              })}
             </Group>
           ))}
         </Group>
       )}
 
       {snackbar}
+      
+      {huntModal.show && (
+        <ModalRoot activeModal="hunt">
+          <ModalPage
+            id="hunt"
+            onClose={() => setHuntModal({ show: false })}
+            header={
+              <ModalPageHeader>
+                🏹 Добыча!
+              </ModalPageHeader>
+            }
+          >
+            <Group>
+              <Card>
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🦌</div>
+                  <Title level="2" style={{ marginBottom: '8px' }}>
+                    {huntModal.creature?.name}
+                  </Title>
+                  <Text weight="2" style={{ marginBottom: '8px' }}>
+                    Ранг опасности: {huntModal.creature?.danger_rank}
+                  </Text>
+                  {huntModal.credits && (
+                    <Text weight="2" style={{ marginBottom: '8px', color: 'var(--accent)' }}>
+                      +{huntModal.credits.toLocaleString()} ₭
+                    </Text>
+                  )}
+                  {huntModal.loot && huntModal.loot.length > 0 && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <Text weight="2" style={{ marginBottom: '8px' }}>Добыча:</Text>
+                      {huntModal.loot.map((item: any, index: number) => (
+                        <Text key={index} style={{ display: 'block', color: 'var(--text_secondary)' }}>
+                          • {item}
+                        </Text>
+                      ))}
+                    </div>
+                  )}
+                  <Button 
+                    size="l" 
+                    mode="primary" 
+                    onClick={() => setHuntModal({ show: false })}
+                    stretched
+                  >
+                    Отлично!
+                  </Button>
+                </div>
+              </Card>
+            </Group>
+          </ModalPage>
+        </ModalRoot>
+      )}
     </Panel>
   );
 };
