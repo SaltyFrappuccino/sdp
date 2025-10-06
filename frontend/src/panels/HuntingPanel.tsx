@@ -46,6 +46,8 @@ interface HuntingGear {
   bonus_success: number;
   description: string;
   min_rank: string;
+  quantity?: number;
+  is_consumable?: boolean;
 }
 
 interface Hunt {
@@ -143,10 +145,10 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const shopItems = data.filter((item: any) => !item.is_basic);
       
       // Сортируем по типу и качеству (от худшего к лучшему)
-      const qualityOrder = { 'Обычное': 1, 'Хорошее': 2, 'Отличное': 3, 'Эпическое': 4, 'Легендарное': 5 };
+      const qualityOrder: { [key: string]: number } = { 'Обычное': 1, 'Хорошее': 2, 'Отличное': 3, 'Эпическое': 4, 'Легендарное': 5 };
       shopItems.sort((a: any, b: any) => {
         if (a.type !== b.type) return a.type.localeCompare(b.type);
-        return qualityOrder[a.quality] - qualityOrder[b.quality];
+        return (qualityOrder[a.quality] || 0) - (qualityOrder[b.quality] || 0);
       });
       
       setShopGear(shopItems);
@@ -364,7 +366,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                     <option value="">Без оружия</option>
                     {gear.filter(g => g.type === 'Оружие').map(g => (
                       <option key={g.id} value={g.id}>
-                        {g.name} (+{(g.bonus_success * 100).toFixed(0)}%) {g.quantity > 1 ? `[${g.quantity}]` : ''}
+                        {g.name} (+{(g.bonus_success * 100).toFixed(0)}%) {g.quantity && g.quantity > 1 ? `[${g.quantity}]` : ''}
                       </option>
                     ))}
                   </NativeSelect>
@@ -384,7 +386,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                     <option value="">Без брони</option>
                     {gear.filter(g => g.type === 'Броня').map(g => (
                       <option key={g.id} value={g.id}>
-                        {g.name} (+{(g.bonus_defense * 100).toFixed(0)}%) {g.quantity > 1 ? `[${g.quantity}]` : ''}
+                        {g.name} (+{(g.bonus_defense * 100).toFixed(0)}%) {g.quantity && g.quantity > 1 ? `[${g.quantity}]` : ''}
                       </option>
                     ))}
                   </NativeSelect>
@@ -448,7 +450,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
               return acc;
             }, {})
           ).map(([type, items]: [string, any]) => (
-            <Group key={type} header={<Header mode="secondary">{type}</Header>}>
+            <Group key={type} header={<Header>{type}</Header>}>
               {items.map((item: any) => (
                 <Cell
                   key={item.id}
