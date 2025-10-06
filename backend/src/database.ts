@@ -2162,7 +2162,7 @@ export async function seedHuntingData(db: any) {
       } else if (creatureId <= aerialDistorted2.lastInsertRowid) {
         // Редкие локации для искажённых
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.2);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, soraEcho.lastInsertRowid, creatureId, 0.15);
+        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEcho.lastInsertRowid, creatureId, 0.15);
       } else {
         // Легендарные локации для бестий
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEcho.lastInsertRowid, creatureId, 0.05);
