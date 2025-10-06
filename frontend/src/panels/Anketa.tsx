@@ -203,7 +203,12 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
 
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
-  const [factionOptions, setFactionOptions] = useState<FactionOption[]>([]);
+  const [factionOptions, setFactionOptions] = useState<FactionOption[]>([
+    { label: 'Порядок', value: 'Порядок' },
+    { label: 'Отражённый Свет Солнца', value: 'Отражённый Свет Солнца' },
+    { label: 'Чёрная Лилия', value: 'Чёрная Лилия' },
+    { label: 'Нейтрал', value: 'Нейтрал' },
+  ]);
 
   const handleImportAnketa = async (event: Event) => {
     const target = event.target as HTMLInputElement;
