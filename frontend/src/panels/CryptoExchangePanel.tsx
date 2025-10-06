@@ -26,7 +26,7 @@ import {
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Icon28DoneOutline, Icon28ErrorCircleOutline } from '@vkontakte/icons';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area, Tooltip as RechartsTooltip } from 'recharts';
 import { API_URL } from '../api';
 
 interface NavIdProps {
@@ -139,8 +139,23 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/crypto/currencies`);
-      const data = await response.json();
-      setCryptos(data);
+      const cryptosData = await response.json();
+      
+      // Загружаем детали (включая историю) для каждой криптовалюты
+      const cryptosWithHistory = await Promise.all(
+        cryptosData.map(async (crypto: Crypto) => {
+          try {
+            const detailsResponse = await fetch(`${API_URL}/crypto/currencies/${crypto.id}`);
+            const details = await detailsResponse.json();
+            return details;
+          } catch (error) {
+            console.error(`Failed to fetch details for crypto ${crypto.id}:`, error);
+            return crypto; // Возвращаем базовые данные если не удалось загрузить детали
+          }
+        })
+      );
+      
+      setCryptos(cryptosWithHistory);
     } catch (error) {
       showSnackbar('Ошибка загрузки криптовалют', false);
     } finally {
@@ -341,73 +356,85 @@ export const CryptoExchangePanel: FC<CryptoExchangePanelProps> = ({ id, fetchedU
         <>
           {loading && <Spinner size="m" style={{ margin: '20px auto' }} />}
           
-          {cryptos.map((crypto) => {
-            const priceChange = crypto.base_volatility * 100;
-            const isPositive = Math.random() > 0.5; // В реальности это будет из истории
+          <Group>
+            <CardGrid size="l">
+              {cryptos.map((crypto) => {
+                const priceChange = crypto.base_volatility * 100;
+                const isPositive = Math.random() > 0.5; // В реальности это будет из истории
 
-            return (
-              <Group key={crypto.id}>
-                <Card mode="shadow">
-                  <Div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <Text weight="2" style={{ fontSize: 18 }}>{crypto.name}</Text>
-                        <Text style={{ color: 'var(--vkui--color_text_secondary)', fontSize: 14 }}>
-                          {crypto.ticker_symbol}
-                        </Text>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <Text weight="2" style={{ fontSize: 18 }}>{formatPrice(crypto.current_price)} ₭</Text>
-                        <Text style={{ color: isPositive ? 'var(--vkui--color_text_positive)' : 'var(--vkui--color_text_negative)', fontSize: 14 }}>
-                          {isPositive ? '+' : '-'}{priceChange.toFixed(2)}%
-                        </Text>
-                      </div>
-                    </div>
-                    
-                    <Text style={{ marginTop: 8, fontSize: 14, color: 'var(--vkui--color_text_secondary)' }}>
-                      {crypto.description}
-                    </Text>
-
-                    <div style={{ marginTop: 12 }}>
+                return (
+                  <Card key={crypto.id}>
+                    <Header>{crypto.name} ({crypto.ticker_symbol})</Header>
+                    <Div>
+                      {crypto.history && crypto.history.length > 1 && (
+                        <div style={{ height: 100 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={crypto.history.slice().reverse()} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                              <XAxis dataKey="timestamp" hide />
+                              <YAxis domain={['dataMin', 'dataMax']} hide />
+                              <RechartsTooltip
+                                formatter={(value: any) => {
+                                  if (typeof value === 'number') {
+                                    return [`${value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭`, "Цена"];
+                                  }
+                                  return [value, "Цена"];
+                                }}
+                                labelFormatter={(label: string | number) => new Date(label).toLocaleString('ru-RU', { 
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit'
+                                })}
+                              />
+                              <Area type="monotone" dataKey="price" stroke="#8884d8" fill="#8884d8" strokeWidth={2} dot={false} />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </Div>
+                    <Div>
+                      <Text>{crypto.description}</Text>
+                      <Text>Цена: {crypto.current_price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₭</Text>
+                      <Text>📊 Волатильность: {(crypto.base_volatility * 100).toFixed(0)}%</Text>
                       <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)' }}>
-                        Волатильность: {(crypto.base_volatility * 100).toFixed(0)}% • 
-                        Макс. эмиссия: {(crypto.total_supply / 1000000).toFixed(1)}М
+                        💎 Макс. эмиссия: {(crypto.total_supply / 1000000).toFixed(1)}М
                       </Text>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                      <Button
-                        size="m"
-                        mode="primary"
-                        stretched
-                        onClick={() => {
-                          fetchCryptoDetails(crypto.id);
-                          setTradeAction('buy');
-                          setActiveModal('trade');
-                        }}
-                        disabled={!selectedCharacter}
-                      >
-                        Купить
-                      </Button>
-                      <Button
-                        size="m"
-                        mode="secondary"
-                        stretched
-                        onClick={() => {
-                          fetchCryptoDetails(crypto.id);
-                          setTradeAction('sell');
-                          setActiveModal('trade');
-                        }}
-                        disabled={!selectedCharacter}
-                      >
-                        Продать
-                      </Button>
-                    </div>
-                  </Div>
-                </Card>
-              </Group>
-            );
-          })}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                        <Button
+                          size="m"
+                          mode="primary"
+                          stretched
+                          onClick={() => {
+                            setSelectedCrypto(crypto);
+                            setTradeAction('buy');
+                            setActiveModal('trade');
+                          }}
+                          disabled={!selectedCharacter}
+                        >
+                          Купить
+                        </Button>
+                        <Button
+                          size="m"
+                          mode="secondary"
+                          stretched
+                          onClick={() => {
+                            setSelectedCrypto(crypto);
+                            setTradeAction('sell');
+                            setActiveModal('trade');
+                          }}
+                          disabled={!selectedCharacter}
+                        >
+                          Продать
+                        </Button>
+                      </div>
+                    </Div>
+                  </Card>
+                );
+              })}
+            </CardGrid>
+          </Group>
         </>
       )}
 
