@@ -3,7 +3,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { View, SplitLayout, SplitCol, ScreenSpinner, ModalRoot, ModalPage, ModalPageHeader, Div, Group, Panel } from '@vkontakte/vkui';
 import { useActiveVkuiLocation } from '@vkontakte/vk-mini-apps-router';
 
-import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, UserAnketaEditor, AdminAnketaEditor, Calculator, MarketPanel, MyAnketasPanel, ActivityRequestsPanel, AdminActivityRequestsPanel, Handbook, MarketExchangePanel, AdminMarketPanel, CasinoPanel, PokerPanel, HorseStatsPanel, NewEventsPanel, NewAdminEventsPanel, BulkCharacterManagement, CryptoExchangePanel, PurchasesPanel, CollectionsPanel } from './panels';
+import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, UserAnketaEditor, AdminAnketaEditor, Calculator, MarketPanel, MyAnketasPanel, ActivityRequestsPanel, AdminActivityRequestsPanel, Handbook, MarketExchangePanel, AdminMarketPanel, CasinoPanel, PokerPanel, HorseStatsPanel, NewEventsPanel, NewAdminEventsPanel, BulkCharacterManagement, CryptoExchangePanel, PurchasesPanel, CollectionsPanel, FactionsList, FactionsCreate, AdminFactions } from './panels';
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { API_URL } from './api';
 import UpdateViewer from './panels/UpdateViewer';
@@ -91,6 +91,9 @@ export const App = () => {
             <CryptoExchangePanel id="crypto_exchange" fetchedUser={fetchedUser} />
             <PurchasesPanel id="purchases" fetchedUser={fetchedUser} />
             <CollectionsPanel id="collections" fetchedUser={fetchedUser} />
+            <FactionsList id="factions_list" />
+            <FactionsCreate id="factions_create" />
+            <AdminFactions id="admin_factions" />
             <UpdateViewer id="update_viewer" />
           </View>
         ) : (

@@ -487,7 +487,6 @@ router.post('/admin/login', (req: Request, res: Response) => {
     res.status(401).json({ success: false, error: 'Invalid password' });
   }
 });
-
 router.put('/characters/:id', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
   const userVkId = req.headers['x-user-vk-id'];
@@ -968,7 +967,6 @@ router.delete('/market/items/:id', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось удалить предмет с рынка', details: errorMessage });
   }
 });
-
 router.post('/market/sell', async (req: Request, res: Response) => {
   try {
     const { character_id, item_index, price } = req.body;
@@ -1456,7 +1454,6 @@ router.get('/characters/accepted', async (req: Request, res: Response) => {
 });
 
 // ==================== НОВАЯ СИСТЕМА СОБЫТИЙ ====================
-
 // GET /api/events - Получить список ивентов
 router.get('/events', async (req: Request, res: Response) => {
   try {
@@ -1957,7 +1954,6 @@ router.get('/admin/characters', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось получить список персонажей' });
   }
 });
-
 // POST /api/admin/characters/bulk-update-attribute-points - Массовое изменение очков атрибутов (админы)
 router.post('/admin/characters/bulk-update-attribute-points', async (req: Request, res: Response) => {
   const adminId = req.headers['x-admin-id'];
@@ -2455,7 +2451,6 @@ router.put('/bets/:bet_id/close', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось закрыть ставку' });
   }
 });
-
 // GET /api/characters/:character_id/bet-history - История ставок персонажа
 router.get('/characters/:character_id/bet-history', async (req: Request, res: Response) => {
   try {
@@ -2910,7 +2905,6 @@ router.post('/market/cover', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось закрыть короткую позицию' });
   }
 });
-
 // POST /api/market/order - Создать торговый ордер
 router.post('/market/order', async (req: Request, res: Response) => {
   const { character_id, ticker_symbol, order_type, side, quantity, price, stop_price, time_in_force } = req.body;
@@ -3412,7 +3406,6 @@ router.post('/casino/roulette', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Не удалось сохранить результат игры' });
   }
 });
-
 // POST /api/casino/horseracing - Сохранить результат игры в скачки
 router.post('/casino/horseracing', async (req: Request, res: Response) => {
   try {
@@ -4240,7 +4233,6 @@ router.post('/poker/rooms/:id/start', async (req: Request, res: Response) => {
 // СТАРЫЙ API УДАЛЕН - ИСПОЛЬЗУЕМ /simple-action
 
 // Заменён на /poker/hands/:id/simple-action (см. ниже)
-
 /**
   try {
     const hand_id = parseInt(req.params.id);
@@ -4737,7 +4729,6 @@ router.post('/admin/market/reset', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Ошибка при сбросе биржи' });
   }
 });
-
 // GET /api/poker/hands/:id/timeout-check - Проверка таймаута хода
 router.get('/poker/hands/:id/timeout-check', async (req: Request, res: Response) => {
   const { id: hand_id } = req.params;
@@ -5170,7 +5161,6 @@ router.get('/crypto/portfolio/:character_id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch crypto portfolio' });
   }
 });
-
 // Купить криптовалюту
 router.post('/crypto/buy', async (req, res) => {
   try {
@@ -5655,7 +5645,6 @@ router.get('/purchases/items/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch item' });
   }
 });
-
 // Купить предмет
 router.post('/purchases/buy', async (req, res) => {
   try {
@@ -6146,7 +6135,6 @@ router.get('/collections/my/:character_id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch collection' });
   }
 });
-
 // Топ коллекционеров
 router.get('/collections/leaderboard', async (req, res) => {
   try {

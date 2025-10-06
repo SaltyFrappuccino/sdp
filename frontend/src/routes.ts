@@ -37,7 +37,10 @@ export const DEFAULT_VIEW_PANELS = {
   CRYPTO_EXCHANGE: 'crypto_exchange',
   PURCHASES: 'purchases',
   COLLECTIONS: 'collections',
-} as const;
+  FACTIONS_LIST: 'factions_list',
+  FACTIONS_CREATE: 'factions_create',
+  ADMIN_FACTIONS: 'admin_factions',
+};
 
 export const routes = RoutesConfig.create([
   createRoot(DEFAULT_ROOT, [
@@ -68,6 +71,9 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.CRYPTO_EXCHANGE, `/${DEFAULT_VIEW_PANELS.CRYPTO_EXCHANGE}`, []),
       createPanel(DEFAULT_VIEW_PANELS.PURCHASES, `/${DEFAULT_VIEW_PANELS.PURCHASES}`, []),
       createPanel(DEFAULT_VIEW_PANELS.COLLECTIONS, `/${DEFAULT_VIEW_PANELS.COLLECTIONS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.FACTIONS_LIST, `/${DEFAULT_VIEW_PANELS.FACTIONS_LIST}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.FACTIONS_CREATE, `/${DEFAULT_VIEW_PANELS.FACTIONS_CREATE}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.ADMIN_FACTIONS, `/${DEFAULT_VIEW_PANELS.ADMIN_FACTIONS}`, []),
     ]),
   ]),
 ]);

@@ -7,6 +7,7 @@ import {
   Input,
   Button,
   Select,
+  CustomSelect,
   PanelHeaderBack,
   Snackbar,
   ScreenSpinner,
@@ -31,6 +32,11 @@ import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 import { readJsonFile } from '../utils/anketaExport';
 import { ManifestationData } from '../components/ManifestationForm';
+
+interface FactionOption {
+  label: string;
+  value: string;
+}
 
 const getAttributePointsForRank = (rank: Rank): number => {
   switch (rank) {
@@ -183,11 +189,32 @@ export const AnketaEditor: FC<NavIdProps & {
   const routeNavigator = useRouteNavigator();
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [factionOptions, setFactionOptions] = useState<FactionOption[]>([]);
 
   useEffect(() => {
     const adminId = localStorage.getItem('adminId');
     setIsAdmin(!!adminId);
   }, []);
+
+  const fetchFactions = async (query = '') => {
+    try {
+      const response = await fetch(`${API_URL}/factions/search?q=${query}`);
+      const factions = await response.json();
+      const options = factions.map((f: any) => ({
+        label: f.name,
+        value: f.name
+      }));
+      setFactionOptions(options);
+    } catch (error) {
+      console.error('Failed to fetch factions:', error);
+    }
+  };
+
+  useEffect(() => {
+    // initial fetch
+    fetchFactions();
+  }, []);
+
 
   const handleImportAnketa = async (event: Event) => {
     const target = event.target as HTMLInputElement;
@@ -381,18 +408,18 @@ export const AnketaEditor: FC<NavIdProps & {
               <Input name="age" type="number" value={String(character.age)} onChange={handleChange} />
             </FormItem>
             <FormItem top="Фракция">
-              <Select
-                name="faction"
-                placeholder="Выберите фракцию"
+              <CustomSelect
+                placeholder="Выберите или начните вводить название"
+                options={factionOptions}
                 value={character.faction}
-                onChange={handleChange}
-                options={[
-                  { label: 'Отражённый Свет Солнца', value: 'Отражённый Свет Солнца' },
-                  { label: 'Чёрная Лилия', value: 'Чёрная Лилия' },
-                  { label: 'Порядок', value: 'Порядок' },
-                  { label: 'Нейтрал', value: 'Нейтрал' },
-                ]}
-              />
+                onInputChange={(e) => fetchFactions(e.target.value)}
+                onChange={(e) => handleChange({
+                  target: {
+                    name: 'faction',
+                    value: e.target.value
+                  }
+                } as any)}
+                />
             </FormItem>
             <FormItem top="Позиция во фракции">
               <Input name="faction_position" value={character.faction_position} onChange={handleChange} />

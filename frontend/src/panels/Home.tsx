@@ -79,13 +79,12 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
             <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('handbook')}>
               Справочник
             </Button>
+            <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('factions_list')}>
+              Реестр фракций
+            </Button>
             <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('casino')}>
               Казино
             </Button>
-          </ButtonGroup>
-        </Div>
-        <Div>
-          <ButtonGroup stretched mode="horizontal">
             <Button stretched size="l" mode="secondary" onClick={() => routeNavigator.push('crypto_exchange')}>
               Криптовалюты
             </Button>

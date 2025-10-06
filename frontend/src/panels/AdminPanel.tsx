@@ -501,17 +501,20 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     <Group header={<Header>⚡ Массовые операции</Header>}>
       <Div>
         <ButtonGroup stretched mode="vertical" gap="m">
-          <Button size="l" mode="secondary">
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('bulk_characters')}>
             👑 Массовое управление персонажами
           </Button>
-          <Button size="l" mode="secondary">
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('admin_market')}>
             📈 Управление Биржей
           </Button>
-          <Button size="l" mode="secondary">
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('admin_events')}>
             🎪 Управление Ивентами
           </Button>
-          <Button size="l" mode="secondary">
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('admin_activity_requests')}>
             📋 Управление заявками на активности
+          </Button>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('admin_factions')}>
+            🔰 Управление фракциями
           </Button>
         </ButtonGroup>
       </Div>

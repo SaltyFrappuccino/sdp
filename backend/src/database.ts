@@ -893,11 +893,27 @@ export async function initDB() {
       );
     `);
 
+    // ========================================
+    // ФРАКЦИИ
+    // ========================================
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS Factions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        creator_vk_id INTEGER,
+        is_canon INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('approved', 'pending', 'rejected')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     await seedStocks(db);
     await seedHorses(db);
     await seedCryptoCurrencies(db);
     await seedPurchaseCategories(db);
     await seedCollectionSeries(db);
+    await seedFactions(db);
 
     return db;
 
@@ -1165,4 +1181,32 @@ async function seedCollectionPacks(db: any) {
   
   await stmt.finalize();
   console.log('Collection packs seeded successfully');
+}
+
+export async function seedFactions(db: any) {
+  const existingFactions = await db.get('SELECT COUNT(*) as count FROM Factions');
+  if (existingFactions.count > 0) {
+    console.log('Factions already exist, skipping seed');
+    return;
+  }
+
+  const factions = [
+    { name: 'Порядок', description: 'Закон и справедливость, поддерживаемые силой. Официальная власть в мире.', is_canon: 1, status: 'approved' },
+    { name: 'Отражённый Свет Солнца', description: 'Религиозная организация, стремящаяся к духовному просветлению и контролю.', is_canon: 1, status: 'approved' },
+    { name: 'Чёрная Лилия', description: 'Криминальная империя, управляющая теневой экономикой и нелегальной деятельностью.', is_canon: 1, status: 'approved' },
+    { name: 'Нейтрал', description: 'Те, кто не примкнул ни к одной из великих фракций, преследуя свои цели.', is_canon: 1, status: 'approved' }
+  ];
+
+  console.log('Seeding factions...');
+  const stmt = await db.prepare(`
+    INSERT INTO Factions (name, description, is_canon, status, creator_vk_id)
+    VALUES (?, ?, ?, ?, NULL)
+  `);
+  
+  for (const faction of factions) {
+    await stmt.run(faction.name, faction.description, faction.is_canon, faction.status);
+  }
+  
+  await stmt.finalize();
+  console.log('Factions seeded successfully');
 }
