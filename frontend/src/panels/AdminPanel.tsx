@@ -340,12 +340,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
                     size="m"
                     mode="secondary"
                     onClick={() => {
-                      const anketaData = {
-                        character_name: character.character_name,
-                        rank: character.rank,
-                        faction: character.faction,
-                        ...character
-                      };
+                      const anketaData = { ...character };
                       const dataStr = JSON.stringify(anketaData, null, 2);
                       const blob = new Blob([dataStr], { type: 'application/json' });
                       const url = URL.createObjectURL(blob);
