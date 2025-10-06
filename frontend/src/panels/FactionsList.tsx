@@ -56,7 +56,7 @@ export const FactionsList: React.FC<NavIdProps> = ({ id }) => {
       
       <Group>
         <Div>
-          <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('factions_create')}>
+          <Button stretched size="l" mode="primary" onClick={() => routeNavigator.push('/factions_create')}>
             Создать свою фракцию
           </Button>
         </Div>
