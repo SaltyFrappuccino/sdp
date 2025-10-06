@@ -7037,14 +7037,14 @@ router.post('/fishing/catch', async (req: Request, res: Response) => {
             const gearInfo = await db.get(`SELECT is_consumable FROM FishingGear WHERE id = ?`, gearId);
             const characterGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
             
-            if (gearInfo && gearInfo.is_consumable) {
+            if (gearInfo && gearInfo.is_consumable && characterGear) {
               // Расходуем приманку
               if (characterGear.quantity > 1) {
                 await db.run(`UPDATE CharacterFishingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
               } else {
                 await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
               }
-            } else {
+            } else if (characterGear) {
               // Проверяем поломку снаряжения (10% шанс)
               if (Math.random() < 0.1) {
                 await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
@@ -7280,14 +7280,14 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
             const gearInfo = await db.get(`SELECT is_consumable FROM HuntingGear WHERE id = ?`, gearId);
             const characterGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
             
-            if (gearInfo && gearInfo.is_consumable) {
+            if (gearInfo && gearInfo.is_consumable && characterGear) {
               // Расходуем ловушку
               if (characterGear.quantity > 1) {
                 await db.run(`UPDATE CharacterHuntingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
               } else {
                 await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
               }
-            } else {
+            } else if (characterGear) {
               // Проверяем поломку снаряжения (15% шанс для охоты)
               if (Math.random() < 0.15) {
                 await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
