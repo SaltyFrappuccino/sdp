@@ -25,6 +25,8 @@ import {
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
+import TerrestrialHuntingMinigame from '../components/TerrestrialHuntingMinigame';
+import AerialHuntingMinigame from '../components/AerialHuntingMinigame';
 
 interface NavIdProps {
   id: string;
@@ -84,6 +86,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [characterId, setCharacterId] = useState<number | null>(null);
   const [credits, setCredits] = useState<number>(0);
   const [huntModal, setHuntModal] = useState<{ show: boolean; creature?: any; loot?: any[]; credits?: number }>({ show: false });
+  const [minigameModal, setMinigameModal] = useState<{ show: boolean; creatureRank?: string; huntType?: string }>({ show: false });
 
   useEffect(() => {
     loadCharacters();
@@ -199,6 +202,35 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
   const handleHunt = async () => {
     if (!selectedLocation || !characterId) return;
+
+    // Определяем ранг существа для мини-игры (случайно)
+    const ranks = ['F', 'E', 'D', 'C', 'B', 'A'];
+    const weights = [35, 30, 20, 10, 4, 1]; // Вероятности
+    let random = Math.random() * 100;
+    let selectedRank = 'F';
+    
+    for (let i = 0; i < weights.length; i++) {
+      if (random < weights[i]) {
+        selectedRank = ranks[i];
+        break;
+      }
+      random -= weights[i];
+    }
+
+    setMinigameModal({ show: true, creatureRank: selectedRank, huntType });
+  };
+
+  const handleMinigameComplete = async (success: boolean) => {
+    setMinigameModal({ show: false });
+    
+    if (!success) {
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Добыча ускользнула!
+        </Snackbar>
+      );
+      return;
+    }
 
     setIsHunting(true);
     try {
@@ -562,6 +594,36 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
       {snackbar}
       
+      {minigameModal.show && (
+        <ModalRoot activeModal="minigame">
+          <ModalPage
+            id="minigame"
+            onClose={() => setMinigameModal({ show: false })}
+            header={
+              <ModalPageHeader>
+                {minigameModal.huntType === 'aerial' ? '🦅 Воздушная охота' : '🏹 Наземная охота'}
+              </ModalPageHeader>
+            }
+          >
+            <Group>
+              {minigameModal.huntType === 'aerial' ? (
+                <AerialHuntingMinigame
+                  creatureRank={minigameModal.creatureRank || 'F'}
+                  onComplete={handleMinigameComplete}
+                  onCancel={() => setMinigameModal({ show: false })}
+                />
+              ) : (
+                <TerrestrialHuntingMinigame
+                  creatureRank={minigameModal.creatureRank || 'F'}
+                  onComplete={handleMinigameComplete}
+                  onCancel={() => setMinigameModal({ show: false })}
+                />
+              )}
+            </Group>
+          </ModalPage>
+        </ModalRoot>
+      )}
+
       {huntModal.show && (
         <ModalRoot activeModal="hunt">
           <ModalPage

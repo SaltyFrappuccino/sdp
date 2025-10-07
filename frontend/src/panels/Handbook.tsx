@@ -264,7 +264,7 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
                 }}
               >
                 {item.title}
-              </div>
+          </div>
             </Accordion.Summary>
             <Accordion.Content>
               {item.children.map((child) => renderTOCItem(child, depth + 1))}
@@ -332,12 +332,12 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.push('/')} />}>
         Справочник
       </PanelHeader>
-
+      
       <Group>
-        <Search
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Поиск по справочнику..."
+          <Search
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск по справочнику..."
         />
       </Group>
 
@@ -345,7 +345,7 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
         <Group header={<Title level="2" style={{ padding: '12px 16px' }}>📑 Оглавление</Title>}>
           <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
             {toc.map((item) => renderTOCItem(item, 0))}
-          </div>
+            </div>
         </Group>
       )}
 
@@ -471,7 +471,7 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
               // Горизонтальная линия
               hr: () => (
                 <hr
-                  style={{
+                          style={{ 
                     border: 'none',
                     borderTop: '2px solid var(--vkui--color_separator_primary)',
                     margin: '32px 0',

@@ -28,6 +28,7 @@ import {
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { API_URL } from '../api';
+import FishingMinigame from '../components/FishingMinigame';
 
 interface NavIdProps {
   id: string;
@@ -84,6 +85,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [characterId, setCharacterId] = useState<number | null>(null);
   const [credits, setCredits] = useState<number>(0);
   const [catchModal, setCatchModal] = useState<{ show: boolean; fish?: any }>({ show: false });
+  const [minigameModal, setMinigameModal] = useState<{ show: boolean; fishRarity?: string }>({ show: false });
 
   useEffect(() => {
     loadCharacters();
@@ -177,6 +179,35 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
   const handleFish = async () => {
     if (!selectedLocation || !characterId) return;
+
+    // Определяем редкость рыбы для мини-игры (случайно)
+    const rarities = ['Обычная', 'Необычная', 'Редкая', 'Очень редкая', 'Легендарная'];
+    const weights = [40, 30, 20, 8, 2]; // Вероятности
+    let random = Math.random() * 100;
+    let selectedRarity = 'Обычная';
+    
+    for (let i = 0; i < weights.length; i++) {
+      if (random < weights[i]) {
+        selectedRarity = rarities[i];
+        break;
+      }
+      random -= weights[i];
+    }
+
+    setMinigameModal({ show: true, fishRarity: selectedRarity });
+  };
+
+  const handleMinigameComplete = async (success: boolean) => {
+    setMinigameModal({ show: false });
+    
+    if (!success) {
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Рыба сорвалась с крючка!
+        </Snackbar>
+      );
+      return;
+    }
 
     setIsFishing(true);
     try {
@@ -487,6 +518,28 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
       {snackbar}
       
+      {minigameModal.show && (
+        <ModalRoot activeModal="minigame">
+          <ModalPage
+            id="minigame"
+            onClose={() => setMinigameModal({ show: false })}
+            header={
+              <ModalPageHeader>
+                🎣 Рыбалка
+              </ModalPageHeader>
+            }
+          >
+            <Group>
+              <FishingMinigame
+                fishRarity={minigameModal.fishRarity || 'Обычная'}
+                onComplete={handleMinigameComplete}
+                onCancel={() => setMinigameModal({ show: false })}
+              />
+            </Group>
+          </ModalPage>
+        </ModalRoot>
+      )}
+
       {catchModal.show && (
         <ModalRoot activeModal="catch">
           <ModalPage

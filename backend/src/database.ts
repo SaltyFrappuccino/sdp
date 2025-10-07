@@ -2099,26 +2099,26 @@ export async function seedFishingData(db: any) {
     // Добавляем водных существ из бестиария
     console.log('Adding aquatic creatures from bestiary...');
     
-    // Водные Затронутые
+    // Водные Затронутые (F-E ранг: 500-2,000₭ за кг)
     const aquaticTouched1 = await db.run(`INSERT INTO FishSpecies (name, name_latin, rarity, size_category, weight_min, weight_max, description, appearance, mutation_type, base_price)
-      VALUES ('Ауральный Лосось', 'Salmo Aura', 'Необычная', 'Крупная', 4, 10, 'Лосось, впитавший Ауру из священных вод', 'Розовое мясо с золотистыми прожилками', 'Затронутая', 25000)`);
+      VALUES ('Ауральный Лосось', 'Salmo Aura', 'Необычная', 'Крупная', 4, 10, 'Лосось, впитавший Ауру из священных вод', 'Розовое мясо с золотистыми прожилками', 'Затронутая', 1500)`);
     
     const aquaticTouched2 = await db.run(`INSERT INTO FishSpecies (name, name_latin, rarity, size_category, weight_min, weight_max, description, appearance, mutation_type, base_price)
-      VALUES ('Металлический Окунь', 'Perca Metallica', 'Обычная', 'Средняя', 1.5, 4, 'Окунь с укреплённой чешуёй', 'Серебристая чешуя с металлическим отливом', 'Затронутая', 8000)`);
+      VALUES ('Металлический Окунь', 'Perca Metallica', 'Обычная', 'Средняя', 1.5, 4, 'Окунь с укреплённой чешуёй', 'Серебристая чешуя с металлическим отливом', 'Затронутая', 800)`);
 
-    // Водные Искажённые
+    // Водные Искажённые (D-C ранг: 3,000-8,000₭ за кг)
     const aquaticDistorted1 = await db.run(`INSERT INTO FishSpecies (name, name_latin, rarity, size_category, weight_min, weight_max, description, appearance, mutation_type, base_price)
-      VALUES ('Фантомная Медуза', 'Medusa Phantasma', 'Редкая', 'Средняя', 2, 6, 'Прозрачная медуза, способная становиться невидимой', 'Полупрозрачное тело, мерцающее в воде', 'Искажённая', 75000)`);
+      VALUES ('Фантомная Медуза', 'Medusa Phantasma', 'Редкая', 'Средняя', 2, 6, 'Прозрачная медуза, способная становиться невидимой', 'Полупрозрачное тело, мерцающее в воде', 'Искажённая', 4500)`);
     
     const aquaticDistorted2 = await db.run(`INSERT INTO FishSpecies (name, name_latin, rarity, size_category, weight_min, weight_max, description, appearance, mutation_type, base_price)
-      VALUES ('Кристальный Краб', 'Cancer Crystallis', 'Очень редкая', 'Крупная', 3, 8, 'Краб с панцирем из живого кристалла', 'Прозрачный панцирь, переливающийся всеми цветами', 'Искажённая', 200000)`);
+      VALUES ('Кристальный Краб', 'Cancer Crystallis', 'Очень редкая', 'Крупная', 3, 8, 'Краб с панцирем из живого кристалла', 'Прозрачный панцирь, переливающийся всеми цветами', 'Искажённая', 7000)`);
 
-    // Водные Бестии
+    // Водные Бестии (B-A ранг: 15,000-50,000₭ за кг)
     const aquaticBeast1 = await db.run(`INSERT INTO FishSpecies (name, name_latin, rarity, size_category, weight_min, weight_max, description, appearance, mutation_type, base_price)
-      VALUES ('Морской Дракон', 'Draco Marinus', 'Легендарная', 'Трофейная', 20, 50, 'Древний морской дракон из глубин Эхо-Зон', 'Массивное существо с чешуёй цвета морской пены и драконьими плавниками', 'Бестия', 1000000)`);
+      VALUES ('Морской Дракон', 'Draco Marinus', 'Легендарная', 'Трофейная', 20, 50, 'Древний морской дракон из глубин Эхо-Зон', 'Массивное существо с чешуёй цвета морской пены и драконьими плавниками', 'Бестия', 25000)`);
     
     const aquaticBeast2 = await db.run(`INSERT INTO FishSpecies (name, name_latin, rarity, size_category, weight_min, weight_max, description, appearance, mutation_type, base_price)
-      VALUES ('Ауральный Кит', 'Cetus Aura', 'Легендарная', 'Трофейная', 100, 200, 'Гигантский кит, пропитанный чистой Аурой', 'Огромное существо, светящееся изнутри мягким золотым светом', 'Бестия', 5000000)`);
+      VALUES ('Ауральный Кит', 'Cetus Aura', 'Легендарная', 'Трофейная', 100, 200, 'Гигантский кит, пропитанный чистой Аурой', 'Огромное существо, светящееся изнутри мягким золотым светом', 'Бестия', 45000)`);
 
     // Привязываем водных существ к локациям
     const aquaticTouched1Id = aquaticTouched1.lastInsertRowid || aquaticTouched1.lastID;
@@ -2187,24 +2187,24 @@ export async function seedHuntingCreatures(db: any) {
     } else {
       console.log('Creating basic hunting creatures...');
       
-      // Создаем базовых существ для охоты
-      const basicCreatures = [
-        // Воздушные существа
-        { name: 'Ауральный Сокол', habitat: 'Воздушный', rank: 'F', description: 'Мелкая птица, затронутая Аурой' },
-        { name: 'Металлический Ворон', habitat: 'Воздушный', rank: 'E', description: 'Ворон с металлическими перьями' },
-        { name: 'Фантомный Орёл', habitat: 'Воздушный', rank: 'D', description: 'Полупрозрачный орёл-призрак' },
-        { name: 'Кристальная Ласточка', habitat: 'Воздушный', rank: 'C', description: 'Ласточка из чистого кристалла' },
-        { name: 'Громовой Дракон', habitat: 'Воздушный', rank: 'B', description: 'Дракон, управляющий молниями' },
-        { name: 'Ауральный Феникс', habitat: 'Воздушный', rank: 'A', description: 'Легендарная птица из чистой Ауры' },
-        
-        // Наземные существа
-        { name: 'Ауральный Волк', habitat: 'Наземный', rank: 'F', description: 'Волк, затронутый Аурой' },
-        { name: 'Металлический Медведь', habitat: 'Наземный', rank: 'E', description: 'Медведь с металлической шерстью' },
-        { name: 'Фантомный Тигр', habitat: 'Наземный', rank: 'D', description: 'Полупрозрачный тигр-призрак' },
-        { name: 'Кристальный Лев', habitat: 'Наземный', rank: 'C', description: 'Лев из чистого кристалла' },
-        { name: 'Земной Дракон', habitat: 'Наземный', rank: 'B', description: 'Дракон, управляющий землёй' },
-        { name: 'Ауральный Единорог', habitat: 'Наземный', rank: 'A', description: 'Легендарный единорог из чистой Ауры' }
-      ];
+        // Создаем базовых существ для охоты (цены за единицу добычи)
+        const basicCreatures = [
+          // Воздушные существа (F-E: 500-2,000₭, D-C: 3,000-8,000₭, B-A: 15,000-50,000₭)
+          { name: 'Ауральный Сокол', habitat: 'Воздушный', rank: 'F', description: 'Мелкая птица, затронутая Аурой' },
+          { name: 'Металлический Ворон', habitat: 'Воздушный', rank: 'E', description: 'Ворон с металлическими перьями' },
+          { name: 'Фантомный Орёл', habitat: 'Воздушный', rank: 'D', description: 'Полупрозрачный орёл-призрак' },
+          { name: 'Кристальная Ласточка', habitat: 'Воздушный', rank: 'C', description: 'Ласточка из чистого кристалла' },
+          { name: 'Громовой Дракон', habitat: 'Воздушный', rank: 'B', description: 'Дракон, управляющий молниями' },
+          { name: 'Ауральный Феникс', habitat: 'Воздушный', rank: 'A', description: 'Легендарная птица из чистой Ауры' },
+          
+          // Наземные существа
+          { name: 'Ауральный Волк', habitat: 'Наземный', rank: 'F', description: 'Волк, затронутый Аурой' },
+          { name: 'Металлический Медведь', habitat: 'Наземный', rank: 'E', description: 'Медведь с металлической шерстью' },
+          { name: 'Фантомный Тигр', habitat: 'Наземный', rank: 'D', description: 'Полупрозрачный тигр-призрак' },
+          { name: 'Кристальный Лев', habitat: 'Наземный', rank: 'C', description: 'Лев из чистого кристалла' },
+          { name: 'Земной Дракон', habitat: 'Наземный', rank: 'B', description: 'Дракон, управляющий землёй' },
+          { name: 'Ауральный Единорог', habitat: 'Наземный', rank: 'A', description: 'Легендарный единорог из чистой Ауры' }
+        ];
       
       for (const creature of basicCreatures) {
         await db.run(`
@@ -2217,8 +2217,8 @@ export async function seedHuntingCreatures(db: any) {
           creature.habitat,
           creature.rank,
           JSON.stringify(['Мясо', 'Шкура', 'Кость']),
-          creature.rank === 'F' ? 10 : creature.rank === 'E' ? 25 : creature.rank === 'D' ? 50 : creature.rank === 'C' ? 100 : creature.rank === 'B' ? 250 : 500,
-          creature.rank === 'F' ? 20 : creature.rank === 'E' ? 50 : creature.rank === 'D' ? 100 : creature.rank === 'C' ? 200 : creature.rank === 'B' ? 500 : 1000,
+          creature.rank === 'F' ? 500 : creature.rank === 'E' ? 1200 : creature.rank === 'D' ? 3000 : creature.rank === 'C' ? 5500 : creature.rank === 'B' ? 15000 : 30000,
+          creature.rank === 'F' ? 800 : creature.rank === 'E' ? 2000 : creature.rank === 'D' ? 4500 : creature.rank === 'C' ? 8000 : creature.rank === 'B' ? 25000 : 50000,
           1
         );
       }
