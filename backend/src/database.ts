@@ -1304,7 +1304,10 @@ export async function initDB() {
       
       // Дополнительная проверка - принудительно заполняем данные охоты
       console.log('Force seeding hunting data to ensure spawns exist...');
-      await seedHuntingData(db);
+      
+      // Принудительно заполняем существа и их связи с локациями
+      console.log('Force seeding hunting creatures and spawns...');
+      await seedHuntingCreatures(db);
     }
 
     return db;
@@ -2155,6 +2158,94 @@ export async function seedFishingData(db: any) {
   } catch (error) {
     console.error('Error seeding fishing data:', error);
     throw error;
+  }
+}
+
+export async function seedHuntingCreatures(db: any) {
+  try {
+    console.log('Force seeding hunting creatures and spawns...');
+    
+    // Получаем ID существ из BestiarySpecies
+    const aerialCreatures = await db.all(`
+      SELECT id FROM BestiarySpecies 
+      WHERE habitat_type = 'Воздушный' 
+      ORDER BY id
+    `);
+    
+    const terrestrialCreatures = await db.all(`
+      SELECT id FROM BestiarySpecies 
+      WHERE habitat_type = 'Наземный' 
+      ORDER BY id
+    `);
+    
+    console.log('Aerial creatures found:', aerialCreatures.length);
+    console.log('Terrestrial creatures found:', terrestrialCreatures.length);
+    
+    if (aerialCreatures.length === 0 && terrestrialCreatures.length === 0) {
+      console.log('No creatures found in BestiarySpecies, skipping...');
+      return;
+    }
+    
+    // Получаем ID локаций охоты
+    const locations = await db.all(`
+      SELECT id, name FROM HuntingLocations 
+      WHERE is_active = 1 
+      ORDER BY id
+    `);
+    
+    console.log('Hunting locations found:', locations.length);
+    
+    // Очищаем существующие связи
+    await db.run(`DELETE FROM HuntingLocationSpawns`);
+    console.log('Cleared existing HuntingLocationSpawns');
+    
+    // Привязываем воздушных существ к локациям
+    for (const creature of aerialCreatures) {
+      for (const location of locations) {
+        let spawnChance = 0.1; // Базовая вероятность
+        
+        // Увеличиваем вероятность для лесных локаций
+        if (location.name.includes('Лес')) {
+          spawnChance = 0.3;
+        }
+        // Уменьшаем для эхо-зон
+        else if (location.name.includes('Эхо')) {
+          spawnChance = 0.05;
+        }
+        
+        await db.run(`
+          INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) 
+          VALUES (?, ?, ?)
+        `, location.id, creature.id, spawnChance);
+      }
+    }
+    
+    // Привязываем земных существ к локациям
+    for (const creature of terrestrialCreatures) {
+      for (const location of locations) {
+        let spawnChance = 0.15; // Базовая вероятность
+        
+        // Увеличиваем вероятность для лесных локаций
+        if (location.name.includes('Лес')) {
+          spawnChance = 0.4;
+        }
+        // Уменьшаем для эхо-зон
+        else if (location.name.includes('Эхо')) {
+          spawnChance = 0.08;
+        }
+        
+        await db.run(`
+          INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) 
+          VALUES (?, ?, ?)
+        `, location.id, creature.id, spawnChance);
+      }
+    }
+    
+    const finalCount = await db.get(`SELECT COUNT(*) as count FROM HuntingLocationSpawns`);
+    console.log(`Created ${finalCount.count} hunting spawns`);
+    
+  } catch (error) {
+    console.error('Error force seeding hunting creatures:', error);
   }
 }
 
