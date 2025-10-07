@@ -2170,7 +2170,7 @@ export async function seedHuntingCreatures(db: any) {
       SELECT DISTINCT habitat_type FROM BestiarySpecies 
       ORDER BY habitat_type
     `);
-    console.log('Available habitat types:', habitatTypes.map(h => h.habitat_type));
+    console.log('Available habitat types:', habitatTypes.map((h: any) => h.habitat_type));
     
     // Получаем ID существ из BestiarySpecies
     const aerialCreatures = await db.all(`
