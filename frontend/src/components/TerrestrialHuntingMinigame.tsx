@@ -27,34 +27,21 @@ const TerrestrialHuntingMinigame: React.FC<TerrestrialHuntingMinigameProps> = ({
     setTimeLeft(Math.floor(8000 / difficulty)); // От 4 до 16 секунд
     setTargetPosition({ x: 50, y: 50 });
     setCrosshairPosition({ x: 20, y: 20 });
-    setCurrentDirection(null);
     setAccuracy(0);
+    
+    // Показываем первое направление сразу
+    const directions: Array<'up' | 'down' | 'left' | 'right'> = ['up', 'down', 'left', 'right'];
+    const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+    setCurrentDirection(randomDirection);
   };
 
   // Фаза 1: Выслеживание (нажимай кнопки в правильном порядке)
   useEffect(() => {
     if (gameState !== 'tracking') return;
 
-    const directions: Array<'up' | 'down' | 'left' | 'right'> = ['up', 'down', 'left', 'right'];
-    let directionIndex = 0;
-
-    const showNextDirection = () => {
-      if (trackingProgress >= 100) {
-        setGameState('aiming');
-        setTimeLeft(Math.floor(5000 / difficulty)); // От 2.5 до 10 секунд на прицел
-        return;
-      }
-
-      const randomDirection = directions[Math.floor(Math.random() * directions.length)];
-      setCurrentDirection(randomDirection);
-    };
-
-    showNextDirection();
-
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 0) {
-          clearInterval(timer);
           setGameState('completed');
           onComplete(false);
           return 0;
@@ -64,7 +51,7 @@ const TerrestrialHuntingMinigame: React.FC<TerrestrialHuntingMinigameProps> = ({
     }, 50);
 
     return () => clearInterval(timer);
-  }, [gameState, trackingProgress, difficulty, onComplete]);
+  }, [gameState, difficulty, onComplete]);
 
   // Обработка нажатия направления
   const handleDirectionClick = (direction: 'up' | 'down' | 'left' | 'right') => {
@@ -73,15 +60,20 @@ const TerrestrialHuntingMinigame: React.FC<TerrestrialHuntingMinigameProps> = ({
     if (direction === currentDirection) {
       // Правильное направление
       const increment = 15 + (difficulty - 1) * 5;  // Чем сложнее, тем медленнее прогресс
-      setTrackingProgress(prev => Math.min(100, prev + increment));
-      setCurrentDirection(null);
+      const newProgress = Math.min(100, trackingProgress + increment);
+      setTrackingProgress(newProgress);
       
-      // Показываем следующее направление через 300мс
-      setTimeout(() => {
-        const directions: Array<'up' | 'down' | 'left' | 'right'> = ['up', 'down', 'left', 'right'];
-        const randomDirection = directions[Math.floor(Math.random() * directions.length)];
-        setCurrentDirection(randomDirection);
-      }, 300);
+      // Проверяем завершение фазы
+      if (newProgress >= 100) {
+        setGameState('aiming');
+        setTimeLeft(Math.floor(5000 / difficulty)); // От 2.5 до 10 секунд на прицел
+        return;
+      }
+      
+      // Показываем следующее направление сразу
+      const directions: Array<'up' | 'down' | 'left' | 'right'> = ['up', 'down', 'left', 'right'];
+      const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+      setCurrentDirection(randomDirection);
     } else {
       // Неправильное направление
       setTrackingProgress(prev => Math.max(0, prev - 10));

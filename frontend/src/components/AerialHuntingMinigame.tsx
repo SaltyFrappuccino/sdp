@@ -36,9 +36,6 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
     setScore(0);
     setNextTargetId(0);
     setTimeLeft(Math.floor(15000 / difficulty)); // От 7.5 до 30 секунд
-    
-    // Создаем первую цель
-    spawnTarget();
   };
 
   // Создать новую цель
@@ -61,6 +58,12 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
   // Игровой цикл
   useEffect(() => {
     if (gameState !== 'active') return;
+
+    // Начальный спавн целей
+    const maxTargets = Math.ceil(2 + difficulty);
+    for (let i = 0; i < Math.min(3, maxTargets); i++) {
+      setTimeout(() => spawnTarget(), i * 500);
+    }
 
     const gameLoop = setInterval(() => {
       // Движение целей
@@ -95,21 +98,26 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
         }
         return newTime;
       });
+    }, 50);
 
-      // Спавн новых целей
+    // Спавн новых целей (отдельный интервал)
+    const spawnInterval = setInterval(() => {
       setTargets(prev => {
         const activeTargets = prev.filter(t => !t.hit);
-        const maxTargets = Math.ceil(1 + difficulty);
+        const maxTargets = Math.ceil(2 + difficulty);
         
-        if (activeTargets.length < maxTargets && Math.random() < 0.02 * difficulty) {
+        if (activeTargets.length < maxTargets) {
           spawnTarget();
         }
         
         return prev;
       });
-    }, 50);
+    }, 2000); // Спавн каждые 2 секунды
 
-    return () => clearInterval(gameLoop);
+    return () => {
+      clearInterval(gameLoop);
+      clearInterval(spawnInterval);
+    };
   }, [gameState, difficulty, onComplete]);
 
   // Проверка победы
@@ -121,16 +129,24 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
   }, [score, requiredScore, gameState, onComplete]);
 
   // Выстрел по цели
-  const shootTarget = (targetId: number) => {
+  const shootTarget = (targetId: number, event: React.MouseEvent) => {
+    event.stopPropagation(); // Останавливаем всплытие события
     if (gameState !== 'active') return;
 
-    setTargets(prev => prev.map(target => {
-      if (target.id === targetId && !target.hit) {
-        setScore(s => s + 1);
-        return { ...target, hit: true };
-      }
-      return target;
-    }));
+    // Проверяем, что цель еще не была подбита
+    setTargets(prev => {
+      const target = prev.find(t => t.id === targetId);
+      if (!target || target.hit) return prev;
+
+      setScore(s => s + 1);
+      
+      return prev.map(t => {
+        if (t.id === targetId) {
+          return { ...t, hit: true };
+        }
+        return t;
+      });
+    });
 
     // Убираем пораженную цель через 500мс
     setTimeout(() => {
@@ -206,7 +222,7 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
             {targets.map(target => (
               <div
                 key={target.id}
-                onClick={() => shootTarget(target.id)}
+                onClick={(e) => shootTarget(target.id, e)}
                 style={{
                   position: 'absolute',
                   left: `${target.x}%`,
@@ -217,7 +233,8 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
                   transition: 'all 0.05s linear',
                   opacity: target.hit ? 0.3 : 1,
                   filter: target.hit ? 'grayscale(100%)' : 'none',
-                  pointerEvents: target.hit ? 'none' : 'auto'
+                  pointerEvents: target.hit ? 'none' : 'auto',
+                  zIndex: 10
                 }}
               >
                 🦅

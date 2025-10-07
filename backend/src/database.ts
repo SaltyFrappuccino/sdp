@@ -1017,13 +1017,13 @@ export async function initDB() {
       CREATE TABLE IF NOT EXISTS CharacterFishInventory (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         character_id INTEGER NOT NULL,
-        fish_id INTEGER NOT NULL,
+        species_id INTEGER NOT NULL,
         weight REAL,
         caught_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         location_id INTEGER,
         is_sold BOOLEAN DEFAULT 0,
         FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
-        FOREIGN KEY (fish_id) REFERENCES FishSpecies(id) ON DELETE CASCADE,
+        FOREIGN KEY (species_id) REFERENCES BestiarySpecies(id) ON DELETE CASCADE,
         FOREIGN KEY (location_id) REFERENCES FishingLocations(id)
       );
 
@@ -1351,7 +1351,52 @@ export async function initDB() {
       console.error('Error removing old tables:', error);
     }
 
-    // Миграция 3: Добавление quality_modifier в инвентарь
+    // Миграция 3: Переименование fish_id в species_id в CharacterFishInventory
+    try {
+      const fishTableInfo = await db.all(`PRAGMA table_info(CharacterFishInventory)`);
+      const hasFishId = fishTableInfo.some((col: any) => col.name === 'fish_id');
+      const hasSpeciesId = fishTableInfo.some((col: any) => col.name === 'species_id');
+      
+      if (hasFishId && !hasSpeciesId) {
+        console.log('Migrating fish_id to species_id in CharacterFishInventory...');
+        
+        // SQLite не поддерживает переименование столбцов напрямую, создаем новую таблицу
+        await db.run(`
+          CREATE TABLE CharacterFishInventory_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            character_id INTEGER NOT NULL,
+            species_id INTEGER NOT NULL,
+            weight REAL,
+            caught_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            location_id INTEGER,
+            is_sold BOOLEAN DEFAULT 0,
+            quality_modifier REAL DEFAULT 1.0,
+            FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+            FOREIGN KEY (species_id) REFERENCES BestiarySpecies(id) ON DELETE CASCADE,
+            FOREIGN KEY (location_id) REFERENCES FishingLocations(id)
+          )
+        `);
+        
+        // Копируем данные
+        await db.run(`
+          INSERT INTO CharacterFishInventory_new (id, character_id, species_id, weight, caught_at, location_id, is_sold)
+          SELECT id, character_id, fish_id, weight, caught_at, location_id, is_sold
+          FROM CharacterFishInventory
+        `);
+        
+        // Удаляем старую и переименовываем новую
+        await db.run(`DROP TABLE CharacterFishInventory`);
+        await db.run(`ALTER TABLE CharacterFishInventory_new RENAME TO CharacterFishInventory`);
+        
+        console.log('✓ fish_id migrated to species_id in CharacterFishInventory');
+      } else {
+        console.log('✓ CharacterFishInventory already uses species_id');
+      }
+    } catch (error) {
+      console.error('Error migrating fish_id to species_id:', error);
+    }
+
+    // Миграция 4: Добавление quality_modifier в инвентарь (если еще не добавлено)
     try {
       const fishTableInfo = await db.all(`PRAGMA table_info(CharacterFishInventory)`);
       const hasQualityModifier = fishTableInfo.some((col: any) => col.name === 'quality_modifier');
@@ -1378,7 +1423,7 @@ export async function initDB() {
       console.error('Error adding quality_modifier:', error);
     }
 
-    // Миграция 4: Проверка обновления снаряжения с отсылками на игры
+    // Миграция 5: Проверка обновления снаряжения с отсылками на игры
     try {
       const sampleGear = await db.get(`SELECT name FROM HuntingGear WHERE name LIKE '%Rebellion%' OR name LIKE '%Алмазный меч%'`);
       

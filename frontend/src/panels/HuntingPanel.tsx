@@ -175,15 +175,8 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/hunting/gear`);
       const data = await response.json();
       
-      // Показываем только покупаемое снаряжение (не базовое) и фильтруем по типу охоты
-      const shopItems = data.filter((item: any) => {
-        if (item.is_basic) return false;
-        if (huntType === 'aerial') {
-          return item.type === 'Оружие' || item.type === 'Броня' || item.type === 'Воздушная ловушка';
-        } else {
-          return item.type === 'Оружие' || item.type === 'Броня' || item.type === 'Наземная ловушка';
-        }
-      });
+      // Показываем только покупаемое снаряжение (не базовое) - БЕЗ ФИЛЬТРОВ
+      const shopItems = data.filter((item: any) => !item.is_basic);
       
       // Сортируем по типу и качеству (от худшего к лучшему)
       const qualityOrder: { [key: string]: number } = { 'Обычное': 1, 'Хорошее': 2, 'Отличное': 3, 'Эпическое': 4, 'Легендарное': 5 };
