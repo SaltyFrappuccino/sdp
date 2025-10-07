@@ -1311,6 +1311,69 @@ export async function initDB() {
       await seedHuntingCreatures(db);
     }
 
+    // ============================================
+    // Автоматические миграции при запуске сервера
+    // ============================================
+    console.log('Running automatic migrations...');
+    
+    // Миграция 1: Добавление habitat_category в HuntingGear
+    try {
+      const tableInfo = await db.all(`PRAGMA table_info(HuntingGear)`);
+      const hasHabitatCategory = tableInfo.some((col: any) => col.name === 'habitat_category');
+      
+      if (!hasHabitatCategory) {
+        console.log('Adding habitat_category field to HuntingGear...');
+        await db.run(`
+          ALTER TABLE HuntingGear 
+          ADD COLUMN habitat_category TEXT CHECK(habitat_category IN ('Наземное', 'Воздушное', 'Универсальное')) DEFAULT 'Универсальное'
+        `);
+        
+        // Обновляем существующие записи
+        await db.run(`UPDATE HuntingGear SET habitat_category = 'Наземное' WHERE type = 'Наземная ловушка'`);
+        await db.run(`UPDATE HuntingGear SET habitat_category = 'Воздушное' WHERE type = 'Воздушная ловушка'`);
+        await db.run(`UPDATE HuntingGear SET habitat_category = 'Универсальное' WHERE type IN ('Оружие', 'Броня')`);
+        console.log('✓ habitat_category field added successfully');
+      } else {
+        console.log('✓ habitat_category field already exists');
+      }
+    } catch (error) {
+      console.error('Error adding habitat_category:', error);
+    }
+
+    // Миграция 2: Удаление старых таблиц (если есть)
+    try {
+      await db.run(`DROP TABLE IF EXISTS HuntingSpecies`);
+      await db.run(`DROP TABLE IF EXISTS FishSpecies`);
+      await db.run(`DROP TABLE IF EXISTS HuntingLocationSpawns`);
+      await db.run(`DROP TABLE IF EXISTS FishLocationSpawns`);
+      console.log('✓ Old species tables cleaned up (now using Bestiary)');
+    } catch (error) {
+      console.error('Error removing old tables:', error);
+    }
+
+    // Миграция 3: Проверка обновления снаряжения с отсылками на игры
+    try {
+      const sampleGear = await db.get(`SELECT name FROM HuntingGear WHERE name LIKE '%Rebellion%' OR name LIKE '%Алмазный меч%'`);
+      
+      if (!sampleGear) {
+        console.log('Updating gear with game references...');
+        // Очищаем старое снаряжение
+        await db.run(`DELETE FROM HuntingGear WHERE 1=1`);
+        await db.run(`DELETE FROM FishingGear WHERE 1=1`);
+        
+        // Пересоздаем с новыми названиями
+        await seedHuntingData(db);
+        await seedFishingData(db);
+        console.log('✓ Gear updated with game references (Minecraft, DMC, LoL, Persona 5)');
+      } else {
+        console.log('✓ Gear already updated with game references');
+      }
+    } catch (error) {
+      console.error('Error updating gear:', error);
+    }
+
+    console.log('All migrations completed successfully!');
+
     return db;
 
   } catch (error) {
