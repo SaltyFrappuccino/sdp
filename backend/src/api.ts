@@ -7239,7 +7239,7 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
       FROM BestiarySpecies s
       JOIN HuntingLocationSpawns sp ON s.id = sp.species_id
       LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
-      WHERE sp.location_id = ? AND s.is_active = 1 AND s.habitat = ?
+      WHERE sp.location_id = ? AND s.is_active = 1 AND s.habitat_type = ?
     `, location_id, habitat);
 
     let bonusSuccess = 0;
