@@ -2165,58 +2165,27 @@ export async function seedHuntingCreatures(db: any) {
   try {
     console.log('Force seeding hunting creatures and spawns...');
     
-    // Сначала проверим, какие типы среды обитания есть в базе
-    const habitatTypes = await db.all(`
-      SELECT DISTINCT habitat_type FROM BestiarySpecies 
-      ORDER BY habitat_type
-    `);
-    console.log('Available habitat types:', habitatTypes.map((h: any) => h.habitat_type));
-    
-    // Получаем ID существ из BestiarySpecies
-    const aerialCreatures = await db.all(`
-      SELECT id FROM BestiarySpecies 
-      WHERE habitat_type = 'Воздушный' 
-      ORDER BY id
-    `);
-    
-    const terrestrialCreatures = await db.all(`
-      SELECT id FROM BestiarySpecies 
-      WHERE habitat_type = 'Наземный' 
-      ORDER BY id
+    // Создаем таблицу для существ охоты, как у рыбалки
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS HuntingSpecies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        habitat_type TEXT NOT NULL CHECK (habitat_type IN ('Воздушный', 'Наземный')),
+        danger_rank TEXT NOT NULL CHECK (danger_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S')),
+        drop_items TEXT,
+        credit_value_min INTEGER DEFAULT 0,
+        credit_value_max INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT 1
+      )
     `);
     
-    console.log('Aerial creatures found:', aerialCreatures.length);
-    console.log('Terrestrial creatures found:', terrestrialCreatures.length);
-    
-    // Если нет существ с правильными типами, попробуем альтернативные варианты
-    if (aerialCreatures.length === 0 && terrestrialCreatures.length === 0) {
-      console.log('Trying alternative habitat type names...');
-      
-      // Попробуем другие возможные названия
-      const aerialAlt = await db.all(`
-        SELECT id FROM BestiarySpecies 
-        WHERE habitat_type LIKE '%Воздух%' OR habitat_type LIKE '%Aerial%' OR habitat_type LIKE '%Air%'
-        ORDER BY id
-      `);
-      
-      const terrestrialAlt = await db.all(`
-        SELECT id FROM BestiarySpecies 
-        WHERE habitat_type LIKE '%Земл%' OR habitat_type LIKE '%Terrestrial%' OR habitat_type LIKE '%Ground%'
-        ORDER BY id
-      `);
-      
-      console.log('Alternative aerial creatures found:', aerialAlt.length);
-      console.log('Alternative terrestrial creatures found:', terrestrialAlt.length);
-      
-      if (aerialAlt.length > 0 || terrestrialAlt.length > 0) {
-        // Используем альтернативные результаты
-        aerialCreatures.push(...aerialAlt);
-        terrestrialCreatures.push(...terrestrialAlt);
-      }
-    }
-    
-    if (aerialCreatures.length === 0 && terrestrialCreatures.length === 0) {
-      console.log('No creatures found in BestiarySpecies, creating basic hunting creatures...');
+    // Проверяем, есть ли уже существа
+    const existingCount = await db.get(`SELECT COUNT(*) as count FROM HuntingSpecies`);
+    if (existingCount.count > 0) {
+      console.log('Hunting species already exist, using existing data...');
+    } else {
+      console.log('Creating basic hunting creatures...');
       
       // Создаем базовых существ для охоты
       const basicCreatures = [
@@ -2238,33 +2207,40 @@ export async function seedHuntingCreatures(db: any) {
       ];
       
       for (const creature of basicCreatures) {
-        const result = await db.run(`
-          INSERT INTO BestiarySpecies (name, description, habitat_type, mutation_class, danger_rank, 
+        await db.run(`
+          INSERT INTO HuntingSpecies (name, description, habitat_type, danger_rank, 
                                      drop_items, credit_value_min, credit_value_max, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `, 
           creature.name,
           creature.description,
           creature.habitat,
-          creature.habitat === 'Воздушный' ? 'Затронутые' : 'Затронутые',
           creature.rank,
           JSON.stringify(['Мясо', 'Шкура', 'Кость']),
           creature.rank === 'F' ? 10 : creature.rank === 'E' ? 25 : creature.rank === 'D' ? 50 : creature.rank === 'C' ? 100 : creature.rank === 'B' ? 250 : 500,
           creature.rank === 'F' ? 20 : creature.rank === 'E' ? 50 : creature.rank === 'D' ? 100 : creature.rank === 'C' ? 200 : creature.rank === 'B' ? 500 : 1000,
           1
         );
-        
-        const creatureId = result.lastInsertRowid || result.lastID;
-        
-        if (creature.habitat === 'Воздушный') {
-          aerialCreatures.push({ id: creatureId });
-        } else {
-          terrestrialCreatures.push({ id: creatureId });
-        }
       }
       
-      console.log(`Created ${aerialCreatures.length} aerial and ${terrestrialCreatures.length} terrestrial creatures`);
+      console.log(`Created ${basicCreatures.length} hunting creatures`);
     }
+    
+    // Получаем ID существ из HuntingSpecies
+    const aerialCreatures = await db.all(`
+      SELECT id FROM HuntingSpecies 
+      WHERE habitat_type = 'Воздушный' AND is_active = 1
+      ORDER BY id
+    `);
+    
+    const terrestrialCreatures = await db.all(`
+      SELECT id FROM HuntingSpecies 
+      WHERE habitat_type = 'Наземный' AND is_active = 1
+      ORDER BY id
+    `);
+    
+    console.log('Aerial creatures found:', aerialCreatures.length);
+    console.log('Terrestrial creatures found:', terrestrialCreatures.length);
     
     // Получаем ID локаций охоты
     const locations = await db.all(`

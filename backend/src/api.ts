@@ -7232,15 +7232,14 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
     const db = await initDB();
 
     // Определяем среду обитания в зависимости от типа охоты
-    const habitat = hunt_type === 'aerial' ? 'Воздух' : 'Земля';
+    const habitat = hunt_type === 'aerial' ? 'Воздушный' : 'Наземный';
 
     const creatures = await db.all(`
-      SELECT s.*, sp.spawn_chance, c.drop_items, c.credit_value_min, c.credit_value_max
-      FROM BestiarySpecies s
+      SELECT s.*, sp.spawn_chance
+      FROM HuntingSpecies s
       JOIN HuntingLocationSpawns sp ON s.id = sp.species_id
-      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
       WHERE sp.location_id = ? AND s.is_active = 1 AND s.habitat_type = ?
-    `, location_id, habitat);
+    `, [location_id, habitat]);
 
     let bonusSuccess = 0;
     if (gear_ids && gear_ids.length > 0) {
