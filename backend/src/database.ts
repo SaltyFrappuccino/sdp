@@ -2445,152 +2445,204 @@ export async function cleanDuplicateRecords(db: any) {
 
     // Очищаем дублирующиеся записи FishingGear
     console.log('Cleaning FishingGear duplicates...');
-    const fishingDuplicates = await db.all(`
-      SELECT name, type, quality, price, COUNT(*) as count 
-      FROM FishingGear 
-      GROUP BY name, type, quality, price 
-      HAVING COUNT(*) > 1
-    `);
-    
-    for (const duplicate of fishingDuplicates) {
-      console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.type}, ${duplicate.quality})`);
+    try {
+      const fishingDuplicates = await db.all(`
+        SELECT name, type, quality, price, COUNT(*) as count 
+        FROM FishingGear 
+        GROUP BY name, type, quality, price 
+        HAVING COUNT(*) > 1
+      `);
       
-      // Оставляем только одну запись, удаляем остальные
-      await db.run(`
-        DELETE FROM FishingGear 
-        WHERE name = ? AND type = ? AND quality = ? AND price = ?
-        AND id NOT IN (
-          SELECT MIN(id) FROM FishingGear 
+      for (const duplicate of fishingDuplicates) {
+        console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.type}, ${duplicate.quality})`);
+        
+        // Оставляем только одну запись, удаляем остальные
+        await db.run(`
+          DELETE FROM FishingGear 
           WHERE name = ? AND type = ? AND quality = ? AND price = ?
-        )
-      `, [
-        duplicate.name, duplicate.type, duplicate.quality, duplicate.price,
-        duplicate.name, duplicate.type, duplicate.quality, duplicate.price
-      ]);
+          AND id NOT IN (
+            SELECT MIN(id) FROM FishingGear 
+            WHERE name = ? AND type = ? AND quality = ? AND price = ?
+          )
+        `, [
+          duplicate.name, duplicate.type, duplicate.quality, duplicate.price,
+          duplicate.name, duplicate.type, duplicate.quality, duplicate.price
+        ]);
+      }
+    } catch (error) {
+      console.log('FishingGear table does not exist or has no duplicates, skipping...');
     }
 
     // Очищаем дублирующиеся записи HuntingGear
     console.log('Cleaning HuntingGear duplicates...');
-    const huntingDuplicates = await db.all(`
-      SELECT name, type, quality, price, COUNT(*) as count 
-      FROM HuntingGear 
-      GROUP BY name, type, quality, price 
-      HAVING COUNT(*) > 1
-    `);
-    
-    for (const duplicate of huntingDuplicates) {
-      console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.type}, ${duplicate.quality})`);
+    try {
+      const huntingDuplicates = await db.all(`
+        SELECT name, type, quality, price, COUNT(*) as count 
+        FROM HuntingGear 
+        GROUP BY name, type, quality, price 
+        HAVING COUNT(*) > 1
+      `);
       
-      // Оставляем только одну запись, удаляем остальные
-      await db.run(`
-        DELETE FROM HuntingGear 
-        WHERE name = ? AND type = ? AND quality = ? AND price = ?
-        AND id NOT IN (
-          SELECT MIN(id) FROM HuntingGear 
+      for (const duplicate of huntingDuplicates) {
+        console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.type}, ${duplicate.quality})`);
+        
+        // Оставляем только одну запись, удаляем остальные
+        await db.run(`
+          DELETE FROM HuntingGear 
           WHERE name = ? AND type = ? AND quality = ? AND price = ?
-        )
-      `, [
-        duplicate.name, duplicate.type, duplicate.quality, duplicate.price,
-        duplicate.name, duplicate.type, duplicate.quality, duplicate.price
-      ]);
+          AND id NOT IN (
+            SELECT MIN(id) FROM HuntingGear 
+            WHERE name = ? AND type = ? AND quality = ? AND price = ?
+          )
+        `, [
+          duplicate.name, duplicate.type, duplicate.quality, duplicate.price,
+          duplicate.name, duplicate.type, duplicate.quality, duplicate.price
+        ]);
+      }
+    } catch (error) {
+      console.log('HuntingGear table does not exist or has no duplicates, skipping...');
     }
 
     // Очищаем дублирующиеся записи FishingLocations
     console.log('Cleaning FishingLocations duplicates...');
-    const fishingLocationDuplicates = await db.all(`
-      SELECT name, island, region, water_type, COUNT(*) as count 
-      FROM FishingLocations 
-      GROUP BY name, island, region, water_type 
-      HAVING COUNT(*) > 1
-    `);
-    
-    for (const duplicate of fishingLocationDuplicates) {
-      console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.island}, ${duplicate.region})`);
+    try {
+      const fishingLocationDuplicates = await db.all(`
+        SELECT name, island, region, water_type, COUNT(*) as count 
+        FROM FishingLocations 
+        GROUP BY name, island, region, water_type 
+        HAVING COUNT(*) > 1
+      `);
       
-      // Оставляем только одну запись, удаляем остальные
-      await db.run(`
-        DELETE FROM FishingLocations 
-        WHERE name = ? AND island = ? AND region = ? AND water_type = ?
-        AND id NOT IN (
-          SELECT MIN(id) FROM FishingLocations 
+      for (const duplicate of fishingLocationDuplicates) {
+        console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.island}, ${duplicate.region})`);
+        
+        // Оставляем только одну запись, удаляем остальные
+        await db.run(`
+          DELETE FROM FishingLocations 
           WHERE name = ? AND island = ? AND region = ? AND water_type = ?
-        )
-      `, [
-        duplicate.name, duplicate.island, duplicate.region, duplicate.water_type,
-        duplicate.name, duplicate.island, duplicate.region, duplicate.water_type
-      ]);
+          AND id NOT IN (
+            SELECT MIN(id) FROM FishingLocations 
+            WHERE name = ? AND island = ? AND region = ? AND water_type = ?
+          )
+        `, [
+          duplicate.name, duplicate.island, duplicate.region, duplicate.water_type,
+          duplicate.name, duplicate.island, duplicate.region, duplicate.water_type
+        ]);
+      }
+    } catch (error) {
+      console.log('FishingLocations table does not exist or has no duplicates, skipping...');
     }
 
     // Очищаем дублирующиеся записи HuntingLocations
     console.log('Cleaning HuntingLocations duplicates...');
-    const huntingLocationDuplicates = await db.all(`
-      SELECT name, island, region, terrain_type, COUNT(*) as count 
-      FROM HuntingLocations 
-      GROUP BY name, island, region, terrain_type 
-      HAVING COUNT(*) > 1
-    `);
-    
-    for (const duplicate of huntingLocationDuplicates) {
-      console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.island}, ${duplicate.region})`);
+    try {
+      const huntingLocationDuplicates = await db.all(`
+        SELECT name, island, region, terrain_type, COUNT(*) as count 
+        FROM HuntingLocations 
+        GROUP BY name, island, region, terrain_type 
+        HAVING COUNT(*) > 1
+      `);
       
-      // Оставляем только одну запись, удаляем остальные
-      await db.run(`
-        DELETE FROM HuntingLocations 
-        WHERE name = ? AND island = ? AND region = ? AND terrain_type = ?
-        AND id NOT IN (
-          SELECT MIN(id) FROM HuntingLocations 
+      for (const duplicate of huntingLocationDuplicates) {
+        console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.island}, ${duplicate.region})`);
+        
+        // Оставляем только одну запись, удаляем остальные
+        await db.run(`
+          DELETE FROM HuntingLocations 
           WHERE name = ? AND island = ? AND region = ? AND terrain_type = ?
-        )
-      `, [
-        duplicate.name, duplicate.island, duplicate.region, duplicate.terrain_type,
-        duplicate.name, duplicate.island, duplicate.region, duplicate.terrain_type
-      ]);
+          AND id NOT IN (
+            SELECT MIN(id) FROM HuntingLocations 
+            WHERE name = ? AND island = ? AND region = ? AND terrain_type = ?
+          )
+        `, [
+          duplicate.name, duplicate.island, duplicate.region, duplicate.terrain_type,
+          duplicate.name, duplicate.island, duplicate.region, duplicate.terrain_type
+        ]);
+      }
+    } catch (error) {
+      console.log('HuntingLocations table does not exist or has no duplicates, skipping...');
     }
 
     // Очищаем дублирующиеся записи FishSpecies
     console.log('Cleaning FishSpecies duplicates...');
-    const fishDuplicates = await db.all(`
-      SELECT name, rarity, COUNT(*) as count 
-      FROM FishSpecies 
-      GROUP BY name, rarity 
-      HAVING COUNT(*) > 1
-    `);
-    
-    for (const duplicate of fishDuplicates) {
-      console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.rarity})`);
+    try {
+      const fishDuplicates = await db.all(`
+        SELECT name, rarity, COUNT(*) as count 
+        FROM FishSpecies 
+        GROUP BY name, rarity 
+        HAVING COUNT(*) > 1
+      `);
       
-      // Оставляем только одну запись, удаляем остальные
-      await db.run(`
-        DELETE FROM FishSpecies 
-        WHERE name = ? AND rarity = ?
-        AND id NOT IN (
-          SELECT MIN(id) FROM FishSpecies 
+      for (const duplicate of fishDuplicates) {
+        console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.rarity})`);
+        
+        // Оставляем только одну запись, удаляем остальные
+        await db.run(`
+          DELETE FROM FishSpecies 
           WHERE name = ? AND rarity = ?
-        )
-      `, [duplicate.name, duplicate.rarity, duplicate.name, duplicate.rarity]);
+          AND id NOT IN (
+            SELECT MIN(id) FROM FishSpecies 
+            WHERE name = ? AND rarity = ?
+          )
+        `, [duplicate.name, duplicate.rarity, duplicate.name, duplicate.rarity]);
+      }
+    } catch (error) {
+      console.log('FishSpecies table does not exist or has no duplicates, skipping...');
     }
 
     // Очищаем дублирующиеся записи BestiarySpecies
     console.log('Cleaning BestiarySpecies duplicates...');
-    const bestiaryDuplicates = await db.all(`
-      SELECT name, habitat, COUNT(*) as count 
-      FROM BestiarySpecies 
-      GROUP BY name, habitat 
-      HAVING COUNT(*) > 1
-    `);
-    
-    for (const duplicate of bestiaryDuplicates) {
-      console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.habitat})`);
+    try {
+      // Проверяем, есть ли колонка habitat
+      const bestiaryColumns = await db.all(`PRAGMA table_info(BestiarySpecies)`);
+      const hasHabitatColumn = bestiaryColumns.some((col: any) => col.name === 'habitat');
       
-      // Оставляем только одну запись, удаляем остальные
-      await db.run(`
-        DELETE FROM BestiarySpecies 
-        WHERE name = ? AND habitat = ?
-        AND id NOT IN (
-          SELECT MIN(id) FROM BestiarySpecies 
-          WHERE name = ? AND habitat = ?
-        )
-      `, [duplicate.name, duplicate.habitat, duplicate.name, duplicate.habitat]);
+      if (hasHabitatColumn) {
+        const bestiaryDuplicates = await db.all(`
+          SELECT name, habitat, COUNT(*) as count 
+          FROM BestiarySpecies 
+          GROUP BY name, habitat 
+          HAVING COUNT(*) > 1
+        `);
+        
+        for (const duplicate of bestiaryDuplicates) {
+          console.log(`Found ${duplicate.count} duplicates of ${duplicate.name} (${duplicate.habitat})`);
+          
+          // Оставляем только одну запись, удаляем остальные
+          await db.run(`
+            DELETE FROM BestiarySpecies 
+            WHERE name = ? AND habitat = ?
+            AND id NOT IN (
+              SELECT MIN(id) FROM BestiarySpecies 
+              WHERE name = ? AND habitat = ?
+            )
+          `, [duplicate.name, duplicate.habitat, duplicate.name, duplicate.habitat]);
+        }
+      } else {
+        // Если нет колонки habitat, используем только name
+        const bestiaryDuplicates = await db.all(`
+          SELECT name, COUNT(*) as count 
+          FROM BestiarySpecies 
+          GROUP BY name 
+          HAVING COUNT(*) > 1
+        `);
+        
+        for (const duplicate of bestiaryDuplicates) {
+          console.log(`Found ${duplicate.count} duplicates of ${duplicate.name}`);
+          
+          // Оставляем только одну запись, удаляем остальные
+          await db.run(`
+            DELETE FROM BestiarySpecies 
+            WHERE name = ?
+            AND id NOT IN (
+              SELECT MIN(id) FROM BestiarySpecies 
+              WHERE name = ?
+            )
+          `, [duplicate.name, duplicate.name]);
+        }
+      }
+    } catch (error) {
+      console.log('BestiarySpecies table does not exist or has no duplicates, skipping...');
     }
 
     console.log('Cleanup completed successfully');
