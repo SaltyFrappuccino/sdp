@@ -7252,12 +7252,27 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
       });
     }
 
-    const roll = Math.random() + bonusSuccess;
+    const roll = Math.random();
     let huntedCreature = null;
 
-    for (const c of creatures) {
-      if (roll >= c.spawn_chance) {
+    console.log('Hunting debug:', {
+      creaturesCount: creatures.length,
+      bonusSuccess,
+      roll,
+      creatures: creatures.map(c => ({ name: c.name, spawn_chance: c.spawn_chance }))
+    });
+
+    // Сортируем существ по шансу появления (от большего к меньшему)
+    const sortedCreatures = creatures.sort((a, b) => b.spawn_chance - a.spawn_chance);
+    
+    for (const c of sortedCreatures) {
+      // Учитываем бонусы от снаряжения
+      const successChance = c.spawn_chance + bonusSuccess;
+      console.log(`Checking ${c.name}: spawn_chance=${c.spawn_chance}, bonusSuccess=${bonusSuccess}, successChance=${successChance}, roll=${roll}`);
+      if (roll <= successChance) {
         huntedCreature = c;
+        console.log(`Successfully hunted: ${c.name}`);
+        break; // Останавливаемся на первом успешном существе
       }
     }
 
