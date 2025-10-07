@@ -112,7 +112,7 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
         
         return prev;
       });
-    }, 2000); // Спавн каждые 2 секунды
+    }, 1000); // Спавн каждую секунду
 
     return () => {
       clearInterval(gameLoop);
@@ -130,14 +130,19 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
 
   // Выстрел по цели
   const shootTarget = (targetId: number, event: React.MouseEvent) => {
+    event.preventDefault();
     event.stopPropagation(); // Останавливаем всплытие события
     if (gameState !== 'active') return;
 
     // Проверяем, что цель еще не была подбита
     setTargets(prev => {
       const target = prev.find(t => t.id === targetId);
-      if (!target || target.hit) return prev;
+      if (!target || target.hit) {
+        console.log('Target already hit or not found:', targetId);
+        return prev;
+      }
 
+      console.log('Hit target:', targetId);
       setScore(s => s + 1);
       
       return prev.map(t => {

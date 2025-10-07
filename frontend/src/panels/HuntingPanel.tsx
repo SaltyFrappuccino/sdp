@@ -143,9 +143,16 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       setLoading(true);
       const response = await fetch(`${API_URL}/hunting/locations`);
       const data = await response.json();
-      setLocations(data);
+      // Убеждаемся, что data - это массив
+      if (Array.isArray(data)) {
+        setLocations(data);
+      } else {
+        console.error('API вернул не массив:', data);
+        setLocations([]);
+      }
     } catch (error) {
       console.error('Ошибка при загрузке локаций:', error);
+      setLocations([]);
     } finally {
       setLoading(false);
     }
@@ -156,17 +163,24 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/hunting/gear/${characterId}`);
       const data = await response.json();
-      // Фильтруем снаряжение по типу охоты
-      const filteredGear = data.filter((item: any) => {
-        if (huntType === 'aerial') {
-          return item.type === 'Воздушное оружие' || item.type === 'Броня' || item.type === 'Воздушная ловушка';
-        } else {
-          return item.type === 'Наземное оружие' || item.type === 'Броня' || item.type === 'Наземная ловушка';
-        }
-      });
-      setGear(filteredGear);
+      // Убеждаемся, что data - это массив
+      if (Array.isArray(data)) {
+        // Фильтруем снаряжение по типу охоты
+        const filteredGear = data.filter((item: any) => {
+          if (huntType === 'aerial') {
+            return item.type === 'Воздушное оружие' || item.type === 'Броня' || item.type === 'Воздушная ловушка';
+          } else {
+            return item.type === 'Наземное оружие' || item.type === 'Броня' || item.type === 'Наземная ловушка';
+          }
+        });
+        setGear(filteredGear);
+      } else {
+        console.error('API вернул не массив:', data);
+        setGear([]);
+      }
     } catch (error) {
       console.error('Ошибка при загрузке снаряжения:', error);
+      setGear([]);
     }
   };
 
@@ -196,9 +210,16 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/hunting/inventory/${characterId}`);
       const data = await response.json();
-      setInventory(data);
+      // Убеждаемся, что data - это массив
+      if (Array.isArray(data)) {
+        setInventory(data);
+      } else {
+        console.error('API вернул не массив:', data);
+        setInventory([]);
+      }
     } catch (error) {
       console.error('Ошибка при загрузке инвентаря:', error);
+      setInventory([]);
     }
   };
 

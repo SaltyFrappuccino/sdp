@@ -54,7 +54,7 @@ const TerrestrialHuntingMinigame: React.FC<TerrestrialHuntingMinigameProps> = ({
   }, [gameState, difficulty, onComplete]);
 
   // Обработка нажатия направления
-  const handleDirectionClick = (direction: 'up' | 'down' | 'left' | 'right') => {
+  const handleDirectionClick = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (gameState !== 'tracking') return;
 
     if (direction === currentDirection) {
@@ -78,7 +78,7 @@ const TerrestrialHuntingMinigame: React.FC<TerrestrialHuntingMinigameProps> = ({
       // Неправильное направление
       setTrackingProgress(prev => Math.max(0, prev - 10));
     }
-  };
+  }, [gameState, currentDirection, difficulty, trackingProgress]);
 
   // Фаза 2: Прицеливание (перемещай прицел к цели)
   useEffect(() => {

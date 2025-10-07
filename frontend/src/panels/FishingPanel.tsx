@@ -134,9 +134,16 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       setLoading(true);
       const response = await fetch(`${API_URL}/fishing/locations`);
       const data = await response.json();
-      setLocations(data);
+      // Убеждаемся, что data - это массив
+      if (Array.isArray(data)) {
+        setLocations(data);
+      } else {
+        console.error('API вернул не массив:', data);
+        setLocations([]);
+      }
     } catch (error) {
       console.error('Ошибка при загрузке локаций:', error);
+      setLocations([]);
     } finally {
       setLoading(false);
     }
@@ -147,9 +154,16 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/fishing/gear/${characterId}`);
       const data = await response.json();
-      setGear(data);
+      // Убеждаемся, что data - это массив
+      if (Array.isArray(data)) {
+        setGear(data);
+      } else {
+        console.error('API вернул не массив:', data);
+        setGear([]);
+      }
     } catch (error) {
       console.error('Ошибка при загрузке снаряжения:', error);
+      setGear([]);
     }
   };
 
@@ -178,9 +192,16 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/fishing/inventory/${characterId}`);
       const data = await response.json();
-      setInventory(data);
+      // Убеждаемся, что data - это массив
+      if (Array.isArray(data)) {
+        setInventory(data);
+      } else {
+        console.error('API вернул не массив:', data);
+        setInventory([]);
+      }
     } catch (error) {
       console.error('Ошибка при загрузке инвентаря:', error);
+      setInventory([]);
     }
   };
 

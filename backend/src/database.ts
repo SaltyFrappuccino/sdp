@@ -985,15 +985,7 @@ export async function initDB() {
         is_active BOOLEAN DEFAULT 1
       );
 
-      -- Связь существ с охотничьими локациями
-      CREATE TABLE IF NOT EXISTS HuntingLocationSpawns (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        species_id INTEGER NOT NULL,
-        location_id INTEGER NOT NULL,
-        spawn_chance REAL,
-        FOREIGN KEY (species_id) REFERENCES BestiarySpecies(id) ON DELETE CASCADE,
-        FOREIGN KEY (location_id) REFERENCES HuntingLocations(id) ON DELETE CASCADE
-      );
+      -- Примечание: Связь существ с охотничьими локациями теперь через BestiaryLocations
 
       -- Снаряжение для охоты
       CREATE TABLE IF NOT EXISTS HuntingGear (
@@ -1283,32 +1275,18 @@ export async function initDB() {
     await seedFishingData(db);
     await seedHuntingData(db);
     
-    // Проверяем, есть ли связи между локациями и существами
-    const huntingSpawnsCount = await db.get(`SELECT COUNT(*) as count FROM HuntingLocationSpawns`);
-    if (huntingSpawnsCount.count === 0) {
-      console.log('No hunting spawns found, force seeding hunting data...');
-      await seedHuntingData(db);
-    }
+    // Примечание: Связи между локациями и существами теперь через BestiaryLocations
       
       console.log('Migration completed successfully');
     } else {
       console.log('No migration needed, tables are up to date');
       
-      // Проверяем, есть ли связи между локациями и существами
-      const huntingSpawnsCount = await db.get(`SELECT COUNT(*) as count FROM HuntingLocationSpawns`);
-      console.log('HuntingLocationSpawns count:', huntingSpawnsCount.count);
-      
-      if (huntingSpawnsCount.count === 0) {
-        console.log('No hunting spawns found, force seeding hunting data...');
-        await seedHuntingData(db);
-      }
+      // Примечание: Связи между локациями и существами теперь через BestiaryLocations
       
       // Дополнительная проверка - принудительно заполняем данные охоты
       console.log('Force seeding hunting data to ensure spawns exist...');
       
-      // Принудительно заполняем существа и их связи с локациями
-      console.log('Force seeding hunting creatures and spawns...');
-      await seedHuntingCreatures(db);
+      // Примечание: Существа теперь создаются через BestiarySpecies
     }
 
     // ============================================
@@ -2297,149 +2275,7 @@ export async function seedFishingData(db: any) {
   }
 }
 
-export async function seedHuntingCreatures(db: any) {
-  try {
-    console.log('Force seeding hunting creatures and spawns...');
-    
-    // Создаем таблицу для существ охоты, как у рыбалки
-    await db.run(`
-      CREATE TABLE IF NOT EXISTS HuntingSpecies (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT,
-        habitat_type TEXT NOT NULL CHECK (habitat_type IN ('Воздушный', 'Наземный')),
-        danger_rank TEXT NOT NULL CHECK (danger_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S')),
-        drop_items TEXT,
-        credit_value_min INTEGER DEFAULT 0,
-        credit_value_max INTEGER DEFAULT 0,
-        is_active BOOLEAN DEFAULT 1
-      )
-    `);
-    
-    // Проверяем, есть ли уже существа
-    const existingCount = await db.get(`SELECT COUNT(*) as count FROM HuntingSpecies`);
-    if (existingCount.count > 0) {
-      console.log('Hunting species already exist, using existing data...');
-    } else {
-      console.log('Creating basic hunting creatures...');
-      
-        // Создаем базовых существ для охоты (цены за единицу добычи)
-        const basicCreatures = [
-          // Воздушные существа (F-E: 500-2,000₭, D-C: 3,000-8,000₭, B-A: 15,000-50,000₭)
-          { name: 'Ауральный Сокол', habitat: 'Воздушный', rank: 'F', description: 'Мелкая птица, затронутая Аурой' },
-          { name: 'Металлический Ворон', habitat: 'Воздушный', rank: 'E', description: 'Ворон с металлическими перьями' },
-          { name: 'Фантомный Орёл', habitat: 'Воздушный', rank: 'D', description: 'Полупрозрачный орёл-призрак' },
-          { name: 'Кристальная Ласточка', habitat: 'Воздушный', rank: 'C', description: 'Ласточка из чистого кристалла' },
-          { name: 'Громовой Дракон', habitat: 'Воздушный', rank: 'B', description: 'Дракон, управляющий молниями' },
-          { name: 'Ауральный Феникс', habitat: 'Воздушный', rank: 'A', description: 'Легендарная птица из чистой Ауры' },
-          
-          // Наземные существа
-          { name: 'Ауральный Волк', habitat: 'Наземный', rank: 'F', description: 'Волк, затронутый Аурой' },
-          { name: 'Металлический Медведь', habitat: 'Наземный', rank: 'E', description: 'Медведь с металлической шерстью' },
-          { name: 'Фантомный Тигр', habitat: 'Наземный', rank: 'D', description: 'Полупрозрачный тигр-призрак' },
-          { name: 'Кристальный Лев', habitat: 'Наземный', rank: 'C', description: 'Лев из чистого кристалла' },
-          { name: 'Земной Дракон', habitat: 'Наземный', rank: 'B', description: 'Дракон, управляющий землёй' },
-          { name: 'Ауральный Единорог', habitat: 'Наземный', rank: 'A', description: 'Легендарный единорог из чистой Ауры' }
-        ];
-      
-      for (const creature of basicCreatures) {
-        await db.run(`
-          INSERT INTO HuntingSpecies (name, description, habitat_type, danger_rank, 
-                                     drop_items, credit_value_min, credit_value_max, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `, 
-          creature.name,
-          creature.description,
-          creature.habitat,
-          creature.rank,
-          JSON.stringify(['Мясо', 'Шкура', 'Кость']),
-          creature.rank === 'F' ? 500 : creature.rank === 'E' ? 1200 : creature.rank === 'D' ? 3000 : creature.rank === 'C' ? 5500 : creature.rank === 'B' ? 15000 : 30000,
-          creature.rank === 'F' ? 800 : creature.rank === 'E' ? 2000 : creature.rank === 'D' ? 4500 : creature.rank === 'C' ? 8000 : creature.rank === 'B' ? 25000 : 50000,
-          1
-        );
-      }
-      
-      console.log(`Created ${basicCreatures.length} hunting creatures`);
-    }
-    
-    // Получаем ID существ из HuntingSpecies
-    const aerialCreatures = await db.all(`
-      SELECT id FROM HuntingSpecies 
-      WHERE habitat_type = 'Воздушный' AND is_active = 1
-      ORDER BY id
-    `);
-    
-    const terrestrialCreatures = await db.all(`
-      SELECT id FROM HuntingSpecies 
-      WHERE habitat_type = 'Наземный' AND is_active = 1
-      ORDER BY id
-    `);
-    
-    console.log('Aerial creatures found:', aerialCreatures.length);
-    console.log('Terrestrial creatures found:', terrestrialCreatures.length);
-    
-    // Получаем ID локаций охоты
-    const locations = await db.all(`
-      SELECT id, name FROM HuntingLocations 
-      WHERE is_active = 1 
-      ORDER BY id
-    `);
-    
-    console.log('Hunting locations found:', locations.length);
-    
-    // Очищаем существующие связи
-    await db.run(`DELETE FROM HuntingLocationSpawns`);
-    console.log('Cleared existing HuntingLocationSpawns');
-    
-    // Привязываем воздушных существ к локациям
-    for (const creature of aerialCreatures) {
-      for (const location of locations) {
-        let spawnChance = 0.1; // Базовая вероятность
-        
-        // Увеличиваем вероятность для лесных локаций
-        if (location.name.includes('Лес')) {
-          spawnChance = 0.3;
-        }
-        // Уменьшаем для эхо-зон
-        else if (location.name.includes('Эхо')) {
-          spawnChance = 0.05;
-        }
-        
-        await db.run(`
-          INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) 
-          VALUES (?, ?, ?)
-        `, location.id, creature.id, spawnChance);
-      }
-    }
-    
-    // Привязываем земных существ к локациям
-    for (const creature of terrestrialCreatures) {
-      for (const location of locations) {
-        let spawnChance = 0.15; // Базовая вероятность
-        
-        // Увеличиваем вероятность для лесных локаций
-        if (location.name.includes('Лес')) {
-          spawnChance = 0.4;
-        }
-        // Уменьшаем для эхо-зон
-        else if (location.name.includes('Эхо')) {
-          spawnChance = 0.08;
-        }
-        
-        await db.run(`
-          INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) 
-          VALUES (?, ?, ?)
-        `, location.id, creature.id, spawnChance);
-      }
-    }
-    
-    const finalCount = await db.get(`SELECT COUNT(*) as count FROM HuntingLocationSpawns`);
-    console.log(`Created ${finalCount.count} hunting spawns`);
-    
-  } catch (error) {
-    console.error('Error force seeding hunting creatures:', error);
-  }
-}
+// Примечание: Функция seedHuntingCreatures удалена, так как теперь используется BestiarySpecies
 
 export async function seedHuntingData(db: any) {
   try {
