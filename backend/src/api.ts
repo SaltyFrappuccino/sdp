@@ -6973,28 +6973,84 @@ router.get('/fishing/locations', async (req: Request, res: Response) => {
 });
 
 // Рыбалка - попытка поймать рыбу
-router.post('/fishing/catch', async (req: Request, res: Response) => {
+// Начать рыбалку - возвращает параметры для мини-игры
+router.post('/fishing/start', async (req: Request, res: Response) => {
   try {
     const { character_id, location_id, gear_ids } = req.body;
     const db = await initDB();
 
-    // Получаем локацию для проверки min_rank
+    // Получаем локацию
     const location = await db.get(`SELECT * FROM FishingLocations WHERE id = ?`, location_id);
     if (!location) {
       await db.close();
       return res.status(404).json({ success: false, message: 'Локация не найдена' });
     }
 
-    // Используем BestiarySpecies для водных существ
+    // Получаем снаряжение
+    let rodBonus = 0;   // От удочки -> сложность игры (меньше удочка = сложнее)
+    let baitBonus = 0;  // От приманки -> редкость рыбы
+    
+    if (gear_ids && gear_ids.length > 0) {
+      const gear = await db.all(`
+        SELECT type, bonus_chance, bonus_rarity 
+        FROM FishingGear 
+        WHERE id IN (${gear_ids.join(',')})
+      `);
+      
+      gear.forEach((g: any) => {
+        if (g.type === 'Удочка') {
+          rodBonus += g.bonus_chance || 0;   // Удочка влияет на сложность
+        } else if (g.type === 'Наживка') {
+          baitBonus += g.bonus_rarity || 0;  // Приманка влияет на редкость
+        }
+      });
+    }
+
+    // Расчет сложности игры (от 0.5 до 2.0)
+    // Чем лучше удочка, тем легче игра
+    const difficulty = Math.max(0.5, 2.0 - (rodBonus * 4));
+    
+    // Расчет бонуса редкости (от 0 до 0.5)
+    const rarityBonus = Math.min(0.5, baitBonus * 1.5);
+
+    await db.close();
+    res.json({ 
+      success: true, 
+      difficulty,        // Сложность мини-игры
+      rarityBonus,       // Бонус к шансу редкой рыбы
+      location_id,
+      character_id,
+      gear_ids
+    });
+  } catch (error) {
+    console.error('Ошибка при начале рыбалки:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Завершить рыбалку - сохранить результат
+router.post('/fishing/complete', async (req: Request, res: Response) => {
+  try {
+    const { character_id, location_id, gear_ids, success, rarityBonus } = req.body;
+    const db = await initDB();
+
+    if (!success) {
+      await db.close();
+      return res.json({ success: false, message: 'Рыба ускользнула...' });
+    }
+
+    // Получаем локацию
+    const location = await db.get(`SELECT * FROM FishingLocations WHERE id = ?`, location_id);
+    
     const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
     const minRankIndex = rankOrder.indexOf(location.min_rank);
     
+    // Получаем рыбу
     const allFish = await db.all(`
       SELECT 
         s.*, 
         c.credit_value_min,
         c.credit_value_max,
-        c.drop_items,
         l.rarity
       FROM BestiarySpecies s
       LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
@@ -7002,92 +7058,59 @@ router.post('/fishing/catch', async (req: Request, res: Response) => {
       WHERE s.habitat_type = 'Водные' AND s.is_active = 1
     `, [location.island]);
 
-    // Фильтруем существ по рангу локации
     const fish = allFish.filter(f => {
       const fishRankIndex = rankOrder.indexOf(f.danger_rank);
       return fishRankIndex >= minRankIndex;
     });
 
-    if (fish.length === 0) {
-      await db.close();
-      return res.json({ 
-        success: false, 
-        message: 'В этой локации нет подходящей рыбы!' 
-      });
-    }
-
-    // Вычисляем бонусы от снаряжения
-    let bonusChance = 0;
-    let bonusRarity = 0;
-    if (gear_ids && gear_ids.length > 0) {
-      const gear = await db.all(`
-        SELECT bonus_chance, bonus_rarity FROM FishingGear WHERE id IN (${gear_ids.join(',')})
-      `);
-      gear.forEach((g: any) => {
-        bonusChance += g.bonus_chance || 0;
-        bonusRarity += g.bonus_rarity || 0;
-      });
-    }
-
-    // Рассчитываем улов
-    const roll = Math.random() + bonusChance;
-    let caughtFish = null;
-
-    // Определяем базовые шансы по редкости из бестиария
+    // Определяем добычу с учетом бонуса редкости
     const sortedFish = fish.map(f => ({
       ...f,
-      spawn_chance: f.rarity === 'Легендарный' ? 0.05 : 
-                    f.rarity === 'Очень редкий' ? 0.15 :
-                    f.rarity === 'Редкий' ? 0.25 :
-                    f.rarity === 'Необычный' ? 0.35 : 0.45
-    })).sort((a, b) => a.spawn_chance - b.spawn_chance);
-
+      spawn_chance: f.rarity === 'Легендарный' ? 0.02 + rarityBonus * 0.3 : 
+                    f.rarity === 'Очень редкий' ? 0.08 + rarityBonus * 0.5 :
+                    f.rarity === 'Редкий' ? 0.15 + rarityBonus * 0.7 :
+                    f.rarity === 'Необычный' ? 0.30 + rarityBonus : 0.50
+    })).sort((a, b) => a.spawn_chance - b.spawn_chance);  // От редких к частым
+    
+    const roll = Math.random();
+    let caughtFish = null;
+    
     for (const f of sortedFish) {
-      const chance = f.spawn_chance + (bonusRarity * 0.1);
-      if (roll >= chance) {
+      if (roll <= f.spawn_chance) {
         caughtFish = f;
+        break;
       }
     }
 
-    if (!caughtFish && fish.length > 0) {
-      caughtFish = sortedFish[0]; // Минимум обычная рыба
+    // Если не выпало ничего редкого, берем самое частое
+    if (!caughtFish && sortedFish.length > 0) {
+      caughtFish = sortedFish[sortedFish.length - 1];
     }
 
     if (caughtFish) {
       // Генерируем вес
       const weight = caughtFish.weight_min + Math.random() * (caughtFish.weight_max - caughtFish.weight_min);
       
-      // Сохраняем в инвентарь
+      // Сохраняем в инвентарь (для рыбы quality_modifier = 1.0, т.к. нет оружия)
       await db.run(`
-        INSERT INTO CharacterFishInventory (character_id, fish_id, weight, location_id)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO CharacterFishInventory (character_id, species_id, weight, location_id, quality_modifier)
+        VALUES (?, ?, ?, ?, 1.0)
       `, character_id, caughtFish.id, weight, location_id);
 
-      // Система поломки снаряжения и расходования приманки
+      // Расходование приманки
       if (gear_ids && gear_ids.length > 0) {
         for (const gearId of gear_ids) {
-          try {
-            const gearInfo = await db.get(`SELECT is_consumable FROM FishingGear WHERE id = ?`, gearId);
-            const characterGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
-            
-            if (gearInfo && gearInfo.is_consumable && characterGear) {
-              // Расходуем приманку
+          const gearInfo = await db.get(`SELECT type FROM FishingGear WHERE id = ?`, gearId);
+          const characterGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+          
+          if (gearInfo && characterGear) {
+            // Приманка всегда расходуется
+            if (gearInfo.type === 'Наживка') {
               if (characterGear.quantity > 1) {
                 await db.run(`UPDATE CharacterFishingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
               } else {
                 await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
               }
-            } else if (characterGear) {
-              // Проверяем поломку снаряжения (10% шанс)
-              if (Math.random() < 0.1) {
-                await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
-              }
-            }
-          } catch (error) {
-            console.log('Error processing fishing gear consumption:', error);
-            // Если колонка is_consumable не существует, просто ломаем снаряжение с шансом 10%
-            if (Math.random() < 0.1) {
-              await db.run(`DELETE FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
             }
           }
         }
@@ -7100,7 +7123,7 @@ router.post('/fishing/catch', async (req: Request, res: Response) => {
       res.json({ success: false, message: 'Рыба не клюёт...' });
     }
   } catch (error) {
-    console.error('Ошибка при рыбалке:', error);
+    console.error('Ошибка при завершении рыбалки:', error);
     res.status(500).json({ message: 'Ошибка сервера' });
   }
 });
@@ -7112,9 +7135,14 @@ router.get('/fishing/inventory/:character_id', async (req: Request, res: Respons
     const db = await initDB();
     
     const inventory = await db.all(`
-      SELECT i.*, f.name, f.base_price, l.name as location_name
+      SELECT 
+        i.*, 
+        s.name, 
+        c.credit_value_min as base_price, 
+        l.name as location_name
       FROM CharacterFishInventory i
-      JOIN FishSpecies f ON i.fish_id = f.id
+      JOIN BestiarySpecies s ON i.species_id = s.id
+      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
       LEFT JOIN FishingLocations l ON i.location_id = l.id
       WHERE i.character_id = ? AND i.is_sold = 0
       ORDER BY i.caught_at DESC
@@ -7136,15 +7164,23 @@ router.post('/fishing/sell', async (req: Request, res: Response) => {
 
     // Получаем рыбу для продажи
     const fish = await db.all(`
-      SELECT i.id, f.base_price, i.weight
+      SELECT 
+        i.id, 
+        i.weight,
+        i.quality_modifier,
+        c.credit_value_min, 
+        c.credit_value_max
       FROM CharacterFishInventory i
-      JOIN FishSpecies f ON i.fish_id = f.id
+      JOIN BestiarySpecies s ON i.species_id = s.id
+      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
       WHERE i.id IN (${fish_ids.join(',')}) AND i.character_id = ?
     `, character_id);
 
     let totalPrice = 0;
     fish.forEach((f: any) => {
-      totalPrice += Math.floor(f.base_price * f.weight);
+      const basePrice = (f.credit_value_min + f.credit_value_max) / 2;
+      const qualityMultiplier = f.quality_modifier || 1.0;
+      totalPrice += Math.floor(basePrice * f.weight * qualityMultiplier);
     });
 
     // Обновляем кредиты персонажа
@@ -7259,26 +7295,92 @@ router.get('/hunting/locations', async (req: Request, res: Response) => {
 });
 
 // Охота - попытка добыть зверя
-router.post('/hunting/hunt', async (req: Request, res: Response) => {
+// Начать охоту - возвращает параметры для мини-игры
+router.post('/hunting/start', async (req: Request, res: Response) => {
   try {
     const { character_id, location_id, gear_ids, hunt_type } = req.body;
     const db = await initDB();
 
-    // Получаем локацию для проверки min_rank
+    // Получаем локацию
     const location = await db.get(`SELECT * FROM HuntingLocations WHERE id = ?`, location_id);
     if (!location) {
       await db.close();
       return res.status(404).json({ success: false, message: 'Локация не найдена' });
     }
 
-    // Определяем среду обитания в зависимости от типа охоты
+    // Определяем среду обитания
     const habitatType = hunt_type === 'aerial' ? 'Воздушные' : 'Наземные';
+    const habitatCategory = hunt_type === 'aerial' ? 'Воздушное' : 'Наземное';
 
-    // Используем BestiarySpecies вместо HuntingSpecies
-    // Фильтруем по habitat_type и учитываем min_rank локации
+    // Получаем снаряжение
+    let weaponBonus = 0;  // От оружия -> качество добычи
+    let armorBonus = 0;   // От брони -> сложность игры (меньше броня = сложнее)
+    let trapBonus = 0;    // От ловушки -> редкость добычи
+    
+    if (gear_ids && gear_ids.length > 0) {
+      const gear = await db.all(`
+        SELECT type, quality, habitat_category, bonus_damage, bonus_defense, bonus_success 
+        FROM HuntingGear 
+        WHERE id IN (${gear_ids.join(',')})
+      `);
+      
+      gear.forEach((g: any) => {
+        if (g.type === 'Оружие' && (g.habitat_category === habitatCategory || g.habitat_category === 'Универсальное')) {
+          weaponBonus += g.bonus_damage || 0;  // Оружие влияет на качество
+        } else if (g.type === 'Броня') {
+          armorBonus += g.bonus_defense || 0;   // Броня влияет на сложность
+        } else if ((g.type === 'Наземная ловушка' || g.type === 'Воздушная ловушка') && g.habitat_category === habitatCategory) {
+          trapBonus += g.bonus_success || 0;    // Ловушка влияет на редкость
+        }
+      });
+    }
+
+    // Расчет сложности игры (от 0.5 до 2.0)
+    // Чем больше брони, тем легче игра
+    const difficulty = Math.max(0.5, 2.0 - (armorBonus * 2));
+    
+    // Расчет модификатора качества (от 0.8 до 2.0)
+    const qualityModifier = 0.8 + weaponBonus * 1.2;
+    
+    // Расчет бонуса редкости (от 0 до 0.5)
+    const rarityBonus = Math.min(0.5, trapBonus);
+
+    await db.close();
+    res.json({ 
+      success: true, 
+      difficulty,           // Сложность мини-игры
+      qualityModifier,      // Множитель цены
+      rarityBonus,          // Бонус к шансу редкой добычи
+      hunt_type,
+      location_id,
+      character_id,
+      gear_ids
+    });
+  } catch (error) {
+    console.error('Ошибка при начале охоты:', error);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// Завершить охоту - сохранить результат
+router.post('/hunting/complete', async (req: Request, res: Response) => {
+  try {
+    const { character_id, location_id, gear_ids, hunt_type, success, qualityModifier, rarityBonus } = req.body;
+    const db = await initDB();
+
+    if (!success) {
+      await db.close();
+      return res.json({ success: false, message: 'Добыча ускользнула...' });
+    }
+
+    // Получаем локацию
+    const location = await db.get(`SELECT * FROM HuntingLocations WHERE id = ?`, location_id);
+    const habitatType = hunt_type === 'aerial' ? 'Воздушные' : 'Наземные';
+    
     const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
     const minRankIndex = rankOrder.indexOf(location.min_rank);
     
+    // Получаем существ
     const creatures = await db.all(`
       SELECT 
         s.*, 
@@ -7292,111 +7394,71 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
       WHERE s.habitat_type = ? AND s.is_active = 1
     `, [location.island, habitatType]);
 
-    // Фильтруем существ по рангу локации (только существа с рангом >= min_rank локации)
     const suitableCreatures = creatures.filter(c => {
       const creatureRankIndex = rankOrder.indexOf(c.danger_rank);
       return creatureRankIndex >= minRankIndex;
     });
 
-    if (suitableCreatures.length === 0) {
-      await db.close();
-      return res.json({ 
-        success: false, 
-        message: 'В этой локации не водятся подходящие существа для такого типа охоты!' 
-      });
-    }
-
-    let bonusSuccess = 0;
-    if (gear_ids && gear_ids.length > 0) {
-      const gear = await db.all(`
-        SELECT bonus_success FROM HuntingGear WHERE id IN (${gear_ids.join(',')})
-      `);
-      gear.forEach((g: any) => {
-        bonusSuccess += g.bonus_success || 0;
-      });
-    }
-
-    const roll = Math.random();
-    let huntedCreature = null;
-
-    console.log('Hunting debug:', {
-      creaturesCount: suitableCreatures.length,
-      bonusSuccess,
-      roll,
-      locationRank: location.min_rank,
-      creatures: suitableCreatures.map(c => ({ name: c.name, rank: c.danger_rank }))
-    });
-
-    // Определяем базовые шансы по редкости из бестиария
+    // Определяем добычу с учетом бонуса редкости
     const sortedCreatures = suitableCreatures.map(c => ({
       ...c,
-      spawn_chance: c.rarity === 'Легендарный' ? 0.05 : 
-                    c.rarity === 'Очень редкий' ? 0.15 :
-                    c.rarity === 'Редкий' ? 0.25 :
-                    c.rarity === 'Необычный' ? 0.35 : 0.45
-    })).sort((a, b) => b.spawn_chance - a.spawn_chance);
+      spawn_chance: c.rarity === 'Легендарный' ? 0.02 + rarityBonus * 0.3 : 
+                    c.rarity === 'Очень редкий' ? 0.08 + rarityBonus * 0.5 :
+                    c.rarity === 'Редкий' ? 0.15 + rarityBonus * 0.7 :
+                    c.rarity === 'Необычный' ? 0.30 + rarityBonus : 0.50
+    })).sort((a, b) => a.spawn_chance - b.spawn_chance);  // От редких к частым
+    
+    const roll = Math.random();
+    let huntedCreature = null;
     
     for (const c of sortedCreatures) {
-      // Учитываем бонусы от снаряжения
-      const successChance = c.spawn_chance + bonusSuccess;
-      console.log(`Checking ${c.name}: spawn_chance=${c.spawn_chance}, bonusSuccess=${bonusSuccess}, successChance=${successChance}, roll=${roll}`);
-      if (roll <= successChance) {
+      if (roll <= c.spawn_chance) {
         huntedCreature = c;
-        console.log(`Successfully hunted: ${c.name}`);
-        break; // Останавливаемся на первом успешном существе
+        break;
       }
+    }
+
+    // Если не выпало ничего редкого, берем самое частое
+    if (!huntedCreature && sortedCreatures.length > 0) {
+      huntedCreature = sortedCreatures[sortedCreatures.length - 1];
     }
 
     if (huntedCreature) {
       const loot = huntedCreature.drop_items ? JSON.parse(huntedCreature.drop_items) : [];
-      const credits = Math.floor(
-        huntedCreature.credit_value_min + 
-        Math.random() * (huntedCreature.credit_value_max - huntedCreature.credit_value_min)
-      );
 
+      // Сохраняем добычу с модификатором качества
       await db.run(`
-        INSERT INTO CharacterHuntInventory (character_id, species_id, loot_items, location_id)
-        VALUES (?, ?, ?, ?)
-      `, character_id, huntedCreature.id, JSON.stringify(loot), location_id);
+        INSERT INTO CharacterHuntInventory (character_id, species_id, loot_items, location_id, quality_modifier)
+        VALUES (?, ?, ?, ?, ?)
+      `, character_id, huntedCreature.id, JSON.stringify(loot), location_id, qualityModifier);
 
-      // Система поломки снаряжения и расходования ловушек
+      // Расходование снаряжения
       if (gear_ids && gear_ids.length > 0) {
         for (const gearId of gear_ids) {
-          try {
-            const gearInfo = await db.get(`SELECT is_consumable FROM HuntingGear WHERE id = ?`, gearId);
-            const characterGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
-            
-            if (gearInfo && gearInfo.is_consumable && characterGear) {
-              // Расходуем ловушку
+          const gearInfo = await db.get(`SELECT type, is_consumable FROM HuntingGear WHERE id = ?`, gearId);
+          const characterGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+          
+          if (gearInfo && characterGear) {
+            // Ловушки всегда расходуются
+            if (gearInfo.type === 'Наземная ловушка' || gearInfo.type === 'Воздушная ловушка') {
               if (characterGear.quantity > 1) {
                 await db.run(`UPDATE CharacterHuntingGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
               } else {
                 await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
               }
-            } else if (characterGear) {
-              // Проверяем поломку снаряжения (15% шанс для охоты)
-              if (Math.random() < 0.15) {
-                await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
-              }
-            }
-          } catch (error) {
-            console.log('Error processing hunting gear consumption:', error);
-            // Если колонка is_consumable не существует, просто ломаем снаряжение с шансом 15%
-            if (Math.random() < 0.15) {
-              await db.run(`DELETE FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
             }
           }
         }
       }
 
       await db.close();
-      res.json({ success: true, creature: huntedCreature, loot, credits });
+      res.json({ success: true, creature: huntedCreature, loot });
     } else {
       await db.close();
       res.json({ success: false, message: 'Зверь ушёл...' });
     }
   } catch (error) {
-    console.error('Ошибка при охоте:', error);
+    console.error('Ошибка при завершении охоты:', error);
     res.status(500).json({ message: 'Ошибка сервера' });
   }
 });
@@ -7432,7 +7494,7 @@ router.post('/hunting/sell', async (req: Request, res: Response) => {
     const db = await initDB();
 
     const hunts = await db.all(`
-      SELECT i.id, c.credit_value_min, c.credit_value_max
+      SELECT i.id, i.quality_modifier, c.credit_value_min, c.credit_value_max
       FROM CharacterHuntInventory i
       JOIN BestiarySpecies s ON i.species_id = s.id
       LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
@@ -7441,7 +7503,9 @@ router.post('/hunting/sell', async (req: Request, res: Response) => {
 
     let totalPrice = 0;
     hunts.forEach((h: any) => {
-      totalPrice += Math.floor(h.credit_value_min + Math.random() * (h.credit_value_max - h.credit_value_min));
+      const basePrice = h.credit_value_min + Math.random() * (h.credit_value_max - h.credit_value_min);
+      const qualityMultiplier = h.quality_modifier || 1.0;
+      totalPrice += Math.floor(basePrice * qualityMultiplier);
     });
 
     await db.run(`UPDATE Characters SET currency = currency + ? WHERE id = ?`, totalPrice, character_id);

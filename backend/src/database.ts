@@ -1351,7 +1351,34 @@ export async function initDB() {
       console.error('Error removing old tables:', error);
     }
 
-    // Миграция 3: Проверка обновления снаряжения с отсылками на игры
+    // Миграция 3: Добавление quality_modifier в инвентарь
+    try {
+      const fishTableInfo = await db.all(`PRAGMA table_info(CharacterFishInventory)`);
+      const hasQualityModifier = fishTableInfo.some((col: any) => col.name === 'quality_modifier');
+      
+      if (!hasQualityModifier) {
+        console.log('Adding quality_modifier to CharacterFishInventory...');
+        await db.run(`ALTER TABLE CharacterFishInventory ADD COLUMN quality_modifier REAL DEFAULT 1.0`);
+        console.log('✓ quality_modifier added to CharacterFishInventory');
+      } else {
+        console.log('✓ quality_modifier already exists in CharacterFishInventory');
+      }
+
+      const huntTableInfo = await db.all(`PRAGMA table_info(CharacterHuntInventory)`);
+      const hasHuntQualityModifier = huntTableInfo.some((col: any) => col.name === 'quality_modifier');
+      
+      if (!hasHuntQualityModifier) {
+        console.log('Adding quality_modifier to CharacterHuntInventory...');
+        await db.run(`ALTER TABLE CharacterHuntInventory ADD COLUMN quality_modifier REAL DEFAULT 1.0`);
+        console.log('✓ quality_modifier added to CharacterHuntInventory');
+      } else {
+        console.log('✓ quality_modifier already exists in CharacterHuntInventory');
+      }
+    } catch (error) {
+      console.error('Error adding quality_modifier:', error);
+    }
+
+    // Миграция 4: Проверка обновления снаряжения с отсылками на игры
     try {
       const sampleGear = await db.get(`SELECT name FROM HuntingGear WHERE name LIKE '%Rebellion%' OR name LIKE '%Алмазный меч%'`);
       

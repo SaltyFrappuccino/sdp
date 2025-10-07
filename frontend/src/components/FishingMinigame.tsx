@@ -2,42 +2,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Progress, Card, Title, Text, Div } from '@vkontakte/vkui';
 
 interface FishingMinigameProps {
-  fishRarity: string;
+  difficulty: number;  // От 0.5 до 2.0 (от удочки)
   onComplete: (success: boolean) => void;
   onCancel: () => void;
 }
 
-const FishingMinigame: React.FC<FishingMinigameProps> = ({ fishRarity, onComplete, onCancel }) => {
+const FishingMinigame: React.FC<FishingMinigameProps> = ({ difficulty, onComplete, onCancel }) => {
   const [gameState, setGameState] = useState<'waiting' | 'active' | 'completed'>('waiting');
   const [progress, setProgress] = useState(0);
   const [targetZone, setTargetZone] = useState({ start: 40, end: 60 });
   const [indicatorPosition, setIndicatorPosition] = useState(0);
   const [zoneDirection, setZoneDirection] = useState(1);
   const [timeLeft, setTimeLeft] = useState(5000);
-  const [difficulty, setDifficulty] = useState(1);
   const [isHolding, setIsHolding] = useState(false);
-
-  // Настройка сложности в зависимости от редкости рыбы
-  useEffect(() => {
-    const difficultyMap: { [key: string]: number } = {
-      'Обычная': 1,
-      'Необычная': 1.5,
-      'Редкая': 2,
-      'Очень редкая': 2.5,
-      'Легендарная': 3
-    };
-    
-    const newDifficulty = difficultyMap[fishRarity] || 1;
-    setDifficulty(newDifficulty);
-    
-    // Уменьшаем зону попадания для более редких рыб
-    const zoneSize = Math.max(10, 20 - (newDifficulty - 1) * 5);
-    const zoneStart = Math.random() * (100 - zoneSize);
-    setTargetZone({ start: zoneStart, end: zoneStart + zoneSize });
-    
-    // Уменьшаем время для более редких рыб
-    setTimeLeft(Math.max(3000, 6000 - (newDifficulty - 1) * 500));
-  }, [fishRarity]);
 
   // Игровой цикл - движение зоны и индикатора
   useEffect(() => {
@@ -111,6 +88,12 @@ const FishingMinigame: React.FC<FishingMinigameProps> = ({ fishRarity, onComplet
     setProgress(0);
     setIndicatorPosition(0);
     setZoneDirection(1);
+    
+    // Настройка параметров игры от сложности
+    const zoneSize = Math.max(10, 25 - difficulty * 7);  // Чем сложнее, тем меньше зона
+    const zoneStart = Math.random() * (100 - zoneSize);
+    setTargetZone({ start: zoneStart, end: zoneStart + zoneSize });
+    setTimeLeft(Math.floor(8000 / difficulty));  // От 4 до 16 секунд
   };
 
   if (gameState === 'waiting') {
@@ -118,7 +101,7 @@ const FishingMinigame: React.FC<FishingMinigameProps> = ({ fishRarity, onComplet
       <Card>
         <Div>
           <Title level="2">🎣 Рыбалка</Title>
-          <Text>Редкость рыбы: {fishRarity}</Text>
+          <Text>Сложность: {difficulty.toFixed(1)}x</Text>
           <Text>Удерживайте кнопку, чтобы индикатор оставался в зеленой зоне!</Text>
           <br />
           <Button size="l" onClick={startGame} stretched>

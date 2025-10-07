@@ -86,7 +86,16 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [characterId, setCharacterId] = useState<number | null>(null);
   const [credits, setCredits] = useState<number>(0);
   const [huntModal, setHuntModal] = useState<{ show: boolean; creature?: any; loot?: any[]; credits?: number }>({ show: false });
-  const [minigameModal, setMinigameModal] = useState<{ show: boolean; creatureRank?: string; huntType?: string }>({ show: false });
+  const [minigameModal, setMinigameModal] = useState<{ 
+    show: boolean; 
+    difficulty?: number;
+    qualityModifier?: number;
+    rarityBonus?: number;
+    huntType?: string;
+    location_id?: number;
+    character_id?: number;
+    gear_ids?: number[];
+  }>({ show: false });
 
   useEffect(() => {
     loadCharacters();
@@ -203,24 +212,53 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const handleHunt = async () => {
     if (!selectedLocation || !characterId) return;
 
-    // Определяем ранг существа для мини-игры (случайно)
-    const ranks = ['F', 'E', 'D', 'C', 'B', 'A'];
-    const weights = [35, 30, 20, 10, 4, 1]; // Вероятности
-    let random = Math.random() * 100;
-    let selectedRank = 'F';
-    
-    for (let i = 0; i < weights.length; i++) {
-      if (random < weights[i]) {
-        selectedRank = ranks[i];
-        break;
-      }
-      random -= weights[i];
-    }
+    setIsHunting(true);
+    try {
+      // Запускаем охоту и получаем параметры мини-игры
+      const response = await fetch(`${API_URL}/hunting/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_id: characterId,
+          location_id: selectedLocation,
+          gear_ids: selectedGear,
+          hunt_type: huntType
+        })
+      });
 
-    setMinigameModal({ show: true, creatureRank: selectedRank, huntType });
+      const result = await response.json();
+      if (result.success) {
+        setMinigameModal({ 
+          show: true, 
+          difficulty: result.difficulty,
+          qualityModifier: result.qualityModifier,
+          rarityBonus: result.rarityBonus,
+          huntType: result.hunt_type,
+          location_id: result.location_id,
+          character_id: result.character_id,
+          gear_ids: result.gear_ids
+        });
+      } else {
+        setSnackbar(
+          <Snackbar onClose={() => setSnackbar(null)}>
+            {result.message || 'Ошибка при начале охоты'}
+          </Snackbar>
+        );
+      }
+    } catch (error) {
+      console.error('Ошибка при начале охоты:', error);
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Ошибка при начале охоты
+        </Snackbar>
+      );
+    } finally {
+      setIsHunting(false);
+    }
   };
 
   const handleMinigameComplete = async (success: boolean) => {
+    const gameData = minigameModal;
     setMinigameModal({ show: false });
     
     if (!success) {
@@ -234,14 +272,18 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
     setIsHunting(true);
     try {
-      const response = await fetch(`${API_URL}/hunting/hunt`, {
+      // Завершаем охоту и сохраняем результат
+      const response = await fetch(`${API_URL}/hunting/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          character_id: characterId,
-          location_id: selectedLocation,
-          gear_ids: selectedGear,
-          hunt_type: huntType
+          character_id: gameData.character_id,
+          location_id: gameData.location_id,
+          gear_ids: gameData.gear_ids,
+          hunt_type: gameData.huntType,
+          success: true,
+          qualityModifier: gameData.qualityModifier,
+          rarityBonus: gameData.rarityBonus
         })
       });
 
@@ -250,10 +292,10 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
         setHuntModal({ 
           show: true, 
           creature: result.creature, 
-          loot: result.loot, 
-          credits: result.credits 
+          loot: result.loot
         });
         loadInventory();
+        loadGear(); // Обновляем снаряжение (ловушки расходуются)
       } else {
         setSnackbar(
           <Snackbar onClose={() => setSnackbar(null)}>
@@ -262,7 +304,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
         );
       }
     } catch (error) {
-      console.error('Ошибка при охоте:', error);
+      console.error('Ошибка при завершении охоты:', error);
       setSnackbar(
         <Snackbar onClose={() => setSnackbar(null)}>
           Ошибка при охоте
@@ -652,13 +694,13 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             <Group>
               {minigameModal.huntType === 'aerial' ? (
                 <AerialHuntingMinigame
-                  creatureRank={minigameModal.creatureRank || 'F'}
+                  difficulty={minigameModal.difficulty || 1.0}
                   onComplete={handleMinigameComplete}
                   onCancel={() => setMinigameModal({ show: false })}
                 />
               ) : (
                 <TerrestrialHuntingMinigame
-                  creatureRank={minigameModal.creatureRank || 'F'}
+                  difficulty={minigameModal.difficulty || 1.0}
                   onComplete={handleMinigameComplete}
                   onCancel={() => setMinigameModal({ show: false })}
                 />

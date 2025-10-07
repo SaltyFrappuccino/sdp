@@ -2,256 +2,297 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Progress, Card, Title, Text, Div } from '@vkontakte/vkui';
 
 interface TerrestrialHuntingMinigameProps {
-  creatureRank: string;
+  difficulty: number;  // От 0.5 до 2.0 (от брони)
   onComplete: (success: boolean) => void;
   onCancel: () => void;
 }
 
 const TerrestrialHuntingMinigame: React.FC<TerrestrialHuntingMinigameProps> = ({ 
-  creatureRank, 
+  difficulty, 
   onComplete, 
   onCancel 
 }) => {
   const [gameState, setGameState] = useState<'waiting' | 'tracking' | 'aiming' | 'completed'>('waiting');
   const [trackingProgress, setTrackingProgress] = useState(0);
-  const [aimProgress, setAimProgress] = useState(0);
   const [targetPosition, setTargetPosition] = useState({ x: 50, y: 50 });
-  const [crosshairPosition, setCrosshairPosition] = useState({ x: 50, y: 50 });
-  const [timeLeft, setTimeLeft] = useState(8000);
-  const [difficulty, setDifficulty] = useState(1);
-  const [isMoving, setIsMoving] = useState(false);
+  const [crosshairPosition, setCrosshairPosition] = useState({ x: 20, y: 20 });
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [accuracy, setAccuracy] = useState(0);
+  const [currentDirection, setCurrentDirection] = useState<'up' | 'down' | 'left' | 'right' | null>(null);
 
-  // Настройка сложности в зависимости от ранга существа
-  useEffect(() => {
-    const difficultyMap: { [key: string]: number } = {
-      'F': 1,
-      'E': 1.5,
-      'D': 2,
-      'C': 2.5,
-      'B': 3,
-      'A': 3.5
-    };
-    
-    const newDifficulty = difficultyMap[creatureRank] || 1;
-    setDifficulty(newDifficulty);
-    setTimeLeft(Math.max(5000, 10000 - (newDifficulty - 1) * 800));
-  }, [creatureRank]);
-
-  // Фаза выслеживания
-  const startTracking = () => {
+  // Начать игру
+  const startGame = () => {
     setGameState('tracking');
     setTrackingProgress(0);
-    
-    const trackingInterval = setInterval(() => {
-      setTrackingProgress(prev => {
-        const increment = 100 / (30 + difficulty * 5); // Чем выше сложность, тем дольше выслеживание
-        const newProgress = prev + increment;
-        
-        if (newProgress >= 100) {
-          clearInterval(trackingInterval);
-          setGameState('aiming');
-          // Устанавливаем случайную позицию цели
-          setTargetPosition({
-            x: 20 + Math.random() * 60,
-            y: 20 + Math.random() * 60
-          });
-          return 100;
-        }
-        return newProgress;
-      });
-    }, 100);
+    setTimeLeft(Math.floor(8000 / difficulty)); // От 4 до 16 секунд
+    setTargetPosition({ x: 50, y: 50 });
+    setCrosshairPosition({ x: 20, y: 20 });
+    setCurrentDirection(null);
+    setAccuracy(0);
   };
 
-  // Движение цели в фазе прицеливания
+  // Фаза 1: Выслеживание (нажимай кнопки в правильном порядке)
   useEffect(() => {
-    if (gameState !== 'aiming') return;
+    if (gameState !== 'tracking') return;
 
-    const moveInterval = setInterval(() => {
-      if (Math.random() < 0.3 + difficulty * 0.1) { // Вероятность движения зависит от сложности
-        setTargetPosition(prev => ({
-          x: Math.max(10, Math.min(90, prev.x + (Math.random() - 0.5) * 20)),
-          y: Math.max(10, Math.min(90, prev.y + (Math.random() - 0.5) * 20))
-        }));
-        setIsMoving(true);
-        setTimeout(() => setIsMoving(false), 500);
+    const directions: Array<'up' | 'down' | 'left' | 'right'> = ['up', 'down', 'left', 'right'];
+    let directionIndex = 0;
+
+    const showNextDirection = () => {
+      if (trackingProgress >= 100) {
+        setGameState('aiming');
+        setTimeLeft(Math.floor(5000 / difficulty)); // От 2.5 до 10 секунд на прицел
+        return;
       }
-    }, 1000 + Math.random() * 2000);
 
-    return () => clearInterval(moveInterval);
-  }, [gameState, difficulty]);
+      const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+      setCurrentDirection(randomDirection);
+    };
 
-  // Таймер
-  useEffect(() => {
-    if (gameState !== 'aiming') return;
+    showNextDirection();
 
     const timer = setInterval(() => {
       setTimeLeft(prev => {
-        const newTime = prev - 100;
-        if (newTime <= 0) {
+        if (prev <= 0) {
+          clearInterval(timer);
           setGameState('completed');
           onComplete(false);
           return 0;
         }
-        return newTime;
+        return prev - 50;
+      });
+    }, 50);
+
+    return () => clearInterval(timer);
+  }, [gameState, trackingProgress, difficulty, onComplete]);
+
+  // Обработка нажатия направления
+  const handleDirectionClick = (direction: 'up' | 'down' | 'left' | 'right') => {
+    if (gameState !== 'tracking') return;
+
+    if (direction === currentDirection) {
+      // Правильное направление
+      const increment = 15 + (difficulty - 1) * 5;  // Чем сложнее, тем медленнее прогресс
+      setTrackingProgress(prev => Math.min(100, prev + increment));
+      setCurrentDirection(null);
+      
+      // Показываем следующее направление через 300мс
+      setTimeout(() => {
+        const directions: Array<'up' | 'down' | 'left' | 'right'> = ['up', 'down', 'left', 'right'];
+        const randomDirection = directions[Math.floor(Math.random() * directions.length)];
+        setCurrentDirection(randomDirection);
+      }, 300);
+    } else {
+      // Неправильное направление
+      setTrackingProgress(prev => Math.max(0, prev - 10));
+    }
+  };
+
+  // Фаза 2: Прицеливание (перемещай прицел к цели)
+  useEffect(() => {
+    if (gameState !== 'aiming') return;
+
+    // Цель движется
+    const targetMovement = setInterval(() => {
+      setTargetPosition(prev => {
+        const speed = 0.5 + difficulty * 0.3;
+        const angle = Math.random() * Math.PI * 2;
+        const newX = Math.max(10, Math.min(90, prev.x + Math.cos(angle) * speed));
+        const newY = Math.max(10, Math.min(90, prev.y + Math.sin(angle) * speed));
+        return { x: newX, y: newY };
       });
     }, 100);
 
-    return () => clearInterval(timer);
-  }, [gameState, onComplete]);
+    // Таймер
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 0) {
+          clearInterval(timer);
+          clearInterval(targetMovement);
+          setGameState('completed');
+          onComplete(false);
+          return 0;
+        }
+        return prev - 50;
+      });
+    }, 50);
 
-  // Управление прицелом
-  const moveCrosshair = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
+    // Обновление точности
+    const accuracyCheck = setInterval(() => {
+      const distance = Math.sqrt(
+        Math.pow(targetPosition.x - crosshairPosition.x, 2) + 
+        Math.pow(targetPosition.y - crosshairPosition.y, 2)
+      );
+      const newAccuracy = Math.max(0, 100 - distance * 2);
+      setAccuracy(newAccuracy);
+    }, 50);
+
+    return () => {
+      clearInterval(targetMovement);
+      clearInterval(timer);
+      clearInterval(accuracyCheck);
+    };
+  }, [gameState, difficulty, onComplete, targetPosition, crosshairPosition]);
+
+  // Движение прицела
+  const moveCrosshair = (direction: 'up' | 'down' | 'left' | 'right') => {
     if (gameState !== 'aiming') return;
-    
+
     const speed = 3;
     setCrosshairPosition(prev => {
       let newX = prev.x;
       let newY = prev.y;
-      
-      switch (direction) {
-        case 'up': newY = Math.max(0, prev.y - speed); break;
-        case 'down': newY = Math.min(100, prev.y + speed); break;
-        case 'left': newX = Math.max(0, prev.x - speed); break;
-        case 'right': newX = Math.min(100, prev.x + speed); break;
-      }
-      
+
+      if (direction === 'up') newY = Math.max(10, prev.y - speed);
+      if (direction === 'down') newY = Math.min(90, prev.y + speed);
+      if (direction === 'left') newX = Math.max(10, prev.x - speed);
+      if (direction === 'right') newX = Math.min(90, prev.x + speed);
+
       return { x: newX, y: newY };
     });
-  }, [gameState]);
+  };
 
   // Выстрел
-  const shoot = useCallback(() => {
+  const shoot = () => {
     if (gameState !== 'aiming') return;
-    
+
     const distance = Math.sqrt(
-      Math.pow(crosshairPosition.x - targetPosition.x, 2) + 
-      Math.pow(crosshairPosition.y - targetPosition.y, 2)
+      Math.pow(targetPosition.x - crosshairPosition.x, 2) + 
+      Math.pow(targetPosition.y - crosshairPosition.y, 2)
     );
-    
-    const hitRadius = Math.max(5, 15 - difficulty * 2); // Чем выше сложность, тем меньше радиус попадания
-    const success = distance <= hitRadius;
-    
+
+    // Успех, если расстояние меньше определенного порога
+    const successThreshold = 8 + difficulty * 2;  // Чем сложнее, тем меньше допуск
+    const success = distance < successThreshold;
+
     setGameState('completed');
     onComplete(success);
-  }, [gameState, crosshairPosition, targetPosition, difficulty, onComplete]);
-
-  if (gameState === 'waiting') {
-    return (
-      <Card>
-        <Div>
-          <Title level="2">🏹 Наземная охота</Title>
-          <Text>Ранг существа: {creatureRank}</Text>
-          <Text>Сначала выследите добычу, затем прицельтесь и сделайте точный выстрел!</Text>
-          <br />
-          <Button size="l" onClick={startTracking} stretched>
-            Начать выслеживание
-          </Button>
-          <Button size="m" mode="secondary" onClick={onCancel} stretched style={{ marginTop: 8 }}>
-            Отменить
-          </Button>
-        </Div>
-      </Card>
-    );
-  }
-
-  if (gameState === 'tracking') {
-    return (
-      <Card>
-        <Div>
-          <Title level="2">🔍 Выслеживание</Title>
-          <Text>Ищем следы существа...</Text>
-          <Progress value={trackingProgress} />
-          <br />
-          <Button size="m" mode="secondary" onClick={onCancel} stretched>
-            Прервать охоту
-          </Button>
-        </Div>
-      </Card>
-    );
-  }
+  };
 
   return (
-    <Card>
-      <Div>
-        <Title level="2">🎯 Прицеливание</Title>
-        
-        <Text>Время: {Math.ceil(timeLeft / 1000)}с</Text>
-        
-        {/* Игровое поле */}
-        <div style={{ 
-          position: 'relative', 
-          width: '100%', 
-          height: '200px', 
-          background: '#2d5016', 
-          margin: '16px 0',
-          borderRadius: '8px',
-          overflow: 'hidden'
-        }}>
-          {/* Цель (существо) */}
+    <Card mode="shadow" style={{ margin: '16px', padding: '16px' }}>
+      <Title level="2" style={{ marginBottom: '12px' }}>🐾 Наземная охота</Title>
+
+      {gameState === 'waiting' && (
+        <Div>
+          <Text style={{ marginBottom: '16px' }}>
+            Сложность: {difficulty.toFixed(1)}x<br/>
+            Готовы начать охоту?
+          </Text>
+          <Button size="l" onClick={startGame} stretched style={{ marginBottom: '8px' }}>
+            🎯 Начать охоту
+          </Button>
+          <Button size="l" mode="secondary" onClick={onCancel} stretched>
+            ❌ Отмена
+          </Button>
+        </Div>
+      )}
+
+      {gameState === 'tracking' && (
+        <Div>
+          <Text weight="2" style={{ marginBottom: '12px' }}>
+            Фаза 1: Выслеживание ({(timeLeft / 1000).toFixed(1)}с)
+          </Text>
+          <Text style={{ marginBottom: '16px', fontSize: '14px', color: 'var(--text_secondary)' }}>
+            Следуйте за следами! Нажимайте стрелки в правильном направлении
+          </Text>
+
+          <Progress value={trackingProgress} style={{ marginBottom: '16px' }} />
+
+          {currentDirection && (
+            <Div style={{ textAlign: 'center', marginBottom: '16px', fontSize: '48px' }}>
+              {currentDirection === 'up' && '⬆️'}
+              {currentDirection === 'down' && '⬇️'}
+              {currentDirection === 'left' && '⬅️'}
+              {currentDirection === 'right' && '➡️'}
+            </Div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            <div></div>
+            <Button size="l" onClick={() => handleDirectionClick('up')}>⬆️</Button>
+            <div></div>
+            <Button size="l" onClick={() => handleDirectionClick('left')}>⬅️</Button>
+            <div></div>
+            <Button size="l" onClick={() => handleDirectionClick('right')}>➡️</Button>
+            <div></div>
+            <Button size="l" onClick={() => handleDirectionClick('down')}>⬇️</Button>
+            <div></div>
+          </div>
+        </Div>
+      )}
+
+      {gameState === 'aiming' && (
+        <Div>
+          <Text weight="2" style={{ marginBottom: '12px' }}>
+            Фаза 2: Прицеливание ({(timeLeft / 1000).toFixed(1)}с)
+          </Text>
+          <Text style={{ marginBottom: '16px', fontSize: '14px', color: 'var(--text_secondary)' }}>
+            Наведите прицел на цель и стреляйте!
+          </Text>
+
           <div style={{
-            position: 'absolute',
-            left: `${targetPosition.x}%`,
-            top: `${targetPosition.y}%`,
-            transform: 'translate(-50%, -50%)',
-            width: '16px',
-            height: '16px',
-            background: isMoving ? '#FF6B35' : '#8B4513',
-            borderRadius: '50%',
-            border: '2px solid #654321',
-            transition: isMoving ? 'none' : 'all 0.3s ease'
-          }} />
-          
-          {/* Прицел */}
-          <div style={{
-            position: 'absolute',
-            left: `${crosshairPosition.x}%`,
-            top: `${crosshairPosition.y}%`,
-            transform: 'translate(-50%, -50%)',
-            width: '20px',
-            height: '20px',
-            border: '2px solid #FF3347',
-            borderRadius: '50%',
-            background: 'rgba(255, 51, 71, 0.2)'
-          }} />
-          
-          {/* Линии прицела */}
-          <div style={{
-            position: 'absolute',
-            left: `${crosshairPosition.x}%`,
-            top: `${crosshairPosition.y}%`,
-            transform: 'translate(-50%, -50%)',
-            width: '2px',
-            height: '40px',
-            background: '#FF3347'
-          }} />
-          <div style={{
-            position: 'absolute',
-            left: `${crosshairPosition.x}%`,
-            top: `${crosshairPosition.y}%`,
-            transform: 'translate(-50%, -50%)',
-            width: '40px',
-            height: '2px',
-            background: '#FF3347'
-          }} />
-        </div>
-        
-        {/* Управление */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
-          <div></div>
-          <Button size="s" onClick={() => moveCrosshair('up')}>↑</Button>
-          <div></div>
-          <Button size="s" onClick={() => moveCrosshair('left')}>←</Button>
-          <Button size="s" onClick={shoot} appearance="positive">🎯</Button>
-          <Button size="s" onClick={() => moveCrosshair('right')}>→</Button>
-          <div></div>
-          <Button size="s" onClick={() => moveCrosshair('down')}>↓</Button>
-          <div></div>
-        </div>
-        
-        <Button size="m" mode="secondary" onClick={onCancel} stretched>
-          Сдаться
-        </Button>
-      </Div>
+            position: 'relative',
+            width: '100%',
+            height: '300px',
+            background: 'linear-gradient(to bottom, #87CEEB 0%, #228B22 100%)',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            overflow: 'hidden'
+          }}>
+            {/* Цель (зверь) */}
+            <div style={{
+              position: 'absolute',
+              left: `${targetPosition.x}%`,
+              top: `${targetPosition.y}%`,
+              transform: 'translate(-50%, -50%)',
+              fontSize: '32px',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+            }}>
+              🦌
+            </div>
+
+            {/* Прицел */}
+            <div style={{
+              position: 'absolute',
+              left: `${crosshairPosition.x}%`,
+              top: `${crosshairPosition.y}%`,
+              transform: 'translate(-50%, -50%)',
+              fontSize: '40px',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'
+            }}>
+              ⊕
+            </div>
+          </div>
+
+          <Progress value={accuracy} style={{ marginBottom: '16px' }} />
+          <Text style={{ marginBottom: '16px', textAlign: 'center' }}>
+            Точность: {Math.round(accuracy)}%
+          </Text>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+            <div></div>
+            <Button size="l" onClick={() => moveCrosshair('up')}>⬆️</Button>
+            <div></div>
+            <Button size="l" onClick={() => moveCrosshair('left')}>⬅️</Button>
+            <div></div>
+            <Button size="l" onClick={() => moveCrosshair('right')}>➡️</Button>
+            <div></div>
+            <Button size="l" onClick={() => moveCrosshair('down')}>⬇️</Button>
+            <div></div>
+          </div>
+
+          <Button size="l" mode="primary" onClick={shoot} stretched>
+            🎯 ВЫСТРЕЛ!
+          </Button>
+        </Div>
+      )}
+
+      {gameState === 'completed' && (
+        <Div>
+          <Text>Игра завершена</Text>
+        </Div>
+      )}
     </Card>
   );
 };

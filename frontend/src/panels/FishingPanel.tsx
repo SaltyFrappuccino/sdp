@@ -85,7 +85,14 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [characterId, setCharacterId] = useState<number | null>(null);
   const [credits, setCredits] = useState<number>(0);
   const [catchModal, setCatchModal] = useState<{ show: boolean; fish?: any }>({ show: false });
-  const [minigameModal, setMinigameModal] = useState<{ show: boolean; fishRarity?: string }>({ show: false });
+  const [minigameModal, setMinigameModal] = useState<{ 
+    show: boolean; 
+    difficulty?: number;
+    rarityBonus?: number;
+    location_id?: number;
+    character_id?: number;
+    gear_ids?: number[];
+  }>({ show: false });
 
   useEffect(() => {
     loadCharacters();
@@ -180,24 +187,50 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const handleFish = async () => {
     if (!selectedLocation || !characterId) return;
 
-    // Определяем редкость рыбы для мини-игры (случайно)
-    const rarities = ['Обычная', 'Необычная', 'Редкая', 'Очень редкая', 'Легендарная'];
-    const weights = [40, 30, 20, 8, 2]; // Вероятности
-    let random = Math.random() * 100;
-    let selectedRarity = 'Обычная';
-    
-    for (let i = 0; i < weights.length; i++) {
-      if (random < weights[i]) {
-        selectedRarity = rarities[i];
-        break;
-      }
-      random -= weights[i];
-    }
+    setIsFishing(true);
+    try {
+      // Запускаем рыбалку и получаем параметры мини-игры
+      const response = await fetch(`${API_URL}/fishing/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_id: characterId,
+          location_id: selectedLocation,
+          gear_ids: selectedGear
+        })
+      });
 
-    setMinigameModal({ show: true, fishRarity: selectedRarity });
+      const result = await response.json();
+      if (result.success) {
+        setMinigameModal({ 
+          show: true, 
+          difficulty: result.difficulty,
+          rarityBonus: result.rarityBonus,
+          location_id: result.location_id,
+          character_id: result.character_id,
+          gear_ids: result.gear_ids
+        });
+      } else {
+        setSnackbar(
+          <Snackbar onClose={() => setSnackbar(null)}>
+            {result.message || 'Ошибка при начале рыбалки'}
+          </Snackbar>
+        );
+      }
+    } catch (error) {
+      console.error('Ошибка при начале рыбалки:', error);
+      setSnackbar(
+        <Snackbar onClose={() => setSnackbar(null)}>
+          Ошибка при начале рыбалки
+        </Snackbar>
+      );
+    } finally {
+      setIsFishing(false);
+    }
   };
 
   const handleMinigameComplete = async (success: boolean) => {
+    const gameData = minigameModal;
     setMinigameModal({ show: false });
     
     if (!success) {
@@ -211,13 +244,16 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
     setIsFishing(true);
     try {
-      const response = await fetch(`${API_URL}/fishing/catch`, {
+      // Завершаем рыбалку и сохраняем результат
+      const response = await fetch(`${API_URL}/fishing/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          character_id: characterId,
-          location_id: selectedLocation,
-          gear_ids: selectedGear
+          character_id: gameData.character_id,
+          location_id: gameData.location_id,
+          gear_ids: gameData.gear_ids,
+          success: true,
+          rarityBonus: gameData.rarityBonus
         })
       });
 
@@ -225,6 +261,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       if (result.success) {
         setCatchModal({ show: true, fish: result.fish });
         loadInventory();
+        loadGear(); // Обновляем снаряжение (приманки расходуются)
       } else {
         setSnackbar(
           <Snackbar onClose={() => setSnackbar(null)}>
@@ -572,7 +609,7 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
           >
             <Group>
               <FishingMinigame
-                fishRarity={minigameModal.fishRarity || 'Обычная'}
+                difficulty={minigameModal.difficulty || 1.0}
                 onComplete={handleMinigameComplete}
                 onCancel={() => setMinigameModal({ show: false })}
               />
