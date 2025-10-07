@@ -28,7 +28,7 @@ const AerialHuntingMinigame: React.FC<AerialHuntingMinigameProps> = ({
   const [nextTargetId, setNextTargetId] = useState(0);
   
   // Требуемый счет для победы
-  const requiredScore = Math.ceil(3 + difficulty * 2); // От 4 до 7 целей
+  const requiredScore = 5; // Всегда 5 целей
 
   const startGame = () => {
     setGameState('active');

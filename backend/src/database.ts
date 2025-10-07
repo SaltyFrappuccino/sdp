@@ -999,7 +999,7 @@ export async function initDB() {
       CREATE TABLE IF NOT EXISTS HuntingGear (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня', 'Наземная ловушка', 'Воздушная ловушка')),
+        type TEXT CHECK(type IN ('Броня', 'Воздушное оружие', 'Наземное оружие', 'Воздушная ловушка', 'Наземная ловушка')),
         quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
         habitat_category TEXT CHECK(habitat_category IN ('Наземное', 'Воздушное', 'Универсальное')) DEFAULT 'Универсальное',
         price INTEGER,
@@ -1139,7 +1139,7 @@ export async function initDB() {
         CREATE TABLE HuntingGear (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
-          type TEXT CHECK(type IN ('Оружие', 'Ловушка', 'Приманка', 'Броня', 'Наземная ловушка', 'Воздушная ловушка')),
+          type TEXT CHECK(type IN ('Броня', 'Воздушное оружие', 'Наземное оружие', 'Воздушная ловушка', 'Наземная ловушка')),
           quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
           price INTEGER,
           bonus_damage REAL,
@@ -2476,39 +2476,17 @@ export async function seedHuntingData(db: any) {
     const midzuMountain = await db.run(`INSERT INTO HuntingLocations (name, island, region, terrain_type, min_rank, description)
       VALUES ('Горы Каменного Кулака', 'Мидзу', 'Горы Каменного Кулака', 'Горы', 'C', 'Суровые горы с мощными зверями.')`);
 
-    console.log('Linking creatures to hunting locations...');
-
-    // Получаем ID существ из бестиария
-    const stoneBoar = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Каменный Кабан'`);
-    const mountainBoar = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Горный Каменный Кабан'`);
-    const voltFox = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Вольт-Лиса'`);
-    const crystalWolf = await db.get(`SELECT id FROM BestiarySpecies WHERE name = 'Кристальный Волк'`);
-
-    // Привязываем существ к локациям
-    if (stoneBoar) {
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, stoneBoar.id, hoshiForest.lastInsertRowid || hoshiForest.lastID, 0.6);
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, stoneBoar.id, midzuForest.lastInsertRowid || midzuForest.lastID, 0.5);
-    }
-
-    if (mountainBoar) {
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, mountainBoar.id, hoshiMountain.lastInsertRowid || hoshiMountain.lastID, 0.4);
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, mountainBoar.id, midzuMountain.lastInsertRowid || midzuMountain.lastID, 0.3);
-    }
-
-    if (voltFox) {
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, voltFox.id, kuroWasteland.lastInsertRowid || kuroWasteland.lastID, 0.35);
-    }
-
-    if (crystalWolf) {
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, crystalWolf.id, hoshiEcho.lastInsertRowid || hoshiEcho.lastID, 0.1);
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, crystalWolf.id, kuroEcho.lastInsertRowid || kuroEcho.lastID, 0.15);
-    }
+    // Примечание: Привязка существ к локациям теперь происходит через BestiaryLocations
+    // при создании записей бестиария. Здесь этот код больше не нужен.
 
     console.log('Seeding hunting gear...');
 
     // Базовое снаряжение (бесплатное для всех)
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
-      VALUES ('Деревянный меч', 'Оружие', 'Базовое', 0, 0, 0, 0, 'Примитивное оружие из дерева (как в Minecraft)', 'F', 1, 'Универсальное')`);
+      VALUES ('Простой лук', 'Воздушное оружие', 'Базовое', 0, 0, 0, 0, 'Примитивное оружие для стрельбы по воздушным целям', 'F', 1, 'Воздушное')`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
+      VALUES ('Деревянное копье', 'Наземное оружие', 'Базовое', 0, 0, 0, 0, 'Примитивное оружие для ближнего боя', 'F', 1, 'Наземное')`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
       VALUES ('Кожаная куртка', 'Броня', 'Базовое', 0, 0, 0, 0, 'Обычная одежда без защиты', 'F', 1, 'Универсальное')`);
@@ -2522,19 +2500,34 @@ export async function seedHuntingData(db: any) {
 
     // Покупаемое оружие (🎮 с отсылками на игры)
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
-      VALUES ('Каменный меч', 'Оружие', 'Обычное', 250000, 0.1, 0, 0.05, '⛏️ Меч из булыжника (Minecraft)', 'F', 0, 'Универсальное')`);
+      VALUES ('Улучшенный лук', 'Воздушное оружие', 'Обычное', 250000, 0.1, 0, 0.05, 'Простой, но надежный лук', 'F', 0, 'Воздушное')`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
-      VALUES ('Железный меч', 'Оружие', 'Хорошее', 1000000, 0.2, 0, 0.1, '⛏️ Прочный железный клинок (Minecraft)', 'E', 0, 'Универсальное')`);
+      VALUES ('Каменный топор', 'Наземное оружие', 'Обычное', 250000, 0.1, 0, 0.05, '⛏️ Топор из булыжника (Minecraft)', 'F', 0, 'Наземное')`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
-      VALUES ('Алмазный меч', 'Оружие', 'Отличное', 5000000, 0.3, 0, 0.15, '⛏️💎 Лучший меч из алмазов (Minecraft)', 'D', 0, 'Универсальное')`);
+      VALUES ('Арбалет', 'Воздушное оружие', 'Хорошее', 1000000, 0.2, 0, 0.1, 'Мощное оружие для точной стрельбы', 'E', 0, 'Воздушное')`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
-      VALUES ('Rebellion', 'Оружие', 'Эпическое', 25000000, 0.45, 0, 0.25, '⚔️ Легендарный двуручный меч Данте (DMC)', 'C', 0, 'Универсальное')`);
+      VALUES ('Железный меч', 'Наземное оружие', 'Хорошее', 1000000, 0.2, 0, 0.1, '⛏️ Прочный железный клинок (Minecraft)', 'E', 0, 'Наземное')`);
 
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
-      VALUES ('Клинок Тёмного Жнеца', 'Оружие', 'Легендарное', 100000000, 0.6, 0, 0.4, '💀 Коса смерти из League of Legends', 'A', 0, 'Универсальное')`);
+      VALUES ('Композитный лук', 'Воздушное оружие', 'Отличное', 5000000, 0.3, 0, 0.15, 'Современный лук из композитных материалов', 'D', 0, 'Воздушное')`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
+      VALUES ('Алмазный меч', 'Наземное оружие', 'Отличное', 5000000, 0.3, 0, 0.15, '⛏️💎 Лучший меч из алмазов (Minecraft)', 'D', 0, 'Наземное')`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
+      VALUES ('Энергетическая винтовка', 'Воздушное оружие', 'Эпическое', 25000000, 0.45, 0, 0.25, 'Высокотехнологичное оружие, стреляющее сгустками энергии', 'C', 0, 'Воздушное')`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
+      VALUES ('Rebellion', 'Наземное оружие', 'Эпическое', 25000000, 0.45, 0, 0.25, '⚔️ Легендарный двуручный меч Данте (DMC)', 'C', 0, 'Наземное')`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
+      VALUES ('Плазменная пушка', 'Воздушное оружие', 'Легендарное', 100000000, 0.6, 0, 0.4, 'Разрушительное оружие, стреляющее плазмой', 'A', 0, 'Воздушное')`);
+
+    await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
+      VALUES ('Клинок Тёмного Жнеца', 'Наземное оружие', 'Легендарное', 100000000, 0.6, 0, 0.4, '💀 Коса смерти из League of Legends', 'A', 0, 'Наземное')`);
 
     // Покупаемая броня
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, habitat_category)
@@ -2566,185 +2559,8 @@ export async function seedHuntingData(db: any) {
     await db.run(`INSERT INTO HuntingGear (name, type, quality, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable, habitat_category)
       VALUES ('Ауральная ловушка', 'Воздушная ловушка', 'Эпическое', 7500000, 0, 0, 0.35, '✨ Ловушка из Ауры для мощных воздушных существ', 'C', 0, 1, 'Воздушное')`);
 
-    // Добавляем воздушных и земных существ из бестиария
-    console.log('Adding aerial and terrestrial creatures from bestiary...');
-    
-    // Воздушные Затронутые
-    const aerialTouched1 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Ауральный Сокол', 'Falco Aura', 'Затронутая', 'D', 'Воздух', 'Сокол, впитавший Ауру из высокогорных ветров', 'Золотистое оперение с серебристыми кончиками крыльев', 'Парящий охотник, использующий Ауру для полёта', 'Средняя', 1)`);
-    
-    const aerialTouched2 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Металлический Ворон', 'Corvus Metallicus', 'Затронутая', 'E', 'Воздух', 'Ворон с укреплёнными костями и клювом', 'Чёрное оперение с металлическим блеском', 'Умный и осторожный, предпочитает высоту', 'Низкая', 1)`);
-
-    // Воздушные Искажённые
-    const aerialDistorted1 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Фантомный Орёл', 'Aquila Phantasma', 'Искажённая', 'C', 'Воздух', 'Орёл, способный становиться невидимым в полёте', 'Прозрачные крылья, мерцающие в воздухе', 'Невидимый хищник, атакующий из ниоткуда', 'Высокая', 1)`);
-    
-    const aerialDistorted2 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Кристальная Ласточка', 'Hirundo Crystallis', 'Искажённая', 'B', 'Воздух', 'Ласточка с телом из живого кристалла', 'Прозрачное тело, переливающееся всеми цветами', 'Быстрый и манёвренный, оставляет кристаллический след', 'Очень высокая', 1)`);
-
-    // Воздушные Бестии
-    const aerialBeast1 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Громовой Дракон', 'Draco Tonitrus', 'Бестия', 'A', 'Воздух', 'Древний дракон, повелитель гроз и ветров', 'Массивное существо с крыльями из молний', 'Создаёт бури и управляет погодой', 'Экстремальная', 1)`);
-    
-    const aerialBeast2 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Ауральный Феникс', 'Phoenix Aura', 'Бестия', 'S', 'Воздух', 'Бессмертная птица, воплощение чистой Ауры', 'Огромное существо, светящееся золотым пламенем', 'Возрождается из пепла, исцеляет раненых', 'Легендарная', 1)`);
-
-    // Земные Затронутые
-    const terrestrialTouched1 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Ауральный Волк', 'Lupus Aura', 'Затронутая', 'D', 'Земля', 'Волк, впитавший Ауру из священных лесов', 'Серебристая шерсть с золотистыми глазами', 'Стайный охотник, использующий Ауру для координации', 'Средняя', 1)`);
-    
-    const terrestrialTouched2 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Металлический Медведь', 'Ursus Metallicus', 'Затронутая', 'C', 'Земля', 'Медведь с укреплёнными костями и когтями', 'Бурая шерсть с металлическими полосами', 'Мощный и медленный, но очень сильный', 'Высокая', 1)`);
-
-    // Земные Искажённые
-    const terrestrialDistorted1 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Фантомный Тигр', 'Panthera Phantasma', 'Искажённая', 'B', 'Земля', 'Тигр, способный становиться невидимым', 'Полупрозрачная шкура с полосами, мерцающими в тени', 'Невидимый хищник, атакующий из засады', 'Очень высокая', 1)`);
-    
-    const terrestrialDistorted2 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Кристальный Лев', 'Leo Crystallis', 'Искажённая', 'A', 'Земля', 'Лев с гривой из живого кристалла', 'Золотистая шкура с кристаллической гривой', 'Король зверей, излучающий кристаллическую энергию', 'Экстремальная', 1)`);
-
-    // Земные Бестии
-    const terrestrialBeast1 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Земной Дракон', 'Draco Terra', 'Бестия', 'A', 'Земля', 'Древний дракон, повелитель гор и пещер', 'Массивное существо с чешуёй цвета земли и камня', 'Создаёт землетрясения и управляет камнями', 'Экстремальная', 1)`);
-    
-    const terrestrialBeast2 = await db.run(`INSERT INTO BestiarySpecies (name, name_latin, mutation_class, rank, habitat, description, appearance, behavior, danger_level, is_active)
-      VALUES ('Ауральный Единорог', 'Unicornis Aura', 'Бестия', 'S', 'Земля', 'Благородное существо, воплощение чистой Ауры', 'Белоснежное тело с золотым рогом', 'Исцеляет раненых и очищает загрязнённые места', 'Легендарная', 1)`);
-
-    // Получаем ID существ
-    const aerialTouched1Id = aerialTouched1.lastInsertRowid || aerialTouched1.lastID;
-    const aerialTouched2Id = aerialTouched2.lastInsertRowid || aerialTouched2.lastID;
-    const aerialDistorted1Id = aerialDistorted1.lastInsertRowid || aerialDistorted1.lastID;
-    const aerialDistorted2Id = aerialDistorted2.lastInsertRowid || aerialDistorted2.lastID;
-    const aerialBeast1Id = aerialBeast1.lastInsertRowid || aerialBeast1.lastID;
-    const aerialBeast2Id = aerialBeast2.lastInsertRowid || aerialBeast2.lastID;
-    
-    const terrestrialTouched1Id = terrestrialTouched1.lastInsertRowid || terrestrialTouched1.lastID;
-    const terrestrialTouched2Id = terrestrialTouched2.lastInsertRowid || terrestrialTouched2.lastID;
-    const terrestrialDistorted1Id = terrestrialDistorted1.lastInsertRowid || terrestrialDistorted1.lastID;
-    const terrestrialDistorted2Id = terrestrialDistorted2.lastInsertRowid || terrestrialDistorted2.lastID;
-    const terrestrialBeast1Id = terrestrialBeast1.lastInsertRowid || terrestrialBeast1.lastID;
-    const terrestrialBeast2Id = terrestrialBeast2.lastInsertRowid || terrestrialBeast2.lastID;
-
-    // Привязываем существ к охотничьим локациям
-    const aerialCreatures = [aerialTouched1Id, aerialTouched2Id, aerialDistorted1Id, aerialDistorted2Id, aerialBeast1Id, aerialBeast2Id];
-    const terrestrialCreatures = [terrestrialTouched1Id, terrestrialTouched2Id, terrestrialDistorted1Id, terrestrialDistorted2Id, terrestrialBeast1Id, terrestrialBeast2Id];
-    
-    // Получаем ID локаций
-    const kagaForestId = kagaForest.lastInsertRowid || kagaForest.lastID;
-    const hoshiForestId = hoshiForest.lastInsertRowid || hoshiForest.lastID;
-    const hoshiEchoId = hoshiEcho.lastInsertRowid || hoshiEcho.lastID;
-    const kuroEchoId = kuroEcho.lastInsertRowid || kuroEcho.lastID;
-
-    console.log('Linking aerial creatures to locations...');
-    console.log('Aerial creatures count:', aerialCreatures.length);
-    console.log('Location IDs:', { kagaForestId, hoshiForestId, hoshiEchoId, kuroEchoId });
-    
-    // Привязываем воздушных существ к локациям
-    for (const creatureId of aerialCreatures) {
-      if (creatureId <= aerialTouched2Id) {
-        // Обычные локации для затронутых
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kagaForestId, creatureId, 0.3);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiForestId, creatureId, 0.4);
-        console.log(`Linked aerial creature ${creatureId} to forest locations`);
-      } else if (creatureId <= aerialDistorted2Id) {
-        // Редкие локации для искажённых
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.2);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.15);
-        console.log(`Linked aerial creature ${creatureId} to echo locations`);
-      } else {
-        // Легендарные локации для бестий
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.05);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.03);
-        console.log(`Linked aerial creature ${creatureId} to legendary locations`);
-      }
-    }
-
-    console.log('Linking terrestrial creatures to locations...');
-    console.log('Terrestrial creatures count:', terrestrialCreatures.length);
-    
-    // Привязываем земных существ к локациям
-    for (const creatureId of terrestrialCreatures) {
-      if (creatureId <= terrestrialTouched2Id) {
-        // Обычные локации для затронутых
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kagaForestId, creatureId, 0.4);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiForestId, creatureId, 0.5);
-        console.log(`Linked terrestrial creature ${creatureId} to forest locations`);
-      } else if (creatureId <= terrestrialDistorted2Id) {
-        // Редкие локации для искажённых
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.25);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.2);
-        console.log(`Linked terrestrial creature ${creatureId} to echo locations`);
-      } else {
-        // Легендарные локации для бестий
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.08);
-        await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.05);
-        console.log(`Linked terrestrial creature ${creatureId} to legendary locations`);
-      }
-    }
-
-    // Добавляем характеристики для новых существ
-    console.log('Adding characteristics for new creatures...');
-    
-    // Характеристики для воздушных существ
-    const aerialCharacteristics = [
-      { species_id: aerialTouched1.lastInsertRowid, characteristic_type: 'drop_items', value: '["Перо Аурального Сокола", "Коготь Сокола", "Ауральная энергия"]' },
-      { species_id: aerialTouched1.lastInsertRowid, characteristic_type: 'credit_value_min', value: '15000' },
-      { species_id: aerialTouched1.lastInsertRowid, characteristic_type: 'credit_value_max', value: '25000' },
-      
-      { species_id: aerialTouched2.lastInsertRowid, characteristic_type: 'drop_items', value: '["Металлическое перо", "Клюв Ворона", "Металлическая пыль"]' },
-      { species_id: aerialTouched2.lastInsertRowid, characteristic_type: 'credit_value_min', value: '8000' },
-      { species_id: aerialTouched2.lastInsertRowid, characteristic_type: 'credit_value_max', value: '15000' },
-      
-      { species_id: aerialDistorted1.lastInsertRowid, characteristic_type: 'drop_items', value: '["Фантомное перо", "Коготь Орла", "Эссенция невидимости"]' },
-      { species_id: aerialDistorted1.lastInsertRowid, characteristic_type: 'credit_value_min', value: '50000' },
-      { species_id: aerialDistorted1.lastInsertRowid, characteristic_type: 'credit_value_max', value: '80000' },
-      
-      { species_id: aerialDistorted2.lastInsertRowid, characteristic_type: 'drop_items', value: '["Кристальное перо", "Кристальный клюв", "Кристальная пыль"]' },
-      { species_id: aerialDistorted2.lastInsertRowid, characteristic_type: 'credit_value_min', value: '100000' },
-      { species_id: aerialDistorted2.lastInsertRowid, characteristic_type: 'credit_value_max', value: '150000' },
-      
-      { species_id: aerialBeast1.lastInsertRowid, characteristic_type: 'drop_items', value: '["Чешуя Громового Дракона", "Коготь Дракона", "Молниевая эссенция", "Сердце Дракона"]' },
-      { species_id: aerialBeast1.lastInsertRowid, characteristic_type: 'credit_value_min', value: '500000' },
-      { species_id: aerialBeast1.lastInsertRowid, characteristic_type: 'credit_value_max', value: '800000' },
-      
-      { species_id: aerialBeast2.lastInsertRowid, characteristic_type: 'drop_items', value: '["Перо Феникса", "Слеза Феникса", "Ауральная эссенция", "Сердце Феникса"]' },
-      { species_id: aerialBeast2.lastInsertRowid, characteristic_type: 'credit_value_min', value: '1000000' },
-      { species_id: aerialBeast2.lastInsertRowid, characteristic_type: 'credit_value_max', value: '2000000' }
-    ];
-
-    // Характеристики для земных существ
-    const terrestrialCharacteristics = [
-      { species_id: terrestrialTouched1.lastInsertRowid, characteristic_type: 'drop_items', value: '["Шерсть Аурального Волка", "Клык Волка", "Ауральная энергия"]' },
-      { species_id: terrestrialTouched1.lastInsertRowid, characteristic_type: 'credit_value_min', value: '20000' },
-      { species_id: terrestrialTouched1.lastInsertRowid, characteristic_type: 'credit_value_max', value: '35000' },
-      
-      { species_id: terrestrialTouched2.lastInsertRowid, characteristic_type: 'drop_items', value: '["Металлическая шерсть", "Коготь Медведя", "Металлическая кость"]' },
-      { species_id: terrestrialTouched2.lastInsertRowid, characteristic_type: 'credit_value_min', value: '30000' },
-      { species_id: terrestrialTouched2.lastInsertRowid, characteristic_type: 'credit_value_max', value: '50000' },
-      
-      { species_id: terrestrialDistorted1.lastInsertRowid, characteristic_type: 'drop_items', value: '["Фантомная шкура", "Клык Тигра", "Эссенция невидимости"]' },
-      { species_id: terrestrialDistorted1.lastInsertRowid, characteristic_type: 'credit_value_min', value: '75000' },
-      { species_id: terrestrialDistorted1.lastInsertRowid, characteristic_type: 'credit_value_max', value: '120000' },
-      
-      { species_id: terrestrialDistorted2.lastInsertRowid, characteristic_type: 'drop_items', value: '["Кристальная грива", "Кристальный коготь", "Кристальная пыль", "Сердце Льва"]' },
-      { species_id: terrestrialDistorted2.lastInsertRowid, characteristic_type: 'credit_value_min', value: '200000' },
-      { species_id: terrestrialDistorted2.lastInsertRowid, characteristic_type: 'credit_value_max', value: '300000' },
-      
-      { species_id: terrestrialBeast1.lastInsertRowid, characteristic_type: 'drop_items', value: '["Чешуя Земного Дракона", "Коготь Дракона", "Земная эссенция", "Сердце Дракона"]' },
-      { species_id: terrestrialBeast1.lastInsertRowid, characteristic_type: 'credit_value_min', value: '600000' },
-      { species_id: terrestrialBeast1.lastInsertRowid, characteristic_type: 'credit_value_max', value: '1000000' },
-      
-      { species_id: terrestrialBeast2.lastInsertRowid, characteristic_type: 'drop_items', value: '["Рог Единорога", "Слеза Единорога", "Ауральная эссенция", "Сердце Единорога"]' },
-      { species_id: terrestrialBeast2.lastInsertRowid, characteristic_type: 'credit_value_min', value: '1500000' },
-      { species_id: terrestrialBeast2.lastInsertRowid, characteristic_type: 'credit_value_max', value: '3000000' }
-    ];
-
-    // Сохраняем характеристики
-    for (const char of [...aerialCharacteristics, ...terrestrialCharacteristics]) {
-      await db.run(`INSERT INTO BestiaryCharacteristics (species_id, characteristic_type, value) VALUES (?, ?, ?)`, 
-        char.species_id, char.characteristic_type, char.value);
-    }
+    // Примечание: Существа для охоты и их характеристики должны создаваться 
+    // в отдельной функции seed бестиария, а не здесь, чтобы избежать дублирования
 
     console.log('Hunting data seeded successfully!');
   } catch (error) {

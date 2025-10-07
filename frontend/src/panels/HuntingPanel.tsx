@@ -159,9 +159,9 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       // Фильтруем снаряжение по типу охоты
       const filteredGear = data.filter((item: any) => {
         if (huntType === 'aerial') {
-          return item.type === 'Оружие' || item.type === 'Броня' || item.type === 'Воздушная ловушка';
+          return item.type === 'Воздушное оружие' || item.type === 'Броня' || item.type === 'Воздушная ловушка';
         } else {
-          return item.type === 'Оружие' || item.type === 'Броня' || item.type === 'Наземная ловушка';
+          return item.type === 'Наземное оружие' || item.type === 'Броня' || item.type === 'Наземная ловушка';
         }
       });
       setGear(filteredGear);
@@ -487,7 +487,7 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                     }}
                   >
                     <option value="">Без оружия</option>
-                    {gear.filter(g => g.type === 'Оружие').map(g => (
+                    {gear.filter(g => g.type === 'Воздушное оружие' || g.type === 'Наземное оружие').map(g => (
                       <option key={g.id} value={g.id}>
                         {g.name} (+{(g.bonus_success * 100).toFixed(0)}%) {g.quantity && g.quantity > 1 ? `[${g.quantity}]` : ''}
                       </option>
