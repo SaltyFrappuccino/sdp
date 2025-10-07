@@ -6978,13 +6978,43 @@ router.post('/fishing/catch', async (req: Request, res: Response) => {
     const { character_id, location_id, gear_ids } = req.body;
     const db = await initDB();
 
-    // Получаем рыб из локации
-    const fish = await db.all(`
-      SELECT f.*, s.spawn_chance 
-      FROM FishSpecies f
-      JOIN FishLocationSpawns s ON f.id = s.fish_id
-      WHERE s.location_id = ? AND f.is_active = 1
-    `, location_id);
+    // Получаем локацию для проверки min_rank
+    const location = await db.get(`SELECT * FROM FishingLocations WHERE id = ?`, location_id);
+    if (!location) {
+      await db.close();
+      return res.status(404).json({ success: false, message: 'Локация не найдена' });
+    }
+
+    // Используем BestiarySpecies для водных существ
+    const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    const minRankIndex = rankOrder.indexOf(location.min_rank);
+    
+    const allFish = await db.all(`
+      SELECT 
+        s.*, 
+        c.credit_value_min,
+        c.credit_value_max,
+        c.drop_items,
+        l.rarity
+      FROM BestiarySpecies s
+      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+      LEFT JOIN BestiaryLocations l ON s.id = l.species_id AND l.island = ?
+      WHERE s.habitat_type = 'Водные' AND s.is_active = 1
+    `, [location.island]);
+
+    // Фильтруем существ по рангу локации
+    const fish = allFish.filter(f => {
+      const fishRankIndex = rankOrder.indexOf(f.danger_rank);
+      return fishRankIndex >= minRankIndex;
+    });
+
+    if (fish.length === 0) {
+      await db.close();
+      return res.json({ 
+        success: false, 
+        message: 'В этой локации нет подходящей рыбы!' 
+      });
+    }
 
     // Вычисляем бонусы от снаряжения
     let bonusChance = 0;
@@ -7003,11 +7033,14 @@ router.post('/fishing/catch', async (req: Request, res: Response) => {
     const roll = Math.random() + bonusChance;
     let caughtFish = null;
 
-    // Сортируем по редкости с учётом бонуса
-    const sortedFish = fish.sort((a: any, b: any) => {
-      const rarityOrder: any = { 'Обычная': 1, 'Необычная': 2, 'Редкая': 3, 'Очень редкая': 4, 'Легендарная': 5 };
-      return rarityOrder[a.rarity] - rarityOrder[b.rarity];
-    });
+    // Определяем базовые шансы по редкости из бестиария
+    const sortedFish = fish.map(f => ({
+      ...f,
+      spawn_chance: f.rarity === 'Легендарный' ? 0.05 : 
+                    f.rarity === 'Очень редкий' ? 0.15 :
+                    f.rarity === 'Редкий' ? 0.25 :
+                    f.rarity === 'Необычный' ? 0.35 : 0.45
+    })).sort((a, b) => a.spawn_chance - b.spawn_chance);
 
     for (const f of sortedFish) {
       const chance = f.spawn_chance + (bonusRarity * 0.1);
@@ -7017,7 +7050,7 @@ router.post('/fishing/catch', async (req: Request, res: Response) => {
     }
 
     if (!caughtFish && fish.length > 0) {
-      caughtFish = fish[0]; // Минимум обычная рыба
+      caughtFish = sortedFish[0]; // Минимум обычная рыба
     }
 
     if (caughtFish) {
@@ -7231,15 +7264,47 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
     const { character_id, location_id, gear_ids, hunt_type } = req.body;
     const db = await initDB();
 
-    // Определяем среду обитания в зависимости от типа охоты
-    const habitat = hunt_type === 'aerial' ? 'Воздушный' : 'Наземный';
+    // Получаем локацию для проверки min_rank
+    const location = await db.get(`SELECT * FROM HuntingLocations WHERE id = ?`, location_id);
+    if (!location) {
+      await db.close();
+      return res.status(404).json({ success: false, message: 'Локация не найдена' });
+    }
 
+    // Определяем среду обитания в зависимости от типа охоты
+    const habitatType = hunt_type === 'aerial' ? 'Воздушные' : 'Наземные';
+
+    // Используем BestiarySpecies вместо HuntingSpecies
+    // Фильтруем по habitat_type и учитываем min_rank локации
+    const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    const minRankIndex = rankOrder.indexOf(location.min_rank);
+    
     const creatures = await db.all(`
-      SELECT s.*, sp.spawn_chance
-      FROM HuntingSpecies s
-      JOIN HuntingLocationSpawns sp ON s.id = sp.species_id
-      WHERE sp.location_id = ? AND s.is_active = 1 AND s.habitat_type = ?
-    `, [location_id, habitat]);
+      SELECT 
+        s.*, 
+        c.credit_value_min,
+        c.credit_value_max,
+        c.drop_items,
+        l.rarity
+      FROM BestiarySpecies s
+      LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+      LEFT JOIN BestiaryLocations l ON s.id = l.species_id AND l.island = ?
+      WHERE s.habitat_type = ? AND s.is_active = 1
+    `, [location.island, habitatType]);
+
+    // Фильтруем существ по рангу локации (только существа с рангом >= min_rank локации)
+    const suitableCreatures = creatures.filter(c => {
+      const creatureRankIndex = rankOrder.indexOf(c.danger_rank);
+      return creatureRankIndex >= minRankIndex;
+    });
+
+    if (suitableCreatures.length === 0) {
+      await db.close();
+      return res.json({ 
+        success: false, 
+        message: 'В этой локации не водятся подходящие существа для такого типа охоты!' 
+      });
+    }
 
     let bonusSuccess = 0;
     if (gear_ids && gear_ids.length > 0) {
@@ -7255,14 +7320,21 @@ router.post('/hunting/hunt', async (req: Request, res: Response) => {
     let huntedCreature = null;
 
     console.log('Hunting debug:', {
-      creaturesCount: creatures.length,
+      creaturesCount: suitableCreatures.length,
       bonusSuccess,
       roll,
-      creatures: creatures.map(c => ({ name: c.name, spawn_chance: c.spawn_chance }))
+      locationRank: location.min_rank,
+      creatures: suitableCreatures.map(c => ({ name: c.name, rank: c.danger_rank }))
     });
 
-    // Сортируем существ по шансу появления (от большего к меньшему)
-    const sortedCreatures = creatures.sort((a, b) => b.spawn_chance - a.spawn_chance);
+    // Определяем базовые шансы по редкости из бестиария
+    const sortedCreatures = suitableCreatures.map(c => ({
+      ...c,
+      spawn_chance: c.rarity === 'Легендарный' ? 0.05 : 
+                    c.rarity === 'Очень редкий' ? 0.15 :
+                    c.rarity === 'Редкий' ? 0.25 :
+                    c.rarity === 'Необычный' ? 0.35 : 0.45
+    })).sort((a, b) => b.spawn_chance - a.spawn_chance);
     
     for (const c of sortedCreatures) {
       // Учитываем бонусы от снаряжения
@@ -7464,6 +7536,101 @@ router.post('/hunting/gear/buy', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Ошибка при покупке снаряжения:', error);
     res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+// ============================================
+// Database Migrations & Updates (Admin Only)
+// ============================================
+
+// Добавить поле habitat_category в HuntingGear
+router.post('/admin/migrations/add-habitat-category', async (req: Request, res: Response) => {
+  try {
+    const adminId = req.headers['x-admin-id'];
+    if (adminId !== ADMIN_VK_ID) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const db = await initDB();
+    
+    // Проверяем, есть ли уже колонка
+    const tableInfo = await db.all(`PRAGMA table_info(HuntingGear)`);
+    const hasColumn = tableInfo.some((col: any) => col.name === 'habitat_category');
+    
+    if (hasColumn) {
+      await db.close();
+      return res.json({ success: true, message: 'Колонка habitat_category уже существует' });
+    }
+
+    // Добавляем колонку
+    await db.run(`
+      ALTER TABLE HuntingGear 
+      ADD COLUMN habitat_category TEXT CHECK(habitat_category IN ('Наземное', 'Воздушное', 'Универсальное')) DEFAULT 'Универсальное'
+    `);
+
+    // Обновляем существующие записи
+    await db.run(`UPDATE HuntingGear SET habitat_category = 'Наземное' WHERE type = 'Наземная ловушка'`);
+    await db.run(`UPDATE HuntingGear SET habitat_category = 'Воздушное' WHERE type = 'Воздушная ловушка'`);
+    await db.run(`UPDATE HuntingGear SET habitat_category = 'Универсальное' WHERE type IN ('Оружие', 'Броня')`);
+
+    await db.close();
+    res.json({ success: true, message: 'Поле habitat_category успешно добавлено и заполнено' });
+  } catch (error) {
+    console.error('Ошибка при добавлении поля habitat_category:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// Пересоздать таблицы рыбалки и охоты
+router.post('/admin/migrations/recreate-activities-tables', async (req: Request, res: Response) => {
+  try {
+    const adminId = req.headers['x-admin-id'];
+    if (adminId !== ADMIN_VK_ID) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const db = await initDB();
+    
+    // Удаляем старые таблицы HuntingSpecies и FishSpecies
+    await db.run(`DROP TABLE IF EXISTS HuntingSpecies`);
+    await db.run(`DROP TABLE IF EXISTS FishSpecies`);
+    await db.run(`DROP TABLE IF EXISTS HuntingLocationSpawns`);
+    await db.run(`DROP TABLE IF EXISTS FishLocationSpawns`);
+    
+    console.log('Старые таблицы удалены, теперь используется BestiarySpecies');
+
+    await db.close();
+    res.json({ success: true, message: 'Таблицы пересозданы, теперь используется Бестиарий' });
+  } catch (error) {
+    console.error('Ошибка при пересоздании таблиц:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// Очистить и пересоздать снаряжение
+router.post('/admin/migrations/reset-gear', async (req: Request, res: Response) => {
+  try {
+    const adminId = req.headers['x-admin-id'];
+    if (adminId !== ADMIN_VK_ID) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const db = await initDB();
+    
+    // Удаляем все снаряжение
+    await db.run(`DELETE FROM HuntingGear WHERE 1=1`);
+    await db.run(`DELETE FROM FishingGear WHERE 1=1`);
+    
+    // Пересоздаем снаряжение с новыми названиями
+    const { seedHuntingData, seedFishingData } = await import('./database.js');
+    await seedHuntingData(db);
+    await seedFishingData(db);
+
+    await db.close();
+    res.json({ success: true, message: 'Снаряжение успешно обновлено с отсылками на игры!' });
+  } catch (error) {
+    console.error('Ошибка при обновлении снаряжения:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера', error: String(error) });
   }
 });
 

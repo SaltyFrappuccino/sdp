@@ -383,14 +383,22 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
           {selectedLocation && (
             <>
-              <Group header={<Header>Экипировка (опционально)</Header>}>
+              <Group header={<Header>Экипировка{selectedGear.length > 0 && ` (+${Math.round((selectedGear.reduce((sum, id) => {
+                const g = gear.find(g => g.id === id);
+                return sum + (g?.bonus_chance || 0) + (g?.bonus_rarity || 0);
+              }, 0)) * 100)}% бонус)`}</Header>}>
                 <Div>
-                  <Text weight="2">Удочки:</Text>
+                  <Text weight="2">Удочка:</Text>
                   <NativeSelect
                     value={selectedGear[0] || ''}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const gearId = parseInt(e.target.value);
-                      setSelectedGear(gearId ? [gearId] : []);
+                      // Если убираем удочку, убираем и наживку
+                      if (!gearId) {
+                        setSelectedGear([]);
+                      } else {
+                        setSelectedGear([gearId]);
+                      }
                     }}
                   >
                     <option value="">Без удочки</option>
@@ -402,9 +410,10 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                   </NativeSelect>
                 </Div>
                 <Div>
-                  <Text weight="2">Наживка:</Text>
+                  <Text weight="2">Наживка: {!selectedGear[0] && <Text style={{ color: 'var(--text_secondary)', fontSize: '12px' }}>(сначала выберите удочку)</Text>}</Text>
                   <NativeSelect
                     value={selectedGear[1] || ''}
+                    disabled={!selectedGear[0]}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const gearId = parseInt(e.target.value);
                       setSelectedGear(prev => {
@@ -455,6 +464,38 @@ const FishingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                     <Avatar size={48} style={{ background: getRarityColor(fish.rarity) }}>
                       🐟
                     </Avatar>
+                  }
+                  after={
+                    <Button 
+                      size="s" 
+                      mode="outline"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`${API_URL}/fishing/sell`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              character_id: characterId,
+                              fish_ids: [fish.id]
+                            })
+                          });
+                          const result = await response.json();
+                          if (result.success) {
+                            setSnackbar(
+                              <Snackbar onClose={() => setSnackbar(null)}>
+                                💰 Продано за {result.credits.toLocaleString()} ₭
+                              </Snackbar>
+                            );
+                            setCredits(credits + result.credits);
+                            loadInventory();
+                          }
+                        } catch (error) {
+                          console.error('Ошибка при продаже:', error);
+                        }
+                      }}
+                    >
+                      💰 Продать
+                    </Button>
                   }
                   multiline
                 >

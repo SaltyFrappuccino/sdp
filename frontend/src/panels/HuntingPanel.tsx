@@ -438,7 +438,10 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
           {selectedLocation && (
             <>
-              <Group header={<Header>Снаряжение (опционально)</Header>}>
+              <Group header={<Header>Снаряжение{selectedGear.length > 0 && ` (+${Math.round((selectedGear.reduce((sum, id) => {
+                const g = gear.find(g => g.id === id);
+                return sum + (g?.bonus_success || 0) + (g?.bonus_damage || 0) + (g?.bonus_defense || 0);
+              }, 0)) * 100)}% бонус)`}</Header>}>
                 <Div>
                   <Text weight="2">Оружие:</Text>
                   <NativeSelect
@@ -457,13 +460,21 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                   </NativeSelect>
                 </Div>
                 <Div>
-                  <Text weight="2">Броня:</Text>
+                  <Text weight="2">Броня: {!selectedGear[0] && <Text style={{ color: 'var(--text_secondary)', fontSize: '12px' }}>(сначала выберите оружие)</Text>}</Text>
                   <NativeSelect
                     value={selectedGear[1] || ''}
+                    disabled={!selectedGear[0]}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const gearId = parseInt(e.target.value);
                       setSelectedGear(prev => {
                         const newGear = prev.filter(id => gear.find(g => g.id === id)?.type !== 'Броня');
+                        // Если убираем броню, убираем и ловушку
+                        if (!gearId) {
+                          return newGear.filter(id => {
+                            const g = gear.find(g => g.id === id);
+                            return g?.type !== 'Наземная ловушка' && g?.type !== 'Воздушная ловушка';
+                          });
+                        }
                         return gearId ? [...newGear, gearId] : newGear;
                       });
                     }}
@@ -477,9 +488,10 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                   </NativeSelect>
                 </Div>
                 <Div>
-                  <Text weight="2">{huntType === 'aerial' ? 'Воздушная ловушка:' : 'Наземная ловушка:'}</Text>
+                  <Text weight="2">{huntType === 'aerial' ? 'Воздушная ловушка:' : 'Наземная ловушка:'} {!selectedGear[1] && <Text style={{ color: 'var(--text_secondary)', fontSize: '12px' }}>(сначала выберите броню)</Text>}</Text>
                   <NativeSelect
                     value={selectedGear[2] || ''}
+                    disabled={!selectedGear[1]}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const gearId = parseInt(e.target.value);
                       setSelectedGear(prev => {
@@ -531,6 +543,38 @@ const HuntingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                     <Avatar size={48} style={{ background: getRankColor(hunt.danger_rank) }}>
                       🦌
                     </Avatar>
+                  }
+                  after={
+                    <Button 
+                      size="s" 
+                      mode="outline"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`${API_URL}/hunting/sell`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              character_id: characterId,
+                              hunt_ids: [hunt.id]
+                            })
+                          });
+                          const result = await response.json();
+                          if (result.success) {
+                            setSnackbar(
+                              <Snackbar onClose={() => setSnackbar(null)}>
+                                💰 Продано за {result.credits.toLocaleString()} ₭
+                              </Snackbar>
+                            );
+                            setCredits(credits + result.credits);
+                            loadInventory();
+                          }
+                        } catch (error) {
+                          console.error('Ошибка при продаже:', error);
+                        }
+                      }}
+                    >
+                      💰 Продать
+                    </Button>
                   }
                   multiline
                 >

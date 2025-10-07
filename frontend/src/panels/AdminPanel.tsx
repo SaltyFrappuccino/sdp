@@ -86,7 +86,32 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const [editingItem, setEditingItem] = useState<Partial<MarketItem> | null>(null);
   const [characterSearch, setCharacterSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'market' | 'crypto' | 'purchases' | 'collections' | 'updates' | 'bulk'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'market' | 'crypto' | 'purchases' | 'collections' | 'updates' | 'bulk' | 'migrations'>('overview');
+  const [migrating, setMigrating] = useState(false);
+
+  const runMigration = async (endpoint: string, message: string) => {
+    setMigrating(true);
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-id': localStorage.getItem('adminId') || ''
+        }
+      });
+      const result = await response.json();
+      if (result.success) {
+        showResultSnackbar(result.message || message, true);
+      } else {
+        showResultSnackbar(result.message || 'Ошибка миграции', false);
+      }
+    } catch (error) {
+      console.error('Ошибка при миграции:', error);
+      showResultSnackbar('Ошибка при выполнении миграции', false);
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const handleBackup = async () => {
     try {
@@ -559,6 +584,51 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     </Group>
   );
 
+  const renderMigrationsTab = () => (
+    <Group>
+      <Header>Миграции и обновления базы данных</Header>
+      <Div>
+        <Text style={{ marginBottom: '16px', color: 'var(--text_secondary)' }}>
+          ⚠️ Используйте эти функции осторожно! Они изменяют структуру базы данных.
+        </Text>
+        
+        <Button
+          size="l"
+          stretched
+          loading={migrating}
+          disabled={migrating}
+          onClick={() => runMigration('/admin/migrations/add-habitat-category', 'Поле habitat_category добавлено')}
+          style={{ marginBottom: '8px' }}
+        >
+          Добавить поле habitat_category в HuntingGear
+        </Button>
+        
+        <Button
+          size="l"
+          stretched
+          loading={migrating}
+          disabled={migrating}
+          onClick={() => runMigration('/admin/migrations/recreate-activities-tables', 'Таблицы пересозданы')}
+          style={{ marginBottom: '8px' }}
+        >
+          Пересоздать таблицы охоты и рыбалки (использовать Бестиарий)
+        </Button>
+        
+        <Button
+          size="l"
+          stretched
+          loading={migrating}
+          disabled={migrating}
+          onClick={() => runMigration('/admin/migrations/reset-gear', 'Снаряжение обновлено')}
+          style={{ marginBottom: '8px' }}
+          mode="primary"
+        >
+          🎮 Обновить снаряжение с отсылками на игры
+        </Button>
+      </Div>
+    </Group>
+  );
+
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -577,6 +647,8 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         return renderUpdatesTab();
       case 'bulk':
         return renderBulkTab();
+      case 'migrations':
+        return renderMigrationsTab();
       default:
         return renderOverviewTab();
     }
@@ -713,6 +785,12 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           onClick={() => setActiveTab('bulk')}
         >
           ⚡ Массовые
+        </TabsItem>
+        <TabsItem 
+          selected={activeTab === 'migrations'} 
+          onClick={() => setActiveTab('migrations')}
+        >
+          🔧 Миграции
         </TabsItem>
       </Tabs>
 

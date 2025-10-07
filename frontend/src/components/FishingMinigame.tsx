@@ -11,10 +11,11 @@ const FishingMinigame: React.FC<FishingMinigameProps> = ({ fishRarity, onComplet
   const [gameState, setGameState] = useState<'waiting' | 'active' | 'completed'>('waiting');
   const [progress, setProgress] = useState(0);
   const [targetZone, setTargetZone] = useState({ start: 40, end: 60 });
-  const [currentPosition, setCurrentPosition] = useState(50);
-  const [direction, setDirection] = useState(1);
+  const [indicatorPosition, setIndicatorPosition] = useState(0);
+  const [zoneDirection, setZoneDirection] = useState(1);
   const [timeLeft, setTimeLeft] = useState(5000);
   const [difficulty, setDifficulty] = useState(1);
+  const [isHolding, setIsHolding] = useState(false);
 
   // Настройка сложности в зависимости от редкости рыбы
   useEffect(() => {
@@ -38,22 +39,33 @@ const FishingMinigame: React.FC<FishingMinigameProps> = ({ fishRarity, onComplet
     setTimeLeft(Math.max(3000, 6000 - (newDifficulty - 1) * 500));
   }, [fishRarity]);
 
-  // Игровой цикл
+  // Игровой цикл - движение зоны и индикатора
   useEffect(() => {
     if (gameState !== 'active') return;
 
     const interval = setInterval(() => {
-      setCurrentPosition(prev => {
-        const speed = 1 + difficulty * 0.5;
-        let newPos = prev + direction * speed;
+      // Движение зеленой зоны туда-сюда
+      setTargetZone(prev => {
+        const zoneSize = prev.end - prev.start;
+        const speed = 0.8 + difficulty * 0.3;
+        let newStart = prev.start + zoneDirection * speed;
         
-        if (newPos <= 0 || newPos >= 100) {
-          setDirection(prev => -prev);
-          newPos = Math.max(0, Math.min(100, newPos));
+        // Отражение от краев
+        if (newStart <= 0 || newStart + zoneSize >= 100) {
+          setZoneDirection(d => -d);
+          newStart = Math.max(0, Math.min(100 - zoneSize, newStart));
         }
         
-        return newPos;
+        return { start: newStart, end: newStart + zoneSize };
       });
+
+      // Движение индикатора при удержании кнопки
+      if (isHolding) {
+        setIndicatorPosition(prev => Math.min(100, prev + 1.5));
+      } else {
+        // Индикатор падает, если не удерживаем
+        setIndicatorPosition(prev => Math.max(0, prev - 0.8));
+      }
 
       setTimeLeft(prev => {
         const newTime = prev - 50;
@@ -67,33 +79,38 @@ const FishingMinigame: React.FC<FishingMinigameProps> = ({ fishRarity, onComplet
     }, 50);
 
     return () => clearInterval(interval);
-  }, [gameState, direction, difficulty, onComplete]);
+  }, [gameState, isHolding, zoneDirection, difficulty, onComplete]);
 
-  const handleCatch = useCallback(() => {
+  // Проверка нахождения в зоне и обновление прогресса
+  useEffect(() => {
     if (gameState !== 'active') return;
-    
-    const inTargetZone = currentPosition >= targetZone.start && currentPosition <= targetZone.end;
-    
-    if (inTargetZone) {
-      setProgress(prev => {
-        const newProgress = prev + (100 / (5 + difficulty));
-        if (newProgress >= 100) {
-          setGameState('completed');
-          onComplete(true);
-          return 100;
-        }
-        return newProgress;
-      });
-    } else {
-      setProgress(prev => Math.max(0, prev - 10));
-    }
-  }, [gameState, currentPosition, targetZone, difficulty, onComplete]);
+
+    const checkInterval = setInterval(() => {
+      const inTargetZone = indicatorPosition >= targetZone.start && indicatorPosition <= targetZone.end;
+      
+      if (inTargetZone) {
+        setProgress(prev => {
+          const newProgress = prev + (2 / difficulty);
+          if (newProgress >= 100) {
+            setGameState('completed');
+            onComplete(true);
+            return 100;
+          }
+          return newProgress;
+        });
+      } else {
+        setProgress(prev => Math.max(0, prev - 1));
+      }
+    }, 50);
+
+    return () => clearInterval(checkInterval);
+  }, [gameState, indicatorPosition, targetZone, difficulty, onComplete]);
 
   const startGame = () => {
     setGameState('active');
     setProgress(0);
-    setCurrentPosition(50);
-    setDirection(1);
+    setIndicatorPosition(0);
+    setZoneDirection(1);
   };
 
   if (gameState === 'waiting') {
@@ -102,7 +119,7 @@ const FishingMinigame: React.FC<FishingMinigameProps> = ({ fishRarity, onComplet
         <Div>
           <Title level="2">🎣 Рыбалка</Title>
           <Text>Редкость рыбы: {fishRarity}</Text>
-          <Text>Нажимайте кнопку "Подсечь", когда индикатор находится в зеленой зоне!</Text>
+          <Text>Удерживайте кнопку, чтобы индикатор оставался в зеленой зоне!</Text>
           <br />
           <Button size="l" onClick={startGame} stretched>
             Начать ловлю
@@ -149,18 +166,28 @@ const FishingMinigame: React.FC<FishingMinigameProps> = ({ fishRarity, onComplet
           {/* Индикатор */}
           <div style={{
             position: 'absolute',
-            left: `${currentPosition}%`,
+            left: `${indicatorPosition}%`,
             top: '50%',
             transform: 'translate(-50%, -50%)',
             width: '4px',
             height: '40px',
             background: '#FF3347',
-            borderRadius: '2px'
+            borderRadius: '2px',
+            boxShadow: '0 0 8px rgba(255, 51, 71, 0.6)'
           }} />
         </div>
         
-        <Button size="l" onClick={handleCatch} stretched>
-          Подсечь!
+        <Button 
+          size="l" 
+          onMouseDown={() => setIsHolding(true)}
+          onMouseUp={() => setIsHolding(false)}
+          onMouseLeave={() => setIsHolding(false)}
+          onTouchStart={() => setIsHolding(true)}
+          onTouchEnd={() => setIsHolding(false)}
+          stretched
+          mode={isHolding ? 'primary' : 'secondary'}
+        >
+          {isHolding ? '🎣 Удерживаю!' : '🎣 Удерживать'}
         </Button>
         
         <Button size="m" mode="secondary" onClick={onCancel} stretched style={{ marginTop: 8 }}>
