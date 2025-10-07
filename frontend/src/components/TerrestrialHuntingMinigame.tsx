@@ -66,7 +66,7 @@ const TerrestrialHuntingMinigame: React.FC<TerrestrialHuntingMinigameProps> = ({
       // Проверяем завершение фазы
       if (newProgress >= 100) {
         setGameState('aiming');
-        setTimeLeft(Math.floor(5000 / difficulty)); // От 2.5 до 10 секунд на прицел
+        setTimeLeft(Math.floor(8000 / difficulty)); // От 4 до 16 секунд на прицел
         return;
       }
       

@@ -7008,7 +7008,19 @@ router.post('/fishing/start', async (req: Request, res: Response) => {
 
     // Расчет сложности игры (от 0.5 до 2.0)
     // Чем лучше удочка, тем легче игра
-    const difficulty = Math.max(0.5, 2.0 - (rodBonus * 4));
+    let baseDifficulty = Math.max(0.5, 2.0 - (rodBonus * 4));
+    
+    // Модификатор сложности от региона
+    let regionModifier = 1.0;
+    if (location.region?.includes('Эхо') || location.region?.includes('Тёмный')) {
+      regionModifier = 1.5; // Эхо-зоны сложнее
+    } else if (location.region?.includes('Лес') || location.region?.includes('Священное')) {
+      regionModifier = 0.8; // Лесные зоны легче
+    } else if (location.region?.includes('Город') || location.region?.includes('Порт')) {
+      regionModifier = 0.9; // Городские зоны немного легче
+    }
+    
+    const difficulty = Math.max(0.5, Math.min(2.0, baseDifficulty * regionModifier));
     
     // Расчет бонуса редкости (от 0 до 0.5)
     const rarityBonus = Math.min(0.5, baitBonus * 1.5);
@@ -7074,7 +7086,7 @@ router.post('/fishing/complete', async (req: Request, res: Response) => {
     
     const roll = Math.random();
     let caughtFish = null;
-    
+
     for (const f of sortedFish) {
       if (roll <= f.spawn_chance) {
         caughtFish = f;
@@ -7101,8 +7113,8 @@ router.post('/fishing/complete', async (req: Request, res: Response) => {
       if (gear_ids && gear_ids.length > 0) {
         for (const gearId of gear_ids) {
           const gearInfo = await db.get(`SELECT type FROM FishingGear WHERE id = ?`, gearId);
-          const characterGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
-          
+            const characterGear = await db.get(`SELECT * FROM CharacterFishingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            
           if (gearInfo && characterGear) {
             // Приманка всегда расходуется
             if (gearInfo.type === 'Наживка') {
@@ -7325,7 +7337,7 @@ router.post('/hunting/start', async (req: Request, res: Response) => {
       `);
       
       gear.forEach((g: any) => {
-        if (g.type === 'Оружие' && (g.habitat_category === habitatCategory || g.habitat_category === 'Универсальное')) {
+        if ((g.type === 'Воздушное оружие' || g.type === 'Наземное оружие') && (g.habitat_category === habitatCategory || g.habitat_category === 'Универсальное')) {
           weaponBonus += g.bonus_damage || 0;  // Оружие влияет на качество
         } else if (g.type === 'Броня') {
           armorBonus += g.bonus_defense || 0;   // Броня влияет на сложность
@@ -7337,7 +7349,19 @@ router.post('/hunting/start', async (req: Request, res: Response) => {
 
     // Расчет сложности игры (от 0.5 до 2.0)
     // Чем больше брони, тем легче игра
-    const difficulty = Math.max(0.5, 2.0 - (armorBonus * 2));
+    let baseDifficulty = Math.max(0.5, 2.0 - (armorBonus * 2));
+    
+    // Модификатор сложности от региона
+    let regionModifier = 1.0;
+    if (location.region?.includes('Эхо') || location.region?.includes('Тёмный')) {
+      regionModifier = 1.5; // Эхо-зоны сложнее
+    } else if (location.region?.includes('Лес') || location.region?.includes('Священное')) {
+      regionModifier = 0.8; // Лесные зоны легче
+    } else if (location.region?.includes('Город') || location.region?.includes('Порт')) {
+      regionModifier = 0.9; // Городские зоны немного легче
+    }
+    
+    const difficulty = Math.max(0.5, Math.min(2.0, baseDifficulty * regionModifier));
     
     // Расчет модификатора качества (от 0.8 до 2.0)
     const qualityModifier = 0.8 + weaponBonus * 1.2;
@@ -7436,8 +7460,8 @@ router.post('/hunting/complete', async (req: Request, res: Response) => {
       if (gear_ids && gear_ids.length > 0) {
         for (const gearId of gear_ids) {
           const gearInfo = await db.get(`SELECT type, is_consumable FROM HuntingGear WHERE id = ?`, gearId);
-          const characterGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
-          
+            const characterGear = await db.get(`SELECT * FROM CharacterHuntingGear WHERE character_id = ? AND gear_id = ?`, character_id, gearId);
+            
           if (gearInfo && characterGear) {
             // Ловушки всегда расходуются
             if (gearInfo.type === 'Наземная ловушка' || gearInfo.type === 'Воздушная ловушка') {

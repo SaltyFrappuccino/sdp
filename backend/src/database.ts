@@ -1401,11 +1401,32 @@ export async function initDB() {
       console.error('Error adding quality_modifier:', error);
     }
 
-    // Миграция 5: Проверка обновления снаряжения с отсылками на игры
+    // Миграция 5: Обновление типов снаряжения охоты на 5 категорий
+    try {
+      const oldGearType = await db.get(`SELECT type FROM HuntingGear WHERE type = 'Оружие' LIMIT 1`);
+      
+      if (oldGearType) {
+        console.log('Updating hunting gear types to 5 categories...');
+        
+        // Обновляем типы снаряжения
+        await db.run(`UPDATE HuntingGear SET type = 'Наземное оружие' WHERE type = 'Оружие' AND habitat_category = 'Наземное'`);
+        await db.run(`UPDATE HuntingGear SET type = 'Воздушное оружие' WHERE type = 'Оружие' AND habitat_category = 'Воздушное'`);
+        await db.run(`UPDATE HuntingGear SET type = 'Наземное оружие' WHERE type = 'Оружие' AND habitat_category = 'Универсальное'`);
+        
+        console.log('✓ Hunting gear types updated to 5 categories');
+      } else {
+        console.log('✓ Hunting gear types already updated');
+      }
+    } catch (error) {
+      console.error('Error updating hunting gear types:', error);
+    }
+
+    // Миграция 6: Проверка обновления снаряжения с отсылками на игры
     try {
       const sampleGear = await db.get(`SELECT name FROM HuntingGear WHERE name LIKE '%Rebellion%' OR name LIKE '%Алмазный меч%'`);
+      const sampleFishingGear = await db.get(`SELECT name FROM FishingGear WHERE name LIKE '%Алмазная удочка%' OR name LIKE '%Посох Речного Царя%'`);
       
-      if (!sampleGear) {
+      if (!sampleGear || !sampleFishingGear) {
         console.log('Updating gear with game references...');
         // Очищаем старое снаряжение
         await db.run(`DELETE FROM HuntingGear WHERE 1=1`);
