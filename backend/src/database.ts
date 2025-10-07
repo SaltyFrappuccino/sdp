@@ -1277,14 +1277,28 @@ export async function initDB() {
         console.log('Restored CharacterHuntingGear data');
       }
 
-      // Заполняем данные только если таблицы пустые
-      console.log('Seeding fishing and hunting data...');
-      await seedFishingData(db);
+    // Заполняем данные только если таблицы пустые
+    console.log('Seeding fishing and hunting data...');
+    await seedFishingData(db);
+    await seedHuntingData(db);
+    
+    // Проверяем, есть ли связи между локациями и существами
+    const huntingSpawnsCount = await db.get(`SELECT COUNT(*) as count FROM HuntingLocationSpawns`);
+    if (huntingSpawnsCount.count === 0) {
+      console.log('No hunting spawns found, force seeding hunting data...');
       await seedHuntingData(db);
+    }
       
       console.log('Migration completed successfully');
     } else {
       console.log('No migration needed, tables are up to date');
+      
+      // Проверяем, есть ли связи между локациями и существами
+      const huntingSpawnsCount = await db.get(`SELECT COUNT(*) as count FROM HuntingLocationSpawns`);
+      if (huntingSpawnsCount.count === 0) {
+        console.log('No hunting spawns found, force seeding hunting data...');
+        await seedHuntingData(db);
+      }
     }
 
     return db;
@@ -2183,22 +2197,22 @@ export async function seedHuntingData(db: any) {
 
     // Привязываем существ к локациям
     if (stoneBoar) {
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (${stoneBoar.id}, ${hoshiForest.lastID}, 0.6)`);
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (${stoneBoar.id}, ${midzuForest.lastID}, 0.5)`);
+      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, stoneBoar.id, hoshiForest.lastInsertRowid || hoshiForest.lastID, 0.6);
+      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, stoneBoar.id, midzuForest.lastInsertRowid || midzuForest.lastID, 0.5);
     }
 
     if (mountainBoar) {
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (${mountainBoar.id}, ${hoshiMountain.lastID}, 0.4)`);
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (${mountainBoar.id}, ${midzuMountain.lastID}, 0.3)`);
+      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, mountainBoar.id, hoshiMountain.lastInsertRowid || hoshiMountain.lastID, 0.4);
+      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, mountainBoar.id, midzuMountain.lastInsertRowid || midzuMountain.lastID, 0.3);
     }
 
     if (voltFox) {
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (${voltFox.id}, ${kuroWasteland.lastID}, 0.35)`);
+      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, voltFox.id, kuroWasteland.lastInsertRowid || kuroWasteland.lastID, 0.35);
     }
 
     if (crystalWolf) {
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (${crystalWolf.id}, ${hoshiEcho.lastID}, 0.1)`);
-      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (${crystalWolf.id}, ${kuroEcho.lastID}, 0.15)`);
+      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, crystalWolf.id, hoshiEcho.lastInsertRowid || hoshiEcho.lastID, 0.1);
+      await db.run(`INSERT INTO HuntingLocationSpawns (species_id, location_id, spawn_chance) VALUES (?, ?, ?)`, crystalWolf.id, kuroEcho.lastInsertRowid || kuroEcho.lastID, 0.15);
     }
 
     console.log('Seeding hunting gear...');
