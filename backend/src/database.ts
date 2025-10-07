@@ -1401,24 +1401,73 @@ export async function initDB() {
       console.error('Error adding quality_modifier:', error);
     }
 
-    // Миграция 5: Обновление типов снаряжения охоты на 5 категорий
+    // Миграция 5: Пересоздание таблицы HuntingGear с правильным CHECK constraint
     try {
+      // Проверяем, есть ли старые типы снаряжения
       const oldGearType = await db.get(`SELECT type FROM HuntingGear WHERE type = 'Оружие' LIMIT 1`);
       
       if (oldGearType) {
-        console.log('Updating hunting gear types to 5 categories...');
+        console.log('Recreating HuntingGear table with correct CHECK constraint...');
         
-        // Обновляем типы снаряжения
-        await db.run(`UPDATE HuntingGear SET type = 'Наземное оружие' WHERE type = 'Оружие' AND habitat_category = 'Наземное'`);
-        await db.run(`UPDATE HuntingGear SET type = 'Воздушное оружие' WHERE type = 'Оружие' AND habitat_category = 'Воздушное'`);
-        await db.run(`UPDATE HuntingGear SET type = 'Наземное оружие' WHERE type = 'Оружие' AND habitat_category = 'Универсальное'`);
+        // Отключаем внешние ключи
+        await db.run(`PRAGMA foreign_keys = OFF`);
         
-        console.log('✓ Hunting gear types updated to 5 categories');
+        // Сохраняем существующие данные
+        const existingGear = await db.all(`SELECT * FROM HuntingGear`);
+        
+        // Удаляем старую таблицу
+        await db.run(`DROP TABLE HuntingGear`);
+        
+        // Создаем новую таблицу с правильным CHECK constraint
+        await db.run(`
+          CREATE TABLE HuntingGear (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            type TEXT CHECK(type IN ('Броня', 'Воздушное оружие', 'Наземное оружие', 'Воздушная ловушка', 'Наземная ловушка')),
+            quality TEXT CHECK(quality IN ('Базовое', 'Обычное', 'Хорошее', 'Отличное', 'Эпическое', 'Легендарное')),
+            habitat_category TEXT CHECK(habitat_category IN ('Наземное', 'Воздушное', 'Универсальное')) DEFAULT 'Универсальное',
+            price INTEGER,
+            bonus_damage REAL,
+            bonus_defense REAL,
+            bonus_success REAL,
+            description TEXT,
+            min_rank TEXT CHECK(min_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+            is_basic BOOLEAN DEFAULT 0,
+            is_consumable BOOLEAN DEFAULT 0,
+            is_active BOOLEAN DEFAULT 1
+          )
+        `);
+        
+        // Восстанавливаем данные с обновленными типами
+        for (const gear of existingGear) {
+          let newType = gear.type;
+          if (gear.type === 'Оружие') {
+            if (gear.habitat_category === 'Воздушное') {
+              newType = 'Воздушное оружие';
+            } else {
+              newType = 'Наземное оружие';
+            }
+          }
+          
+          await db.run(`
+            INSERT INTO HuntingGear (name, type, quality, habitat_category, price, bonus_damage, bonus_defense, bonus_success, description, min_rank, is_basic, is_consumable, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            gear.name, newType, gear.quality, gear.habitat_category || 'Универсальное',
+            gear.price, gear.bonus_damage, gear.bonus_defense, gear.bonus_success,
+            gear.description, gear.min_rank, gear.is_basic, gear.is_consumable, gear.is_active
+          ]);
+        }
+        
+        // Включаем внешние ключи обратно
+        await db.run(`PRAGMA foreign_keys = ON`);
+        
+        console.log('✓ HuntingGear table recreated with correct CHECK constraint');
       } else {
-        console.log('✓ Hunting gear types already updated');
+        console.log('✓ HuntingGear table already has correct types');
       }
     } catch (error) {
-      console.error('Error updating hunting gear types:', error);
+      console.error('Error recreating HuntingGear table:', error);
     }
 
     // Миграция 6: Проверка обновления снаряжения с отсылками на игры
