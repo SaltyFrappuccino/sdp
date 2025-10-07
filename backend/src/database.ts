@@ -1295,10 +1295,16 @@ export async function initDB() {
       
       // Проверяем, есть ли связи между локациями и существами
       const huntingSpawnsCount = await db.get(`SELECT COUNT(*) as count FROM HuntingLocationSpawns`);
+      console.log('HuntingLocationSpawns count:', huntingSpawnsCount.count);
+      
       if (huntingSpawnsCount.count === 0) {
         console.log('No hunting spawns found, force seeding hunting data...');
         await seedHuntingData(db);
       }
+      
+      // Дополнительная проверка - принудительно заполняем данные охоты
+      console.log('Force seeding hunting data to ensure spawns exist...');
+      await seedHuntingData(db);
     }
 
     return db;
@@ -2347,37 +2353,50 @@ export async function seedHuntingData(db: any) {
     const hoshiEchoId = hoshiEcho.lastInsertRowid || hoshiEcho.lastID;
     const kuroEchoId = kuroEcho.lastInsertRowid || kuroEcho.lastID;
 
+    console.log('Linking aerial creatures to locations...');
+    console.log('Aerial creatures count:', aerialCreatures.length);
+    console.log('Location IDs:', { kagaForestId, hoshiForestId, hoshiEchoId, kuroEchoId });
+    
     // Привязываем воздушных существ к локациям
     for (const creatureId of aerialCreatures) {
       if (creatureId <= aerialTouched2Id) {
         // Обычные локации для затронутых
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kagaForestId, creatureId, 0.3);
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiForestId, creatureId, 0.4);
+        console.log(`Linked aerial creature ${creatureId} to forest locations`);
       } else if (creatureId <= aerialDistorted2Id) {
         // Редкие локации для искажённых
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.2);
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.15);
+        console.log(`Linked aerial creature ${creatureId} to echo locations`);
       } else {
         // Легендарные локации для бестий
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.05);
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.03);
+        console.log(`Linked aerial creature ${creatureId} to legendary locations`);
       }
     }
 
+    console.log('Linking terrestrial creatures to locations...');
+    console.log('Terrestrial creatures count:', terrestrialCreatures.length);
+    
     // Привязываем земных существ к локациям
     for (const creatureId of terrestrialCreatures) {
       if (creatureId <= terrestrialTouched2Id) {
         // Обычные локации для затронутых
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kagaForestId, creatureId, 0.4);
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiForestId, creatureId, 0.5);
+        console.log(`Linked terrestrial creature ${creatureId} to forest locations`);
       } else if (creatureId <= terrestrialDistorted2Id) {
         // Редкие локации для искажённых
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.25);
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.2);
+        console.log(`Linked terrestrial creature ${creatureId} to echo locations`);
       } else {
         // Легендарные локации для бестий
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, hoshiEchoId, creatureId, 0.08);
         await db.run(`INSERT INTO HuntingLocationSpawns (location_id, species_id, spawn_chance) VALUES (?, ?, ?)`, kuroEchoId, creatureId, 0.05);
+        console.log(`Linked terrestrial creature ${creatureId} to legendary locations`);
       }
     }
 
