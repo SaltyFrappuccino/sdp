@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Panel, PanelHeader, Button, Div, Spacing, ScreenSpinner, Group, Cell, Header, PanelHeaderBack } from '@vkontakte/vkui';
 import { getVersionDiff } from '../utils/diff';
-import axios, { AxiosResponse } from 'axios';
 import { API_URL } from '../api';
 
 const formatValue = (value: any): string => {
@@ -36,24 +35,27 @@ const UpdateViewer = ({ id }: { id: string }) => {
 
   useEffect(() => {
     if (update_id) {
-      axios.get(`${API_URL}/updates/${update_id}`).then((response: AxiosResponse<any>) => {
-        const oldData = response.data.original_character;
-        const newData = response.data.update.updated_data;
-        const updatePayload: UpdateData = {
-          id: response.data.update.id,
-          anketa_id: response.data.update.character_id,
-          status: response.data.update.status,
-          old_data: oldData,
-          new_data: newData,
-        };
-        setUpdate(updatePayload);
-        const differences = getVersionDiff(newData, oldData);
-        setDiffResult(differences);
-        setLoading(false);
-      }).catch((error: any) => {
-        console.error("Error fetching update:", error);
-        setLoading(false);
-      });
+      fetch(`${API_URL}/updates/${update_id}`)
+        .then((response) => response.json())
+        .then((data) => {
+          const oldData = data.original_character;
+          const newData = data.update.updated_data;
+          const updatePayload: UpdateData = {
+            id: data.update.id,
+            anketa_id: data.update.character_id,
+            status: data.update.status,
+            old_data: oldData,
+            new_data: newData,
+          };
+          setUpdate(updatePayload);
+          const differences = getVersionDiff(newData, oldData);
+          setDiffResult(differences);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching update:", error);
+          setLoading(false);
+        });
     }
   }, [update_id]);
 
@@ -65,9 +67,12 @@ const UpdateViewer = ({ id }: { id: string }) => {
       return;
     }
     try {
-      await axios.post(`${API_URL}/updates/${update_id}/approve`, {}, {
-        headers: { 'X-Admin-Id': adminId },
-        withCredentials: true
+      await fetch(`${API_URL}/updates/${update_id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-id': adminId
+        }
       });
       routeNavigator.push('/admin_panel');
     } catch (error) {
@@ -83,9 +88,12 @@ const UpdateViewer = ({ id }: { id: string }) => {
       return;
     }
     try {
-      await axios.post(`${API_URL}/updates/${update_id}/reject`, {}, {
-        headers: { 'X-Admin-Id': adminId },
-        withCredentials: true
+      await fetch(`${API_URL}/updates/${update_id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-id': adminId
+        }
       });
       routeNavigator.push('/admin_panel');
     } catch (error) {

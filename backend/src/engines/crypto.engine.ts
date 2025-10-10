@@ -1,0 +1,162 @@
+import { getDbConnection } from '../database/connection.js';
+
+// Интервал обновления цен (в миллисекундах)
+const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 минут
+
+interface CryptoCurrency {
+  id: number;
+  name: string;
+  ticker_symbol: string;
+  current_price: number;
+  base_volatility: number;
+  total_supply: number;
+  circulating_supply: number;
+}
+
+interface CryptoEvent {
+  id: number;
+  impacted_crypto_id: number | null;
+  impact_strength: number;
+  end_time: string;
+}
+
+/**
+ * Обновляет цены всех криптовалют на основе волатильности и активных событий
+ */
+async function updateCryptoPrices() {
+  try {
+    console.log('[CryptoEngine] Начало обновления цен криптовалют...');
+    
+    const db = await getDbConnection();
+
+    // Получаем все активные криптовалюты
+    const cryptocurrencies = await db.all(`
+      SELECT id, name, ticker_symbol, current_price, base_volatility, total_supply, circulating_supply
+      FROM CryptoCurrencies
+    `) as CryptoCurrency[];
+
+    if (cryptocurrencies.length === 0) {
+      console.log('[CryptoEngine] Нет криптовалют для обновления');
+      return;
+    }
+
+    // Получаем активные события
+    const activeEvents = await db.all(`
+      SELECT id, impacted_crypto_id, impact_strength, end_time
+      FROM CryptoEvents
+      WHERE datetime(end_time) > datetime('now')
+    `) as CryptoEvent[];
+
+    console.log(`[CryptoEngine] Активных событий: ${activeEvents.length}`);
+
+    // Обновляем цену каждой криптовалюты
+    for (const crypto of cryptocurrencies) {
+      const oldPrice = crypto.current_price;
+
+      // Базовое изменение на основе волатильности
+      const volatility = crypto.base_volatility / 100;
+      const baseChange = (Math.random() - 0.5) * 2 * volatility;
+
+      // Добавляем влияние событий
+      let eventImpact = 0;
+      for (const event of activeEvents) {
+        if (event.impacted_crypto_id === crypto.id || event.impacted_crypto_id === null) {
+          eventImpact += (event.impact_strength / 100) * (Math.random() - 0.3);
+        }
+      }
+
+      // Рыночная динамика: иногда добавляем резкие скачки (1% шанс)
+      let marketShock = 0;
+      if (Math.random() < 0.01) {
+        marketShock = (Math.random() - 0.5) * 0.2;
+        console.log(`[CryptoEngine] Рыночный шок для ${crypto.ticker_symbol}: ${(marketShock * 100).toFixed(2)}%`);
+      }
+
+      // Итоговое изменение цены
+      const totalChange = baseChange + eventImpact + marketShock;
+      let newPrice = oldPrice * (1 + totalChange);
+
+      // Ограничиваем минимальную цену
+      newPrice = Math.max(0.01, newPrice);
+      newPrice = Math.round(newPrice * 100) / 100;
+
+      // Обновляем цену в базе данных
+      await db.run(`
+        UPDATE CryptoCurrencies
+        SET current_price = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `, newPrice, crypto.id);
+
+      // Записываем в историю цен
+      await db.run(`
+        INSERT INTO CryptoPriceHistory (crypto_id, price, timestamp)
+        VALUES (?, ?, datetime('now'))
+      `, crypto.id, newPrice);
+
+      const changePercent = ((newPrice - oldPrice) / oldPrice * 100).toFixed(2);
+      const changeSymbol = newPrice > oldPrice ? '▲' : newPrice < oldPrice ? '▼' : '━';
+      console.log(`[CryptoEngine] ${crypto.ticker_symbol}: ${oldPrice.toFixed(2)} → ${newPrice.toFixed(2)} (${changeSymbol} ${changePercent}%)`);
+    }
+
+    // Очищаем старую историю цен (старше 30 дней)
+    const deleted = await db.run(`
+      DELETE FROM CryptoPriceHistory
+      WHERE datetime(timestamp) < datetime('now', '-30 days')
+    `);
+
+    if (deleted.changes && deleted.changes > 0) {
+      console.log(`[CryptoEngine] Удалено ${deleted.changes} старых записей из истории цен`);
+    }
+
+    console.log('[CryptoEngine] Обновление цен завершено успешно');
+  } catch (error) {
+    console.error('[CryptoEngine] Ошибка при обновлении цен:', error);
+  }
+}
+
+/**
+ * Очищает завершившиеся события
+ */
+async function cleanupExpiredEvents() {
+  try {
+    const db = await getDbConnection();
+    const result = await db.run(`
+      DELETE FROM CryptoEvents
+      WHERE datetime(end_time) < datetime('now')
+    `);
+
+    if (result.changes && result.changes > 0) {
+      console.log(`[CryptoEngine] Удалено ${result.changes} завершившихся событий`);
+    }
+  } catch (error) {
+    console.error('[CryptoEngine] Ошибка при очистке событий:', error);
+  }
+}
+
+/**
+ * Запускает движок криптовалют
+ */
+export async function startCryptoEngine() {
+  console.log('[CryptoEngine] Запуск движка криптовалют...');
+  console.log(`[CryptoEngine] Интервал обновления: ${UPDATE_INTERVAL / 1000} секунд`);
+
+  // Первое обновление сразу при запуске
+  await updateCryptoPrices();
+  await cleanupExpiredEvents();
+
+  // Периодическое обновление цен
+  setInterval(async () => {
+    await updateCryptoPrices();
+    await cleanupExpiredEvents();
+  }, UPDATE_INTERVAL);
+
+  console.log('[CryptoEngine] Движок криптовалют запущен успешно');
+}
+
+/**
+ * Останавливает движок криптовалют
+ */
+export function stopCryptoEngine() {
+  console.log('[CryptoEngine] Движок криптовалют остановлен');
+}
+

@@ -33,13 +33,15 @@ import {
   Badge,
   RichCell,
   Avatar,
-  Separator
+  Separator,
+  IconButton,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { FC, useState, useEffect, ReactNode } from 'react';
 import { API_URL } from '../api';
 import { exportAnketaToJson, downloadJsonFile } from '../utils/anketaExport';
-import { Icon24CheckCircleOutline, Icon24ErrorCircle, Icon24Add, Icon24Download, Icon24Settings, Icon24Users, Icon24MoneyCircle, Icon24Gift } from '@vkontakte/icons';
+import { Icon24CheckCircleOutline, Icon24ErrorCircle, Icon24Add, Icon24Download, Icon24Settings, Icon24Users, Icon24MoneyCircle, Icon24Gift, Icon24MoreVertical } from '@vkontakte/icons';
+import { AnketaActionMenu } from '../components/AnketaActionMenu';
 
 interface Character {
   id: number;
@@ -77,17 +79,20 @@ const MODAL_PAGE_MARKET_ITEM = 'market_item';
 export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [pendingCharacters, setPendingCharacters] = useState<Character[]>([]);
   const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
   const [updates, setUpdates] = useState<Update[]>([]);
-  const [loading, setLoading] = useState({ characters: true, items: true, updates: true });
+  const [loading, setLoading] = useState({ characters: true, pending: true, items: true, updates: true });
   const [snackbar, setSnackbar] = useState<ReactNode | null>(null);
   const [popout, setPopout] = useState<ReactNode | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<Partial<MarketItem> | null>(null);
   const [characterSearch, setCharacterSearch] = useState('');
+  const [pendingSearch, setPendingSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'market' | 'crypto' | 'purchases' | 'collections' | 'updates' | 'bulk' | 'migrations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'pending' | 'market' | 'crypto' | 'purchases' | 'collections' | 'updates' | 'bulk' | 'migrations'>('overview');
   const [migrating, setMigrating] = useState(false);
+  const [actionMenuCharacter, setActionMenuCharacter] = useState<Character | null>(null);
 
   const runMigration = async (endpoint: string, message: string) => {
     setMigrating(true);
@@ -162,6 +167,19 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     }
   };
 
+  const fetchPendingCharacters = async () => {
+    try {
+      const response = await fetch(`${API_URL}/characters?status=на рассмотрении`);
+      const data = await response.json();
+      setPendingCharacters(data);
+    } catch (error) {
+      console.error('Failed to fetch pending characters:', error);
+      showResultSnackbar('Не удалось загрузить новые анкеты', false);
+    } finally {
+      setLoading(prev => ({ ...prev, pending: false }));
+    }
+  };
+
   const fetchMarketItems = async () => {
     try {
       const response = await fetch(`${API_URL}/market/items`);
@@ -189,9 +207,12 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
   };
 
   useEffect(() => {
-    fetchCharacters();
-    fetchMarketItems();
-    fetchUpdates();
+    Promise.all([
+      fetchCharacters(),
+      fetchPendingCharacters(),
+      fetchMarketItems(),
+      fetchUpdates()
+    ]);
   }, []);
 
   const showResultSnackbar = (text: string, isSuccess: boolean) => {
@@ -203,6 +224,17 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         {text}
       </Snackbar>
     );
+  };
+
+  const handleActionSuccess = (message: string) => {
+    showResultSnackbar(message, true);
+    // Обновляем списки после успешного действия
+    fetchCharacters();
+    fetchPendingCharacters();
+  };
+
+  const handleActionError = (message: string) => {
+    showResultSnackbar(message, false);
   };
 
   const handleLogout = () => {
@@ -338,59 +370,95 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         <Div>
           {loading.characters ? (
             <Spinner size="m" style={{ margin: '20px 0' }} />
-          ) : (
+          ) : filteredCharacters.length > 0 ? (
             filteredCharacters.map((character) => (
-              <div key={character.id} style={{ marginBottom: '16px' }}>
+              <div key={character.id} style={{ marginBottom: '8px' }}>
                 <RichCell
                   before={<Avatar size={40} />}
                   after={
-                    <Badge mode="new">
-                      {character.status}
-                    </Badge>
+                    <IconButton onClick={() => setActionMenuCharacter(character)}>
+                      <Icon24MoreVertical />
+                    </IconButton>
                   }
                   multiline
-                  subtitle={`Ранг: ${character.rank} • Фракция: ${character.faction}`}
+                  subtitle={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span>Ранг: {character.rank} • Фракция: {character.faction}</span>
+                      <Badge mode={character.status === 'Отклонено' ? 'prominent' : 'new'}>
+                        {character.status}
+                      </Badge>
+                    </div>
+                  }
                 >
                   {character.character_name}
                 </RichCell>
-                <Div>
-                  <ButtonGroup stretched mode="horizontal" gap="m">
-                    <Button
-                      size="m"
-                      mode="secondary"
-                      onClick={() => routeNavigator.push(`/admin_anketa_edit/${character.id}`)}
-                      stretched
-                    >
-                      Редактировать
-                    </Button>
-                    <Button
-                      size="m"
-                      mode="secondary"
-                      onClick={() => {
-                        const anketaData = { ...character };
-                        const dataStr = JSON.stringify(anketaData, null, 2);
-                        const blob = new Blob([dataStr], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `${character.character_name}_${character.id}.json`;
-                        link.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                      before={<Icon24Download />}
-                      stretched
-                    >
-                      Экспорт
-                    </Button>
-                  </ButtonGroup>
-                </Div>
               </div>
             ))
+          ) : (
+            <Div style={{ textAlign: 'center', padding: '20px' }}>
+              <Text style={{ color: 'var(--vkui--color_text_secondary)' }}>
+                Нет персонажей
+              </Text>
+            </Div>
           )}
         </Div>
       </Group>
     </>
   );
+
+  const renderPendingTab = () => {
+    const filteredPending = pendingCharacters.filter(char =>
+      char.character_name.toLowerCase().includes(pendingSearch.toLowerCase()) ||
+      char.faction.toLowerCase().includes(pendingSearch.toLowerCase())
+    );
+
+    return (
+      <>
+        <Group header={<Header>📋 Новые анкеты на рассмотрении</Header>}>
+          <Search
+            value={pendingSearch}
+            onChange={(e) => setPendingSearch(e.target.value)}
+            placeholder="Поиск по имени или фракции"
+          />
+          <Div>
+            {loading.pending ? (
+              <Spinner size="m" style={{ margin: '20px 0' }} />
+            ) : filteredPending.length > 0 ? (
+              filteredPending.map((character) => (
+                <div key={character.id} style={{ marginBottom: '8px' }}>
+                  <RichCell
+                    before={<Avatar size={40} />}
+                    after={
+                      <IconButton onClick={() => setActionMenuCharacter(character)}>
+                        <Icon24MoreVertical />
+                      </IconButton>
+                    }
+                    multiline
+                    subtitle={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span>Ранг: {character.rank} • Фракция: {character.faction}</span>
+                        <Badge mode="new">
+                          {character.status}
+                        </Badge>
+                      </div>
+                    }
+                  >
+                    {character.character_name}
+                  </RichCell>
+                </div>
+              ))
+            ) : (
+              <Div style={{ textAlign: 'center', padding: '20px' }}>
+                <Text style={{ color: 'var(--vkui--color_text_secondary)' }}>
+                  Нет анкет на рассмотрении
+                </Text>
+              </Div>
+            )}
+          </Div>
+        </Group>
+      </>
+    );
+  };
 
   const renderMarketTab = () => (
     <>
@@ -448,7 +516,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           <Button 
             size="l" 
             mode="primary" 
-            onClick={() => routeNavigator.replace('/admin_crypto')}
+            onClick={() => routeNavigator.push('/admin_crypto')}
             before={<Icon24MoneyCircle />}
           >
             ₿ Управление криптовалютами (CRUD)
@@ -472,7 +540,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           <Button 
             size="l" 
             mode="primary" 
-            onClick={() => routeNavigator.replace('/admin_purchases')}
+            onClick={() => routeNavigator.push('/admin_purchases')}
             before={<Icon24Gift />}
           >
             🛍️ Управление покупками (CRUD)
@@ -496,7 +564,7 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           <Button 
             size="l" 
             mode="primary" 
-            onClick={() => routeNavigator.replace('/admin_collections')}
+            onClick={() => routeNavigator.push('/admin_collections')}
             before={<Icon24Gift />}
           >
             💎 Управление коллекциями (CRUD)
@@ -518,19 +586,95 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
       <Div>
         {loading.updates ? (
           <Spinner size="m" style={{ margin: '20px 0' }} />
-        ) : (
+        ) : updates.length > 0 ? (
           updates.map((update) => (
-            <RichCell
-              key={update.id}
-              after={
-                <Badge mode="new">
-                  {update.status}
-                </Badge>
-              }
-            >
-              {update.character_name}
-            </RichCell>
+            <div key={update.id} style={{ marginBottom: '8px' }}>
+              <RichCell
+                multiline
+                subtitle={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span>ID анкеты: {update.character_id}</span>
+                    <Badge mode={update.status === 'pending' ? 'new' : 'prominent'}>
+                      {update.status}
+                    </Badge>
+                  </div>
+                }
+              >
+                {update.character_name}
+              </RichCell>
+              <Div>
+                <ButtonGroup stretched mode="horizontal" gap="s">
+                  <Button
+                    size="s"
+                    mode="outline"
+                    onClick={() => routeNavigator.push(`/update_viewer/${update.id}`)}
+                    stretched
+                  >
+                    Просмотр деталей
+                  </Button>
+                  {update.status === 'pending' && (
+                    <>
+                      <Button
+                        size="s"
+                        mode="primary"
+                        onClick={async () => {
+                          const adminId = localStorage.getItem('adminId');
+                          try {
+                            const response = await fetch(`${API_URL}/updates/${update.id}/approve`, {
+                              method: 'POST',
+                              headers: { 'x-admin-id': adminId || '' }
+                            });
+                            if (response.ok) {
+                              showResultSnackbar('Изменение принято', true);
+                              fetchUpdates();
+                            } else {
+                              showResultSnackbar('Ошибка при принятии изменения', false);
+                            }
+                          } catch (error) {
+                            showResultSnackbar('Ошибка сети', false);
+                          }
+                        }}
+                        stretched
+                      >
+                        Принять
+                      </Button>
+                      <Button
+                        size="s"
+                        mode="outline"
+                        appearance="negative"
+                        onClick={async () => {
+                          const adminId = localStorage.getItem('adminId');
+                          try {
+                            const response = await fetch(`${API_URL}/updates/${update.id}/reject`, {
+                              method: 'POST',
+                              headers: { 'x-admin-id': adminId || '' }
+                            });
+                            if (response.ok) {
+                              showResultSnackbar('Изменение отклонено', true);
+                              fetchUpdates();
+                            } else {
+                              showResultSnackbar('Ошибка при отклонении изменения', false);
+                            }
+                          } catch (error) {
+                            showResultSnackbar('Ошибка сети', false);
+                          }
+                        }}
+                        stretched
+                      >
+                        Отклонить
+                      </Button>
+                    </>
+                  )}
+                </ButtonGroup>
+              </Div>
+            </div>
           ))
+        ) : (
+          <Div style={{ textAlign: 'center', padding: '20px' }}>
+            <Text style={{ color: 'var(--vkui--color_text_secondary)' }}>
+              Нет ожидающих изменений
+            </Text>
+          </Div>
         )}
       </Div>
     </Group>
@@ -540,25 +684,25 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     <Group header={<Header>⚡ Массовые операции</Header>}>
       <Div>
         <ButtonGroup stretched mode="vertical" gap="m">
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/bulk_characters')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/bulk_characters')}>
             👑 Массовое управление персонажами
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_market')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_market')}>
             📈 Управление Биржей
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_events')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_events')}>
             🎪 Управление Ивентами
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_activity_requests')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_activity_requests')}>
             📋 Управление заявками на активности
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_factions')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_factions')}>
             🔰 Управление фракциями
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_bestiary')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_bestiary')}>
             🐾 Управление бестиарием
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_activities')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_activities')}>
             🎮 Управление активностями
           </Button>
         </ButtonGroup>
@@ -570,13 +714,13 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
     <Group header={<Header>💰 Управление экономикой</Header>}>
       <Div>
         <ButtonGroup stretched mode="vertical" gap="m">
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_crypto')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_crypto')}>
             ₿ Управление криптовалютами
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_purchases')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_purchases')}>
             🛍️ Управление покупками
           </Button>
-          <Button size="l" mode="secondary" onClick={() => routeNavigator.replace('/admin_collections')}>
+          <Button size="l" mode="secondary" onClick={() => routeNavigator.push('/admin_collections')}>
             💎 Управление коллекциями
           </Button>
         </ButtonGroup>
@@ -635,6 +779,8 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
         return renderOverviewTab();
       case 'characters':
         return renderCharactersTab();
+      case 'pending':
+        return renderPendingTab();
       case 'market':
         return renderMarketTab();
       case 'crypto':
@@ -751,6 +897,17 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           👥 Персонажи
         </TabsItem>
         <TabsItem 
+          selected={activeTab === 'pending'} 
+          onClick={() => setActiveTab('pending')}
+        >
+          📋 Новые анкеты
+          {pendingCharacters.length > 0 && (
+            <Counter mode="primary" style={{ marginLeft: '4px' }}>
+              {pendingCharacters.length}
+            </Counter>
+          )}
+        </TabsItem>
+        <TabsItem 
           selected={activeTab === 'market'} 
           onClick={() => setActiveTab('market')}
         >
@@ -779,6 +936,11 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
           onClick={() => setActiveTab('updates')}
         >
           📝 Изменения
+          {updates.filter(u => u.status === 'pending').length > 0 && (
+            <Counter mode="primary" style={{ marginLeft: '4px' }}>
+              {updates.filter(u => u.status === 'pending').length}
+            </Counter>
+          )}
         </TabsItem>
         <TabsItem 
           selected={activeTab === 'bulk'} 
@@ -797,6 +959,15 @@ export const AdminPanel: FC<NavIdProps> = ({ id }) => {
       {renderContent()}
       {modal}
       {snackbar}
+      {actionMenuCharacter && (
+        <AnketaActionMenu
+          characterId={actionMenuCharacter.id}
+          characterName={actionMenuCharacter.character_name}
+          onClose={() => setActionMenuCharacter(null)}
+          onSuccess={handleActionSuccess}
+          onError={handleActionError}
+        />
+      )}
     </Panel>
   );
 };

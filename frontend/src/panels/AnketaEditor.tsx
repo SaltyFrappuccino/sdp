@@ -18,6 +18,7 @@ import {
   Div,
   IconButton,
   FormLayoutGroup,
+  Caption,
 } from '@vkontakte/vkui';
 import { Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
@@ -33,6 +34,7 @@ import { Rank } from '../components/AbilityBuilder';
 import { API_URL } from '../api';
 import { readJsonFile } from '../utils/anketaExport';
 import { ManifestationData } from '../components/ManifestationForm';
+import { getMaxContractsForRank, validateContractCount } from '../utils/contractValidation';
 
 interface FactionOption {
   label: string;
@@ -191,6 +193,7 @@ export const AnketaEditor: FC<NavIdProps & {
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [factionOptions, setFactionOptions] = useState<FactionOption[]>([]);
+  const [localSnackbar, setLocalSnackbar] = useState<ReactNode | null>(null);
 
   useEffect(() => {
     const adminId = localStorage.getItem('adminId');
@@ -342,6 +345,18 @@ export const AnketaEditor: FC<NavIdProps & {
 
   const addContract = () => {
     if (!character) return;
+    const validation = validateContractCount(character.rank, character.contracts.length + 1);
+    if (!validation.valid) {
+      setLocalSnackbar(
+        <Snackbar
+          onClose={() => setLocalSnackbar(null)}
+          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+        >
+          {validation.message}
+        </Snackbar>
+      );
+      return;
+    }
     onCharacterChange({ ...character, contracts: [...character.contracts, { ...emptyContract }] });
   };
 
@@ -563,9 +578,16 @@ export const AnketaEditor: FC<NavIdProps & {
               </Div>
             ))}
             <FormItem>
-              <Button onClick={addContract} before={<Icon24Add />}>
+              <Button 
+                onClick={addContract} 
+                before={<Icon24Add />}
+                disabled={character.contracts.length >= getMaxContractsForRank(character.rank)}
+              >
                 Добавить контракт
               </Button>
+              <Caption level="1" style={{ marginTop: '8px', display: 'block' }}>
+                Контракты: {character.contracts.length}/{getMaxContractsForRank(character.rank)}
+              </Caption>
             </FormItem>
           </Group>
 
@@ -620,6 +642,7 @@ export const AnketaEditor: FC<NavIdProps & {
             </Button>
           </Div>
           {snackbar}
+          {localSnackbar}
         </>
       ) : (
         <Div>Не удалось загрузить данные анкеты.</Div>

@@ -20,7 +20,7 @@ import {
   ModalPage,
   ModalPageHeader,
   IconButton,
-  Text,
+  Caption,
 } from '@vkontakte/vkui';
 import { Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
@@ -38,6 +38,7 @@ import { readJsonFile } from '../utils/anketaExport';
 import ReactMarkdown from 'react-markdown';
 import { ManifestationData } from '../components/ManifestationForm';
 import { ShinkiAbility } from '../components/ShinkiAbilityForm';
+import { getMaxContractsForRank, validateContractCount } from '../utils/contractValidation';
 
 export interface AnketaProps extends NavIdProps {
   fetchedUser?: UserInfo;
@@ -413,6 +414,18 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
   };
 
   const addContract = () => {
+    const validation = validateContractCount(formData.rank, formData.contracts.length + 1);
+    if (!validation.valid) {
+      setSnackbar(
+        <Snackbar
+          onClose={() => setSnackbar(null)}
+          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+        >
+          {validation.message}
+        </Snackbar>
+      );
+      return;
+    }
     setFormData(prev => ({ ...prev, contracts: [...prev.contracts, { ...emptyContract }] }));
   };
 
@@ -560,21 +573,27 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
        }
      });
 
-     // Проверка лимита очков атрибутов
-     if (formData.attributes) {
-       const attributeCosts: { [key: string]: number } = {
-         "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
-       };
-       
-       const spentPoints = Object.values(formData.attributes).reduce((acc, level) => acc + (attributeCosts[level as string] || 0), 0);
-       const totalPoints = getAttributePointsForRank(formData.rank);
-       
-       if (spentPoints > totalPoints) {
-         errors.attributes = `Превышен лимит очков атрибутов! Потрачено: ${spentPoints}, доступно: ${totalPoints}`;
-       }
-     }
+    // Проверка лимита очков атрибутов
+    if (formData.attributes) {
+      const attributeCosts: { [key: string]: number } = {
+        "Дилетант": 1, "Новичок": 2, "Опытный": 4, "Эксперт": 7, "Мастер": 10
+      };
+      
+      const spentPoints = Object.values(formData.attributes).reduce((acc, level) => acc + (attributeCosts[level as string] || 0), 0);
+      const totalPoints = getAttributePointsForRank(formData.rank);
+      
+      if (spentPoints > totalPoints) {
+        errors.attributes = `Превышен лимит очков атрибутов! Потрачено: ${spentPoints}, доступно: ${totalPoints}`;
+      }
+    }
 
-     // Проверка контрактов (только если они есть)
+    // Проверка лимита контрактов
+    const contractValidation = validateContractCount(formData.rank, formData.contracts.length);
+    if (!contractValidation.valid) {
+      errors.contracts = contractValidation.message || 'Превышен лимит контрактов';
+    }
+
+    // Проверка контрактов (только если они есть)
      if (formData.contracts && formData.contracts.length > 0) {
        formData.contracts.forEach((contract, contractIndex) => {
          // Проверка обязательных полей контракта только если контракт не пустой
@@ -835,9 +854,9 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         />
         {formErrors.attributes && (
           <FormItem>
-            <Text style={{ color: 'var(--vkui--color_text_negative)' }}>
+            <Caption level="1" style={{ color: 'var(--vkui--color_text_negative)', display: 'block' }}>
               {formErrors.attributes}
-            </Text>
+            </Caption>
           </FormItem>
         )}
         <AuraCellsCalculator
@@ -861,17 +880,24 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
             {/* Отображение ошибок валидации для контракта */}
             {Object.keys(formErrors).filter(key => key.startsWith(`contract_${index}_`)).map(errorKey => (
               <FormItem key={errorKey}>
-                <Text style={{ color: 'var(--vkui--color_text_negative)' }}>
+                <Caption level="1" style={{ color: 'var(--vkui--color_text_negative)', display: 'block' }}>
                   {formErrors[errorKey]}
-                </Text>
+                </Caption>
               </FormItem>
             ))}
           </Div>
         ))}
         <FormItem>
-          <Button onClick={addContract} before={<Icon24Add />}>
+          <Button 
+            onClick={addContract} 
+            before={<Icon24Add />}
+            disabled={formData.contracts.length >= getMaxContractsForRank(formData.rank)}
+          >
             Добавить контракт
           </Button>
+          <Caption level="1" style={{ marginTop: '8px', display: 'block' }}>
+            Контракты: {formData.contracts.length}/{getMaxContractsForRank(formData.rank)}
+          </Caption>
         </FormItem>
       </Group>
 
