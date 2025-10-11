@@ -28,11 +28,16 @@ const JournalPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     if (!fetchedUser?.id) return;
     
     try {
-      const response = await fetch(`${API_URL}/characters/user/${fetchedUser.id}`);
+      const response = await fetch(`${API_URL}/my-anketas/${fetchedUser.id}`);
       const data = await response.json();
       
-      if (data.success && data.characters.length > 0) {
-        setCharacterId(data.characters[0].id);
+      const acceptedChars = data.filter((char: any) => 
+        char.status === 'Принято' && 
+        (char.life_status === 'Жив' || char.life_status === 'Жива')
+      );
+      
+      if (acceptedChars.length > 0) {
+        setCharacterId(acceptedChars[0].id);
       }
     } catch (error) {
       console.error('Ошибка загрузки персонажа:', error);

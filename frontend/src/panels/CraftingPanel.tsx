@@ -29,11 +29,16 @@ const CraftingPanel: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     if (!fetchedUser?.id) return;
     
     try {
-      const response = await fetch(`${API_URL}/characters/user/${fetchedUser.id}`);
+      const response = await fetch(`${API_URL}/my-anketas/${fetchedUser.id}`);
       const data = await response.json();
       
-      if (data.success && data.characters.length > 0) {
-        const char = data.characters[0];
+      const acceptedChars = data.filter((char: any) => 
+        char.status === 'Принято' && 
+        (char.life_status === 'Жив' || char.life_status === 'Жива')
+      );
+      
+      if (acceptedChars.length > 0) {
+        const char = acceptedChars[0];
         setCharacterId(char.id);
         setCharacterRank(char.rank || 'F');
       }

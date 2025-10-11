@@ -76,17 +76,20 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/characters/user/${fetchedUser.id}`);
+      const response = await fetch(`${API_URL}/my-anketas/${fetchedUser.id}`);
       const data = await response.json();
       
-      if (data.success && data.characters.length > 0) {
-        setCharacters(data.characters);
-        const firstChar = data.characters[0];
+      const acceptedChars = data.filter((char: any) => 
+        char.status === 'Принято' && 
+        (char.life_status === 'Жив' || char.life_status === 'Жива')
+      );
+      
+      if (acceptedChars.length > 0) {
+        setCharacters(acceptedChars);
+        const firstChar = acceptedChars[0];
         setSelectedCharacter(firstChar);
         setCharacterId(firstChar.id);
-        
-        const inventory = JSON.parse(firstChar.inventory || '{}');
-        setCredits(inventory.credits || 0);
+        setCredits(firstChar.currency || 0);
       }
     } catch (error) {
       console.error('Ошибка загрузки персонажей:', error);
@@ -309,8 +312,7 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
               const char = characters.find(c => c.id === id);
               setCharacterId(id);
               setSelectedCharacter(char);
-              const inventory = JSON.parse(char?.inventory || '{}');
-              setCredits(inventory.credits || 0);
+              setCredits(char?.currency || 0);
             }}
             style={{ marginTop: 12 }}
           >
