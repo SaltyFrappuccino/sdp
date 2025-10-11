@@ -1,5 +1,7 @@
 import { FC } from 'react';
 import { FormItem, Textarea, Header, Div, Card, Separator, Select, Text } from '@vkontakte/vkui';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 interface ManifestationData {
   modus: 'Аватар' | 'Проекция' | 'Вооружение' | 'Слияние' | '';
@@ -39,8 +41,12 @@ export const ManifestationForm: FC<ManifestationFormProps> = ({ manifestation, o
 
   return (
     <Card mode="shadow" style={{ marginTop: '12px' }}>
-      <Header style={{ backgroundColor: 'var(--vkui--color_background_accent_alpha)', color: 'var(--vkui--color_text_primary)', padding: '12px' }}>
+      <Header style={{ backgroundColor: 'var(--vkui--color_background_accent_alpha)', color: 'var(--vkui--color_text_primary)', padding: '12px', display: 'flex', alignItems: 'center' }}>
         ⚡ Манифестация (75% Синхронизации)
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.manifestation.text}
+          handbookSection={HANDBOOK_TOOLTIPS.manifestation.section}
+        />
       </Header>
       <Div>
         <FormItem top="Модус Манифестации">

@@ -1,5 +1,7 @@
 import { FC } from 'react';
 import { FormItem, Checkbox, Header } from '@vkontakte/vkui';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 const archetypeGroups = {
   "Ударная Сила": ["Дуэлянт", "Канонир", "Берсерк", "Снайпер", "Ассасин", "Гладиатор"],
@@ -16,7 +18,13 @@ interface ArchetypeSelectorProps {
 export const ArchetypeSelector: FC<ArchetypeSelectorProps> = ({ selectedArchetypes, onArchetypeChange }) => {
   return (
     <>
-      <Header>Архетип(ы)</Header>
+      <Header style={{ display: 'flex', alignItems: 'center' }}>
+        Архетип(ы)
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.archetypes.text}
+          handbookSection={HANDBOOK_TOOLTIPS.archetypes.section}
+        />
+      </Header>
       {Object.entries(archetypeGroups).map(([groupName, archetypes]) => (
         <FormItem top={groupName} key={groupName}>
           {archetypes.map(archetype => (

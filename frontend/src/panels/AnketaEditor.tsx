@@ -35,6 +35,8 @@ import { API_URL } from '../api';
 import { readJsonFile } from '../utils/anketaExport';
 import { ManifestationData } from '../components/ManifestationForm';
 import { getMaxContractsForRank, validateContractCount } from '../utils/contractValidation';
+import { HandbookTooltip } from '../components/HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 interface FactionOption {
   label: string;
@@ -399,10 +401,26 @@ export const AnketaEditor: FC<NavIdProps & {
       ) : character ? (
         <>
           <Group header={<Header>I. ОБЩАЯ ИНФОРМАЦИЯ</Header>}>
-            <FormItem top="Имя и Фамилия">
+            <FormItem top={
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                Имя и Фамилия
+                <HandbookTooltip
+                  tooltipText={HANDBOOK_TOOLTIPS.characterName.text}
+                  handbookSection={HANDBOOK_TOOLTIPS.characterName.section}
+                />
+              </div>
+            }>
               <Input name="character_name" value={character.character_name} onChange={handleChange} />
             </FormItem>
-            <FormItem top="Ранг Проводника">
+            <FormItem top={
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                Ранг Проводника
+                <HandbookTooltip
+                  tooltipText={HANDBOOK_TOOLTIPS.rank.text}
+                  handbookSection={HANDBOOK_TOOLTIPS.rank.section}
+                />
+              </div>
+            }>
               <Select
                 name="rank"
                 value={character.rank}
@@ -423,7 +441,15 @@ export const AnketaEditor: FC<NavIdProps & {
             <FormItem top="Возраст">
               <Input name="age" type="number" value={String(character.age)} onChange={handleChange} />
             </FormItem>
-            <FormItem top="Фракция">
+            <FormItem top={
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                Фракция
+                <HandbookTooltip
+                  tooltipText={HANDBOOK_TOOLTIPS.faction.text}
+                  handbookSection={HANDBOOK_TOOLTIPS.faction.section}
+                />
+              </div>
+            }>
               <CustomSelect
                 placeholder="Выберите или начните вводить название"
                 options={factionOptions}
@@ -447,7 +473,15 @@ export const AnketaEditor: FC<NavIdProps & {
             <FormItem top="Позиция во фракции">
               <Input name="faction_position" value={character.faction_position} onChange={handleChange} />
             </FormItem>
-            <FormItem top="Родной остров">
+            <FormItem top={
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                Родной остров
+                <HandbookTooltip
+                  tooltipText={HANDBOOK_TOOLTIPS.homeIsland.text}
+                  handbookSection={HANDBOOK_TOOLTIPS.homeIsland.section}
+                />
+              </div>
+            }>
               <Select
                 name="home_island"
                 placeholder="Выберите родной остров"

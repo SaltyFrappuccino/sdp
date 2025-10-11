@@ -235,6 +235,19 @@ export const Handbook: React.FC<NavIdProps> = ({ id }) => {
     }
   };
 
+  // Экспортируемая функция для программного перехода к разделу
+  // Может быть вызвана из других компонентов через navigateToHandbookSection
+  useEffect(() => {
+    // Проверяем, есть ли сохраненная позиция для перехода
+    const targetSection = localStorage.getItem('handbook_target_section');
+    if (targetSection && !loading) {
+      setTimeout(() => {
+        scrollToSection(targetSection);
+        localStorage.removeItem('handbook_target_section');
+      }, 500);
+    }
+  }, [loading]);
+
   // Прокрутка вверх
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });

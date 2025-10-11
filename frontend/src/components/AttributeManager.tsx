@@ -1,5 +1,7 @@
 import { FC, useMemo } from 'react';
 import { FormItem, Select, Header, Text } from '@vkontakte/vkui';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 const attributesList = [
     {
@@ -81,7 +83,13 @@ export const AttributeManager: FC<AttributeManagerProps> = ({ attributes, onAttr
 
   return (
     <>
-      <Header>Атрибуты</Header>
+      <Header style={{ display: 'flex', alignItems: 'center' }}>
+        Атрибуты
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.attributes.text}
+          handbookSection={HANDBOOK_TOOLTIPS.attributes.section}
+        />
+      </Header>
       <FormItem>
         <Text>
           Вы получаете <b>{totalPoints}</b> очков для распределения.

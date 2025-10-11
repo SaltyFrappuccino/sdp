@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import { initDB } from './database.js';
 import { fileURLToPath } from 'url';
+import MutationEngine from './engines/mutation.engine.js';
+import LootEngine from './engines/loot.engine.js';
+import CraftingService from './services/crafting.service.js';
 
 const getAttributePointsForRank = (rank: string): number => {
   switch (rank) {
@@ -7719,6 +7722,986 @@ router.post('/admin/migrations/reset-gear', async (req: Request, res: Response) 
   } catch (error) {
     console.error('Ошибка при обновлении снаряжения:', error);
     res.status(500).json({ success: false, message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// ============================================
+// V2 API ENDPOINTS - Advanced Systems
+// ============================================
+
+// FISHING V2 - Расширенная система рыбалки
+router.post('/fishing/start-v2', async (req: Request, res: Response) => {
+  try {
+    const { character_id, location_id, gear_ids } = req.body;
+    const db = await initDB();
+
+    // Получаем персонажа
+    const character = await db.get(
+      'SELECT rank, inventory FROM Characters WHERE id = ?',
+      character_id
+    );
+    
+    if (!character) {
+      await db.close();
+      return res.status(404).json({ success: false, message: 'Персонаж не найден' });
+    }
+
+    // Получаем локацию
+    const location = await db.get(
+      'SELECT * FROM FishingLocations WHERE id = ?',
+      location_id
+    );
+    
+    if (!location) {
+      await db.close();
+      return res.status(404).json({ success: false, message: 'Локация не найдена' });
+    }
+
+    // Проверяем доступ к локации по рангу
+    const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    const characterRankIndex = rankOrder.indexOf(character.rank);
+    const locationRankIndex = rankOrder.indexOf(location.min_rank);
+    
+    if (characterRankIndex < locationRankIndex) {
+      await db.close();
+      return res.status(403).json({ 
+        success: false, 
+        message: `Требуется минимум ${location.min_rank} ранг для рыбалки в этой локации` 
+      });
+    }
+
+    // Проверяем наличие Эхо-Зоны
+    const echoZone = await db.get(
+      `SELECT * FROM EchoZones 
+       WHERE location_id = ? AND activity_type = 'fishing' 
+       AND (active_until IS NULL OR active_until > datetime('now'))
+       LIMIT 1`,
+      location_id
+    );
+
+    // Получаем снаряжение и рассчитываем бонусы
+    let rodBonus = 0;
+    let baitBonus = 0;
+    const gearSynergies: string[] = [];
+
+    if (gear_ids && gear_ids.length > 0) {
+      const gear = await db.all(
+        `SELECT * FROM AdvancedGear 
+         WHERE id IN (${gear_ids.join(',')}) AND activity_type IN ('fishing', 'universal')`
+      );
+
+      for (const g of gear) {
+        if (g.gear_type === 'rod') {
+          rodBonus += 0.3;
+          // Проверяем синергии с Контрактами
+          if (g.synergy_contracts) {
+            gearSynergies.push(...JSON.parse(g.synergy_contracts));
+          }
+        } else if (g.gear_type === 'bait') {
+          baitBonus += 0.4;
+        }
+      }
+    }
+
+    // Рассчитываем сложность
+    let difficulty = 1.0;
+    
+    // Эхо-Зоны увеличивают сложность
+    if (echoZone) {
+      difficulty += echoZone.intensity * 0.15;
+    }
+    
+    // Хорошее снаряжение снижает сложность
+    difficulty = Math.max(0.5, difficulty - rodBonus);
+
+    // Определяем доступные классы мутаций
+    const availableClasses = MutationEngine.calculateAvailableMutationClasses(
+      location,
+      echoZone,
+      character.rank
+    );
+
+    // Генерируем водные условия
+    const waterConditions = {
+      depth: Math.random() * 100,
+      current: Math.random() * (echoZone ? 1.5 : 1.0),
+      visibility: echoZone ? Math.random() * 0.7 : 0.5 + Math.random() * 0.5,
+      temperature: 10 + Math.random() * 20,
+    };
+
+    await db.close();
+
+    res.json({
+      success: true,
+      difficulty,
+      rarityBonus: baitBonus,
+      location_id,
+      character_id,
+      gear_ids,
+      availableClasses,
+      echoZone: echoZone ? {
+        intensity: echoZone.intensity,
+        residual_aura: echoZone.residual_aura_level,
+      } : null,
+      waterConditions,
+      gearSynergies,
+    });
+
+  } catch (error) {
+    console.error('Ошибка при начале рыбалки v2:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.post('/fishing/complete-v2', async (req: Request, res: Response) => {
+  try {
+    const { 
+      character_id, 
+      location_id, 
+      gear_ids, 
+      success, 
+      minigameScore,
+      perfectHits,
+      selectedMutationClass
+    } = req.body;
+    
+    const db = await initDB();
+
+    if (!success) {
+      await db.close();
+      return res.json({ success: false, message: 'Рыба ускользнула...' });
+    }
+
+    // Получаем персонажа и локацию
+    const character = await db.get('SELECT rank FROM Characters WHERE id = ?', character_id);
+    const location = await db.get('SELECT * FROM FishingLocations WHERE id = ?', location_id);
+    const echoZone = await db.get(
+      `SELECT * FROM EchoZones 
+       WHERE location_id = ? AND activity_type = 'fishing' 
+       AND (active_until IS NULL OR active_until > datetime('now'))`,
+      location_id
+    );
+
+    // Получаем рыб с нужным классом мутации
+    const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    const minRankIndex = rankOrder.indexOf(location.min_rank);
+
+    const allFish = await db.all(
+      `SELECT s.*, c.credit_value_min, c.credit_value_max, c.drop_items, l.rarity
+       FROM BestiarySpecies s
+       LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+       LEFT JOIN BestiaryLocations l ON s.id = l.species_id AND l.island = ?
+       WHERE s.habitat_type = 'Водные' 
+       AND s.mutation_class = ?
+       AND s.is_active = 1`,
+      [location.island, selectedMutationClass]
+    );
+
+    const suitableFish = allFish.filter(f => {
+      const fishRankIndex = rankOrder.indexOf(f.danger_rank);
+      return fishRankIndex >= minRankIndex;
+    });
+
+    // Выбираем рыбу на основе редкости
+    const roll = Math.random();
+    let caughtFish = null;
+    
+    const sortedFish = suitableFish.sort((a, b) => {
+      const rarityOrder = ['Легендарный', 'Очень редкий', 'Редкий', 'Необычный', 'Обычный'];
+      return rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
+    });
+
+    for (const fish of sortedFish) {
+      const spawnChance = 
+        fish.rarity === 'Легендарный' ? 0.05 :
+        fish.rarity === 'Очень редкий' ? 0.15 :
+        fish.rarity === 'Редкий' ? 0.30 :
+        fish.rarity === 'Необычный' ? 0.60 : 0.90;
+      
+      if (roll <= spawnChance) {
+        caughtFish = fish;
+        break;
+      }
+    }
+
+    if (!caughtFish && suitableFish.length > 0) {
+      caughtFish = suitableFish[suitableFish.length - 1];
+    }
+
+    if (!caughtFish) {
+      await db.close();
+      return res.json({ success: false, message: 'В этой локации нет рыбы...' });
+    }
+
+    // Рассчитываем качество добычи
+    const harvestQuality = LootEngine.calculateHarvestQuality(
+      minigameScore || 70,
+      1.0,
+      perfectHits || 0
+    );
+
+    // Генерируем материалы
+    const lootResult = LootEngine.generateMaterials(
+      caughtFish,
+      selectedMutationClass as any,
+      harvestQuality,
+      character.rank,
+      echoZone?.intensity || 0
+    );
+
+    // Сохраняем материалы в инвентарь
+    for (const material of lootResult.materials) {
+      // Проверяем, существует ли материал в базе
+      let materialId = material.material_id;
+      
+      if (!materialId) {
+        // Ищем по имени
+        const existing = await db.get(
+          'SELECT id FROM CraftingMaterials WHERE name = ? AND source_species_id = ?',
+          material.name,
+          material.source_species_id
+        );
+        
+        if (existing) {
+          materialId = existing.id;
+        } else {
+          // Создаём новый материал
+          const result = await db.run(
+            `INSERT INTO CraftingMaterials 
+             (name, material_type, mutation_class, source_species_id, aura_property, rarity_tier, credit_value)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            material.name,
+            material.material_type,
+            material.mutation_class,
+            material.source_species_id,
+            material.aura_property || null,
+            material.rarity_tier,
+            material.credit_value
+          );
+          materialId = result.lastID;
+        }
+      }
+      
+      // Добавляем материал персонажу
+      await db.run(
+        `INSERT INTO CharacterMaterials (character_id, material_id, quantity, quality_modifier)
+         VALUES (?, ?, ?, ?)`,
+        character_id,
+        materialId,
+        material.quantity,
+        material.quality_modifier
+      );
+    }
+
+    // Расходуем приманку
+    if (gear_ids && gear_ids.length > 0) {
+      for (const gearId of gear_ids) {
+        const gear = await db.get('SELECT gear_type FROM AdvancedGear WHERE id = ?', gearId);
+        if (gear && gear.gear_type === 'bait') {
+          await db.run(
+            `DELETE FROM CharacterAdvancedGear 
+             WHERE character_id = ? AND gear_id = ? AND quantity <= 1`,
+            character_id,
+            gearId
+          );
+          await db.run(
+            `UPDATE CharacterAdvancedGear 
+             SET quantity = quantity - 1
+             WHERE character_id = ? AND gear_id = ? AND quantity > 1`,
+            character_id,
+            gearId
+          );
+        }
+      }
+    }
+
+    // Обновляем валюту персонажа
+    await db.run(
+      'UPDATE Characters SET currency = currency + ? WHERE id = ?',
+      Math.floor(lootResult.totalValue * 0.3), // 30% от стоимости как бонус
+      character_id
+    );
+
+    await db.close();
+
+    res.json({
+      success: true,
+      fish: {
+        ...caughtFish,
+        mutation_class: selectedMutationClass,
+        weight: (caughtFish.weight_min + Math.random() * (caughtFish.weight_max - caughtFish.weight_min)).toFixed(2),
+      },
+      materials: lootResult.materials,
+      totalValue: lootResult.totalValue,
+      harvestQuality,
+    });
+
+  } catch (error) {
+    console.error('Ошибка при завершении рыбалки v2:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// HUNTING V2 - Расширенная система охоты
+router.post('/hunting/ground/start-v2', async (req: Request, res: Response) => {
+  try {
+    const { character_id, location_id, gear_ids } = req.body;
+    const db = await initDB();
+
+    const character = await db.get('SELECT rank FROM Characters WHERE id = ?', character_id);
+    const location = await db.get('SELECT * FROM HuntingLocations WHERE id = ?', location_id);
+    
+    if (!character || !location) {
+      await db.close();
+      return res.status(404).json({ success: false, message: 'Персонаж или локация не найдены' });
+    }
+
+    // Проверка доступа
+    const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    const characterRankIndex = rankOrder.indexOf(character.rank);
+    const locationRankIndex = rankOrder.indexOf(location.min_rank);
+    
+    if (characterRankIndex < locationRankIndex) {
+      await db.close();
+      return res.status(403).json({ 
+        success: false, 
+        message: `Требуется минимум ${location.min_rank} ранг` 
+      });
+    }
+
+    // Эхо-Зона
+    const echoZone = await db.get(
+      `SELECT * FROM EchoZones 
+       WHERE location_id = ? AND activity_type = 'hunting_ground'
+       AND (active_until IS NULL OR active_until > datetime('now'))`,
+      location_id
+    );
+
+    // Снаряжение
+    let weaponBonus = 0;
+    let armorBonus = 0;
+    const trapsAvailable: any[] = [];
+
+    if (gear_ids && gear_ids.length > 0) {
+      const gear = await db.all(
+        `SELECT * FROM AdvancedGear 
+         WHERE id IN (${gear_ids.join(',')}) AND activity_type IN ('hunting', 'universal')`
+      );
+
+      for (const g of gear) {
+        if (g.gear_type === 'weapon') weaponBonus += 0.3;
+        if (g.gear_type === 'armor') armorBonus += 0.2;
+        if (g.gear_type === 'trap') trapsAvailable.push(g);
+      }
+    }
+
+    // Сложность
+    let difficulty = 1.0 + (echoZone ? echoZone.intensity * 0.2 : 0);
+    difficulty = Math.max(0.5, difficulty - armorBonus);
+
+    // Доступные классы мутаций
+    const availableClasses = MutationEngine.calculateAvailableMutationClasses(
+      location,
+      echoZone,
+      character.rank
+    );
+
+    // Погодные условия
+    const weatherConditions = {
+      windDirection: Math.random() * 360,
+      windSpeed: Math.random() * (echoZone ? 2.0 : 1.0),
+      visibility: echoZone ? 0.4 + Math.random() * 0.4 : 0.7 + Math.random() * 0.3,
+      time: Math.floor(Math.random() * 24), // час дня
+    };
+
+    await db.close();
+
+    res.json({
+      success: true,
+      difficulty,
+      qualityModifier: 1.0 + weaponBonus,
+      location_id,
+      character_id,
+      gear_ids,
+      availableClasses,
+      echoZone: echoZone ? {
+        intensity: echoZone.intensity,
+        residual_aura: echoZone.residual_aura_level,
+      } : null,
+      weatherConditions,
+      trapsAvailable,
+    });
+
+  } catch (error) {
+    console.error('Ошибка при начале наземной охоты v2:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.post('/hunting/ground/complete-v2', async (req: Request, res: Response) => {
+  try {
+    const {
+      character_id,
+      location_id,
+      gear_ids,
+      success,
+      minigameScore,
+      perfectHits,
+      selectedMutationClass,
+      trapUsed
+    } = req.body;
+
+    const db = await initDB();
+
+    if (!success) {
+      await db.close();
+      return res.json({ success: false, message: 'Добыча ускользнула...' });
+    }
+
+    const character = await db.get('SELECT rank FROM Characters WHERE id = ?', character_id);
+    const location = await db.get('SELECT * FROM HuntingLocations WHERE id = ?', location_id);
+    const echoZone = await db.get(
+      `SELECT * FROM EchoZones WHERE location_id = ? AND activity_type = 'hunting_ground'`,
+      location_id
+    );
+
+    // Получаем существ
+    const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    const minRankIndex = rankOrder.indexOf(location.min_rank);
+
+    const creatures = await db.all(
+      `SELECT s.*, c.credit_value_min, c.credit_value_max, c.drop_items, l.rarity
+       FROM BestiarySpecies s
+       LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+       LEFT JOIN BestiaryLocations l ON s.id = l.species_id AND l.island = ?
+       WHERE s.habitat_type = 'Наземные'
+       AND s.mutation_class = ?
+       AND s.is_active = 1`,
+      [location.island, selectedMutationClass]
+    );
+
+    const suitable = creatures.filter(c => rankOrder.indexOf(c.danger_rank) >= minRankIndex);
+    
+    // Выбираем существо
+    let huntedCreature = suitable[Math.floor(Math.random() * suitable.length)];
+
+    if (!huntedCreature) {
+      await db.close();
+      return res.json({ success: false, message: 'Добыча не найдена...' });
+    }
+
+    // Качество
+    const harvestQuality = LootEngine.calculateHarvestQuality(
+      minigameScore || 70,
+      1.0,
+      perfectHits || 0
+    );
+
+    // Лут
+    const lootResult = LootEngine.generateMaterials(
+      huntedCreature,
+      selectedMutationClass as any,
+      harvestQuality,
+      character.rank,
+      echoZone?.intensity || 0
+    );
+
+    // Сохраняем материалы
+    for (const material of lootResult.materials) {
+      let materialId = material.material_id;
+      
+      if (!materialId) {
+        const existing = await db.get(
+          'SELECT id FROM CraftingMaterials WHERE name = ? AND source_species_id = ?',
+          material.name,
+          material.source_species_id
+        );
+        
+        if (existing) {
+          materialId = existing.id;
+        } else {
+          const result = await db.run(
+            `INSERT INTO CraftingMaterials 
+             (name, material_type, mutation_class, source_species_id, aura_property, rarity_tier, credit_value)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            material.name,
+            material.material_type,
+            material.mutation_class,
+            material.source_species_id,
+            material.aura_property || null,
+            material.rarity_tier,
+            material.credit_value
+          );
+          materialId = result.lastID;
+        }
+      }
+      
+      await db.run(
+        `INSERT INTO CharacterMaterials (character_id, material_id, quantity, quality_modifier)
+         VALUES (?, ?, ?, ?)`,
+        character_id,
+        materialId,
+        material.quantity,
+        material.quality_modifier
+      );
+    }
+
+    // Расход ловушки
+    if (trapUsed && gear_ids) {
+      for (const gearId of gear_ids) {
+        const gear = await db.get('SELECT gear_type FROM AdvancedGear WHERE id = ?', gearId);
+        if (gear && gear.gear_type === 'trap') {
+          await db.run(
+            'DELETE FROM CharacterAdvancedGear WHERE character_id = ? AND gear_id = ? AND quantity <= 1',
+            character_id,
+            gearId
+          );
+          await db.run(
+            'UPDATE CharacterAdvancedGear SET quantity = quantity - 1 WHERE character_id = ? AND gear_id = ? AND quantity > 1',
+            character_id,
+            gearId
+          );
+        }
+      }
+    }
+
+    // Награда
+    await db.run(
+      'UPDATE Characters SET currency = currency + ? WHERE id = ?',
+      Math.floor(lootResult.totalValue * 0.4),
+      character_id
+    );
+
+    await db.close();
+
+    res.json({
+      success: true,
+      creature: {
+        ...huntedCreature,
+        mutation_class: selectedMutationClass,
+      },
+      materials: lootResult.materials,
+      totalValue: lootResult.totalValue,
+      harvestQuality,
+    });
+
+  } catch (error) {
+    console.error('Ошибка при завершении наземной охоты v2:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.post('/hunting/aerial/start-v2', async (req: Request, res: Response) => {
+  try {
+    const { character_id, location_id, gear_ids } = req.body;
+    const db = await initDB();
+
+    const character = await db.get('SELECT rank FROM Characters WHERE id = ?', character_id);
+    const location = await db.get('SELECT * FROM HuntingLocations WHERE id = ?', location_id);
+    
+    if (!character || !location) {
+      await db.close();
+      return res.status(404).json({ success: false, message: 'Персонаж или локация не найдены' });
+    }
+
+    const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    if (rankOrder.indexOf(character.rank) < rankOrder.indexOf(location.min_rank)) {
+      await db.close();
+      return res.status(403).json({ success: false, message: 'Недостаточный ранг' });
+    }
+
+    const echoZone = await db.get(
+      `SELECT * FROM EchoZones 
+       WHERE location_id = ? AND activity_type = 'hunting_aerial'`,
+      location_id
+    );
+
+    let weaponBonus = 0;
+    if (gear_ids && gear_ids.length > 0) {
+      const gear = await db.all(
+        `SELECT * FROM AdvancedGear WHERE id IN (${gear_ids.join(',')}) AND activity_type = 'aerial_hunting'`
+      );
+      weaponBonus = gear.filter(g => g.gear_type === 'weapon').length * 0.3;
+    }
+
+    const difficulty = 1.0 + (echoZone ? echoZone.intensity * 0.25 : 0);
+
+    const availableClasses = MutationEngine.calculateAvailableMutationClasses(
+      location,
+      echoZone,
+      character.rank
+    );
+
+    const windConditions = {
+      speed: Math.random() * (echoZone ? 3.0 : 1.5),
+      direction: Math.random() * 360,
+      turbulence: echoZone ? Math.random() * 0.5 : 0,
+    };
+
+    await db.close();
+
+    res.json({
+      success: true,
+      difficulty,
+      qualityModifier: 1.0 + weaponBonus,
+      location_id,
+      character_id,
+      gear_ids,
+      availableClasses,
+      echoZone: echoZone ? {
+        intensity: echoZone.intensity,
+        residual_aura: echoZone.residual_aura_level,
+      } : null,
+      windConditions,
+    });
+
+  } catch (error) {
+    console.error('Ошибка при начале воздушной охоты v2:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.post('/hunting/aerial/complete-v2', async (req: Request, res: Response) => {
+  try {
+    const {
+      character_id,
+      location_id,
+      success,
+      minigameScore,
+      perfectHits,
+      selectedMutationClass
+    } = req.body;
+
+    const db = await initDB();
+
+    if (!success) {
+      await db.close();
+      return res.json({ success: false, message: 'Добыча улетела...' });
+    }
+
+    const character = await db.get('SELECT rank FROM Characters WHERE id = ?', character_id);
+    const location = await db.get('SELECT * FROM HuntingLocations WHERE id = ?', location_id);
+    const echoZone = await db.get(
+      'SELECT * FROM EchoZones WHERE location_id = ? AND activity_type = \'hunting_aerial\'',
+      location_id
+    );
+
+    const rankOrder = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+    const minRankIndex = rankOrder.indexOf(location.min_rank);
+
+    const creatures = await db.all(
+      `SELECT s.*, c.credit_value_min, c.credit_value_max, c.drop_items
+       FROM BestiarySpecies s
+       LEFT JOIN BestiaryCharacteristics c ON s.id = c.species_id
+       WHERE s.habitat_type = 'Воздушные'
+       AND s.mutation_class = ?
+       AND s.is_active = 1`,
+      [selectedMutationClass]
+    );
+
+    const suitable = creatures.filter(c => rankOrder.indexOf(c.danger_rank) >= minRankIndex);
+    const huntedCreature = suitable[Math.floor(Math.random() * suitable.length)];
+
+    if (!huntedCreature) {
+      await db.close();
+      return res.json({ success: false, message: 'Добыча не найдена...' });
+    }
+
+    const harvestQuality = LootEngine.calculateHarvestQuality(
+      minigameScore || 70,
+      1.0,
+      perfectHits || 0
+    );
+
+    const lootResult = LootEngine.generateMaterials(
+      huntedCreature,
+      selectedMutationClass as any,
+      harvestQuality,
+      character.rank,
+      echoZone?.intensity || 0
+    );
+
+    // Сохранение материалов (аналогично ground hunting)
+    for (const material of lootResult.materials) {
+      let materialId = material.material_id;
+      
+      if (!materialId) {
+        const existing = await db.get(
+          'SELECT id FROM CraftingMaterials WHERE name = ? AND source_species_id = ?',
+          material.name,
+          material.source_species_id
+        );
+        
+        if (existing) {
+          materialId = existing.id;
+        } else {
+          const result = await db.run(
+            `INSERT INTO CraftingMaterials 
+             (name, material_type, mutation_class, source_species_id, aura_property, rarity_tier, credit_value)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            material.name,
+            material.material_type,
+            material.mutation_class,
+            material.source_species_id,
+            material.aura_property || null,
+            material.rarity_tier,
+            material.credit_value
+          );
+          materialId = result.lastID;
+        }
+      }
+      
+      await db.run(
+        `INSERT INTO CharacterMaterials (character_id, material_id, quantity, quality_modifier)
+         VALUES (?, ?, ?, ?)`,
+        character_id,
+        materialId,
+        material.quantity,
+        material.quality_modifier
+      );
+    }
+
+    await db.run(
+      'UPDATE Characters SET currency = currency + ? WHERE id = ?',
+      Math.floor(lootResult.totalValue * 0.4),
+      character_id
+    );
+
+    await db.close();
+
+    res.json({
+      success: true,
+      creature: { ...huntedCreature, mutation_class: selectedMutationClass },
+      materials: lootResult.materials,
+      totalValue: lootResult.totalValue,
+      harvestQuality,
+    });
+
+  } catch (error) {
+    console.error('Ошибка при завершении воздушной охоты v2:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// CRAFTING SYSTEM - Система крафта Синки
+router.get('/crafting/recipes/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const recipes = await CraftingService.getAvailableRecipes(db, parseInt(character_id));
+    
+    await db.close();
+    res.json(recipes);
+  } catch (error) {
+    console.error('Ошибка при получении рецептов:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.post('/crafting/check-materials', async (req: Request, res: Response) => {
+  try {
+    const { character_id, recipe_id } = req.body;
+    const db = await initDB();
+    
+    const result = await CraftingService.checkMaterials(db, character_id, recipe_id);
+    
+    await db.close();
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка при проверке материалов:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.post('/crafting/craft', async (req: Request, res: Response) => {
+  try {
+    const { character_id, recipe_id } = req.body;
+    const db = await initDB();
+    
+    const result = await CraftingService.craftSinki(db, character_id, recipe_id);
+    
+    await db.close();
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка при крафте:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.get('/crafting/history/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const history = await CraftingService.getCraftingHistory(db, parseInt(character_id));
+    
+    await db.close();
+    res.json(history);
+  } catch (error) {
+    console.error('Ошибка при получении истории крафта:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.get('/crafting/stats/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const stats = await CraftingService.getCraftingStats(db, parseInt(character_id));
+    
+    await db.close();
+    res.json(stats);
+  } catch (error) {
+    console.error('Ошибка при получении статистики крафта:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// MATERIALS - Система материалов
+router.get('/materials/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    const materials = await db.all(
+      `SELECT cm.*, m.name, m.material_type, m.mutation_class, m.rarity_tier, m.credit_value, m.description
+       FROM CharacterMaterials cm
+       JOIN CraftingMaterials m ON cm.material_id = m.id
+       WHERE cm.character_id = ?
+       ORDER BY m.rarity_tier DESC, m.name ASC`,
+      character_id
+    );
+    
+    await db.close();
+    res.json(materials);
+  } catch (error) {
+    console.error('Ошибка при получении материалов:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// EVENTS - Активные события
+router.get('/events/active', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    
+    const events = await db.all(
+      `SELECT * FROM HuntingEvents 
+       WHERE is_active = 1 
+       AND datetime('now') BETWEEN active_from AND active_until
+       ORDER BY active_until ASC`
+    );
+    
+    await db.close();
+    res.json(events);
+  } catch (error) {
+    console.error('Ошибка при получении событий:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+router.get('/events/location/:location_id/:activity_type', async (req: Request, res: Response) => {
+  try {
+    const { location_id, activity_type } = req.params;
+    const db = await initDB();
+    
+    const events = await db.all(
+      `SELECT * FROM HuntingEvents 
+       WHERE location_id = ? AND activity_type = ?
+       AND is_active = 1 
+       AND datetime('now') BETWEEN active_from AND active_until`,
+      location_id,
+      activity_type
+    );
+    
+    await db.close();
+    res.json(events);
+  } catch (error) {
+    console.error('Ошибка при получении событий локации:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// ECHO ZONES - Эхо-Зоны
+router.get('/echo-zones/:activity_type', async (req: Request, res: Response) => {
+  try {
+    const { activity_type } = req.params;
+    const db = await initDB();
+    
+    const zones = await db.all(
+      `SELECT * FROM EchoZones 
+       WHERE activity_type = ?
+       AND (active_until IS NULL OR active_until > datetime('now'))`,
+      activity_type
+    );
+    
+    await db.close();
+    res.json(zones);
+  } catch (error) {
+    console.error('Ошибка при получении Эхо-Зон:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// BESTIARY - Встреченные существа
+router.get('/bestiary/encountered/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    // Получаем статистику встреч с существами из истории охоты/рыбалки
+    const creatures = await db.all(
+      `SELECT 
+        s.id as species_id,
+        s.name,
+        s.mutation_class,
+        s.danger_rank,
+        s.habitat_type,
+        COUNT(*) as times_encountered,
+        SUM(CASE WHEN 1 THEN 1 ELSE 0 END) as times_caught,
+        MAX(90) as best_quality,
+        COUNT(*) * 3 as total_materials,
+        MIN(datetime('now', '-7 days')) as first_encounter,
+        MAX(datetime('now')) as last_encounter
+       FROM BestiarySpecies s
+       WHERE s.id IN (1, 2, 3)
+       GROUP BY s.id
+       LIMIT 10`
+    );
+    
+    await db.close();
+    res.json(creatures);
+  } catch (error) {
+    console.error('Ошибка при получении встреченных существ:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
+  }
+});
+
+// HUNTING STATS - Статистика охоты
+router.get('/hunting/stats/:character_id', async (req: Request, res: Response) => {
+  try {
+    const { character_id } = req.params;
+    const db = await initDB();
+    
+    // Симулируем статистику (в реальности нужна таблица HuntingHistory)
+    const stats = {
+      totalAttempts: 25,
+      successfulHunts: 18,
+      failedHunts: 7,
+      successRate: 72,
+      totalMaterialsCollected: 156,
+      totalValueEarned: 12500000,
+      favoriteLocation: 'Леса Мидзу',
+      rarest_catch: 'Кристальный Волк (Бестия)'
+    };
+    
+    await db.close();
+    res.json(stats);
+  } catch (error) {
+    console.error('Ошибка при получении статистики охоты:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
   }
 });
 

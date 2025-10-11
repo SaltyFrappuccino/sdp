@@ -3,6 +3,8 @@ import { Group, Header, FormItem, Input, Select, Button, Div, Accordion, IconBut
 import { Icon24Add, Icon24Cancel } from '@vkontakte/icons';
 import { ShinkiAbilityForm, ShinkiAbility } from './ShinkiAbilityForm';
 import { Rank } from './AbilityBuilder';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 interface Item {
   name: string;
@@ -64,7 +66,15 @@ export const InventoryManager: FC<InventoryManagerProps> = ({ inventory, onInven
 
   return (
     <>
-    <Group header={<Header>V. ИНВЕНТАРЬ</Header>}>
+    <Group header={
+      <Header style={{ display: 'flex', alignItems: 'center' }}>
+        V. ИНВЕНТАРЬ
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.shinki.text}
+          handbookSection={HANDBOOK_TOOLTIPS.shinki.section}
+        />
+      </Header>
+    }>
       {inventory.map((item, index) => (
         <Div key={index} style={{ marginBottom: '12px' }}>
           <Accordion>
@@ -106,7 +116,17 @@ export const InventoryManager: FC<InventoryManagerProps> = ({ inventory, onInven
               </FormItem>
               {item.type === 'Синки' && (
                 <>
-                  <FormItem top="Тип Синки">
+                  <FormItem 
+                    top={
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        Тип Синки
+                        <HandbookTooltip
+                          tooltipText={HANDBOOK_TOOLTIPS.shinki.text}
+                          handbookSection={HANDBOOK_TOOLTIPS.shinki.section}
+                        />
+                      </div>
+                    }
+                  >
                     <Select
                       value={item.sinki_type}
                       onChange={(e) => handleItemChange(index, 'sinki_type', e.target.value)}

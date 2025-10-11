@@ -1,7 +1,10 @@
 import { FC } from 'react';
 import { FormItem, Input, Textarea, Button, Select, Header, Div, Checkbox, Text } from '@vkontakte/vkui';
 import { Icon24Delete, Icon24Add } from '@vkontakte/icons';
-import { AbilityBuilder, Rank, SelectedTags } from './AbilityBuilder';
+import { AbilityBuilder, Rank, SelectedTags, ActivationConditions as ActivationConditionsType } from './AbilityBuilder';
+import { ActivationConditions } from './ActivationConditions';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 export interface ShinkiAbility {
   name: string;
@@ -10,6 +13,7 @@ export interface ShinkiAbility {
   description: string;
   tags: SelectedTags;
   is_summon?: boolean;
+  activation_conditions?: ActivationConditionsType;
 }
 
 interface ShinkiAbilityFormProps {
@@ -20,14 +24,14 @@ interface ShinkiAbilityFormProps {
 
 export const ShinkiAbilityForm: FC<ShinkiAbilityFormProps> = ({ abilities, onAbilitiesChange, characterRank }) => {
 
-  const handleAbilityChange = (abilityIndex: number, field: keyof ShinkiAbility, value: string | number | boolean | SelectedTags) => {
+  const handleAbilityChange = (abilityIndex: number, field: keyof ShinkiAbility, value: string | number | boolean | SelectedTags | ActivationConditionsType) => {
     const newAbilities = [...abilities];
     newAbilities[abilityIndex] = { ...newAbilities[abilityIndex], [field]: value };
     onAbilitiesChange(newAbilities);
   };
 
   const addAbility = () => {
-    const newAbility: ShinkiAbility = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: {}, is_summon: false };
+    const newAbility: ShinkiAbility = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: {}, is_summon: false, activation_conditions: {} };
     onAbilitiesChange([...abilities, newAbility]);
   };
 
@@ -52,7 +56,13 @@ export const ShinkiAbilityForm: FC<ShinkiAbilityFormProps> = ({ abilities, onAbi
 
   return (
     <div>
-      <Header>Способности Синки</Header>
+      <Header style={{ display: 'flex', alignItems: 'center' }}>
+        Способности Синки
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.abilities.text}
+          handbookSection={HANDBOOK_TOOLTIPS.abilities.section}
+        />
+      </Header>
       {abilities.map((ability, abilityIndex) => {
         const isSummon = ability.is_summon;
         const requiredTags = ['Пробивающий', 'Защитный', 'Неотвратимый', 'Область'];
@@ -95,6 +105,11 @@ export const ShinkiAbilityForm: FC<ShinkiAbilityFormProps> = ({ abilities, onAbi
                 onChange={(e) => handleAbilityChange(abilityIndex, 'description', e.target.value)}
               />
             </FormItem>
+
+            <ActivationConditions
+              conditions={ability.activation_conditions}
+              onChange={(conditions) => handleAbilityChange(abilityIndex, 'activation_conditions', conditions)}
+            />
             
             <FormItem>
               <Checkbox

@@ -1,10 +1,18 @@
 import { FC, useMemo } from 'react';
 import { Group, Header, Text, Div, FormItem, Select } from '@vkontakte/vkui';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 // --- TYPES ---
 export type Rank = 'F' | 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'SS' | 'SSS';
 export type CellType = 'Нулевая' | 'Малая (I)' | 'Значительная (II)' | 'Предельная (III)';
 export type SelectedTags = Record<string, Rank>;
+
+export interface ActivationConditions {
+  verbal?: string;
+  gesture?: string;
+  general?: string;
+}
 
 // --- DATA ---
 const tagCosts: Record<Rank, number> = {
@@ -71,8 +79,29 @@ export const AbilityBuilder: FC<AbilityBuilderProps> = ({
 
   const remainingPoints = budget - spentPoints;
 
+  // Получаем подсказку для каждого тега
+  const getTagTooltip = (tagName: string) => {
+    const tooltipMap: Record<string, { text: string; section: string }> = {
+      'Пробивающий': HANDBOOK_TOOLTIPS.tagPiercing,
+      'Неотвратимый': HANDBOOK_TOOLTIPS.tagUnavoidable,
+      'Область': HANDBOOK_TOOLTIPS.tagArea,
+      'Контроль': HANDBOOK_TOOLTIPS.tagControl,
+      'Защитный': HANDBOOK_TOOLTIPS.tagDefensive,
+      'Концептуальный': HANDBOOK_TOOLTIPS.tagConceptual,
+    };
+    return tooltipMap[tagName];
+  };
+
   return (
-    <Group header={<Header>Конструктор Способности</Header>}>
+    <Group header={
+      <Header style={{ display: 'flex', alignItems: 'center' }}>
+        Конструктор Способности
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.abilities.text}
+          handbookSection={HANDBOOK_TOOLTIPS.abilities.section}
+        />
+      </Header>
+    }>
       <Div>
         <Text>Бюджет Мощи: <b>{budget}</b> ( {spec.budget} x {cellCost} )</Text>
         <Text>Потрачено: <b>{spentPoints}</b></Text>
@@ -86,8 +115,22 @@ export const AbilityBuilder: FC<AbilityBuilderProps> = ({
       {/* 2. Новый интерфейс выбора тегов */}
       {tagTypes.map(tagName => {
         const currentRank = selectedTags[tagName] || '-';
+        const tooltip = getTagTooltip(tagName);
         return (
-          <FormItem top={tagName} key={tagName}>
+          <FormItem 
+            top={
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                {tagName}
+                {tooltip && (
+                  <HandbookTooltip
+                    tooltipText={tooltip.text}
+                    handbookSection={tooltip.section}
+                  />
+                )}
+              </div>
+            } 
+            key={tagName}
+          >
             <Select
               placeholder="Не выбрано"
               value={currentRank}

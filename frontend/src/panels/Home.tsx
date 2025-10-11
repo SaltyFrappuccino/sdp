@@ -165,13 +165,13 @@ export const Home: FC<HomeProps> = ({ id, fetchedUser }) => {
                   <span>Бестиарий</span>
                 </div>
               </Button>
-              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('fishing')} stretched style={{ minHeight: '80px' }}>
+              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('fishing_v2')} stretched style={{ minHeight: '80px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '24px' }}>🎣</span>
                   <span>Рыбалка</span>
                 </div>
               </Button>
-              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('hunting')} stretched style={{ minHeight: '80px' }}>
+              <Button size="l" mode="secondary" onClick={() => routeNavigator.push('hunting_v2')} stretched style={{ minHeight: '80px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                   <span style={{ fontSize: '24px' }}>🏹</span>
                   <span>Охота</span>

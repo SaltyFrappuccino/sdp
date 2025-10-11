@@ -39,6 +39,8 @@ import ReactMarkdown from 'react-markdown';
 import { ManifestationData } from '../components/ManifestationForm';
 import { ShinkiAbility } from '../components/ShinkiAbilityForm';
 import { getMaxContractsForRank, validateContractCount } from '../utils/contractValidation';
+import { HandbookTooltip } from '../components/HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 export interface AnketaProps extends NavIdProps {
   fetchedUser?: UserInfo;
@@ -749,10 +751,30 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
       </ModalRoot>
       
       <Group header={<Header>I. ОБЩАЯ ИНФОРМАЦИЯ</Header>}>
-        <FormItem top="Имя и Фамилия" status={formErrors.character_name ? 'error' : 'default'} bottom={formErrors.character_name}>
+        <FormItem 
+          top={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              Имя и Фамилия
+              <HandbookTooltip
+                tooltipText={HANDBOOK_TOOLTIPS.characterName.text}
+                handbookSection={HANDBOOK_TOOLTIPS.characterName.section}
+              />
+            </div>
+          }
+          status={formErrors.character_name ? 'error' : 'default'} 
+          bottom={formErrors.character_name}
+        >
           <Input name="character_name" value={formData.character_name} onChange={handleChange} />
         </FormItem>
-        <FormItem top="Ранг Проводника">
+        <FormItem top={
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            Ранг Проводника
+            <HandbookTooltip
+              tooltipText={HANDBOOK_TOOLTIPS.rank.text}
+              handbookSection={HANDBOOK_TOOLTIPS.rank.section}
+            />
+          </div>
+        }>
           <Select
             name="rank"
             value={formData.rank}
@@ -773,7 +795,19 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         <FormItem top="Возраст" status={formErrors.age ? 'error' : 'default'} bottom={formErrors.age}>
           <Input name="age" type="number" value={formData.age} onChange={handleChange} />
         </FormItem>
-        <FormItem top="Фракция" status={formErrors.faction ? 'error' : 'default'} bottom={formErrors.faction}>
+        <FormItem 
+          top={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              Фракция
+              <HandbookTooltip
+                tooltipText={HANDBOOK_TOOLTIPS.faction.text}
+                handbookSection={HANDBOOK_TOOLTIPS.faction.section}
+              />
+            </div>
+          }
+          status={formErrors.faction ? 'error' : 'default'} 
+          bottom={formErrors.faction}
+        >
           <CustomSelect
             placeholder="Выберите или начните вводить название"
             options={factionOptions}
@@ -797,7 +831,19 @@ export const Anketa: FC<AnketaProps> = ({ id, fetchedUser }) => {
         <FormItem top="Позиция во фракции" status={formErrors.faction_position ? 'error' : 'default'} bottom={formErrors.faction_position}>
           <Input name="faction_position" value={formData.faction_position} onChange={handleChange} />
         </FormItem>
-        <FormItem top="Родной остров" status={formErrors.home_island ? 'error' : 'default'} bottom={formErrors.home_island}>
+        <FormItem 
+          top={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              Родной остров
+              <HandbookTooltip
+                tooltipText={HANDBOOK_TOOLTIPS.homeIsland.text}
+                handbookSection={HANDBOOK_TOOLTIPS.homeIsland.section}
+              />
+            </div>
+          }
+          status={formErrors.home_island ? 'error' : 'default'} 
+          bottom={formErrors.home_island}
+        >
           <Select
             name="home_island"
             placeholder="Выберите родной остров"

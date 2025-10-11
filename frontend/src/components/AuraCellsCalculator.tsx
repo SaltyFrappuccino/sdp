@@ -1,5 +1,7 @@
 import { FC } from 'react';
 import { Div, Title } from '@vkontakte/vkui';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 interface AuraCellData {
   rank: string;
@@ -75,7 +77,13 @@ const AuraCellsCalculator: FC<Props> = ({ contracts, currentRank, manualAuraCell
 
   return (
     <Div>
-      <Title level="2" style={{ marginBottom: 16 }}>Ячейки Ауры</Title>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        <Title level="2" style={{ marginBottom: 0, marginRight: 8 }}>Ячейки Ауры</Title>
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.cellTypes.text}
+          handbookSection={HANDBOOK_TOOLTIPS.cellTypes.section}
+        />
+      </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={tableStyle}>
           <thead>

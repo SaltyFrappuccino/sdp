@@ -35,3 +35,8 @@ export { default as AdminBestiaryPanel } from './AdminBestiaryPanel';
 export { default as FishingPanel } from './FishingPanel';
 export { default as HuntingPanel } from './HuntingPanel';
 export { default as AdminActivitiesPanel } from './AdminActivitiesPanel';
+export { default as FishingPanelV2 } from './FishingPanelV2';
+export { default as HuntingPanelV2 } from './HuntingPanelV2';
+export { default as MaterialsPanel } from './MaterialsPanel';
+export { default as CraftingPanel } from './CraftingPanel';
+export { default as JournalPanel } from './JournalPanel';

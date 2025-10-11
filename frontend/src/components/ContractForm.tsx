@@ -1,9 +1,12 @@
 import { FC, useState } from 'react';
 import { FormItem, Input, Textarea, Button, Select, Header, Div, ModalRoot, ModalPage, ModalPageHeader, FormLayoutGroup, IconButton, Checkbox, Text } from '@vkontakte/vkui';
 import { Icon24Delete, Icon24Add, Icon24Cancel } from '@vkontakte/icons';
-import { AbilityBuilder, Rank, SelectedTags } from './AbilityBuilder';
+import { AbilityBuilder, Rank, SelectedTags, ActivationConditions as ActivationConditionsType } from './AbilityBuilder';
 import { ManifestationForm, ManifestationData } from './ManifestationForm';
 import { DominionForm, DominionData } from './DominionForm';
+import { ActivationConditions } from './ActivationConditions';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 interface Ability {
   name: string;
@@ -12,6 +15,7 @@ interface Ability {
   description: string;
   tags: SelectedTags;
   is_summon?: boolean;
+  activation_conditions?: ActivationConditionsType;
 }
 
 interface Contract {
@@ -48,14 +52,14 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
     onChange(index, e.target.name as keyof Contract, value);
   };
 
-  const handleAbilityChange = (abilityIndex: number, field: keyof Ability, value: string | number | boolean) => {
+  const handleAbilityChange = (abilityIndex: number, field: keyof Ability, value: string | number | boolean | SelectedTags | ActivationConditionsType) => {
     const newAbilities = [...contract.abilities];
     newAbilities[abilityIndex] = { ...newAbilities[abilityIndex], [field]: value };
     onChange(index, 'abilities', newAbilities);
   };
 
   const addAbility = () => {
-    const newAbility: Ability = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: {}, is_summon: false };
+    const newAbility: Ability = { name: '', cell_type: 'Нулевая', cell_cost: 1, description: '', tags: {}, is_summon: false, activation_conditions: {} };
     onChange(index, 'abilities', [...contract.abilities, newAbility]);
   };
 
@@ -164,10 +168,26 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
         </ModalPage>
       </ModalRoot>
 
-      <FormItem top="Название Контракта">
+      <FormItem top={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          Название Контракта
+          <HandbookTooltip
+            tooltipText={HANDBOOK_TOOLTIPS.contractName.text}
+            handbookSection={HANDBOOK_TOOLTIPS.contractName.section}
+          />
+        </div>
+      }>
         <Input name="contract_name" value={contract.contract_name} onChange={handleChange} />
       </FormItem>
-      <FormItem top="Имя/Название Существа">
+      <FormItem top={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          Имя/Название Существа
+          <HandbookTooltip
+            tooltipText={HANDBOOK_TOOLTIPS.creatureName.text}
+            handbookSection={HANDBOOK_TOOLTIPS.creatureName.section}
+          />
+        </div>
+      }>
         <Input name="creature_name" value={contract.creature_name} onChange={handleChange} />
       </FormItem>
       <FormItem top="Изображения существа (URL)">
@@ -187,7 +207,15 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
           Добавить URL
         </Button>
       </FormItem>
-      <FormItem top="Ранг Существа">
+      <FormItem top={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          Ранг Существа
+          <HandbookTooltip
+            tooltipText={HANDBOOK_TOOLTIPS.creatureRank.text}
+            handbookSection={HANDBOOK_TOOLTIPS.creatureRank.section}
+          />
+        </div>
+      }>
         <Select
           name="creature_rank"
           value={contract.creature_rank}
@@ -205,16 +233,40 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
           ]}
         />
       </FormItem>
-      <FormItem top="Спектр/Тематика">
+      <FormItem top={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          Спектр/Тематика
+          <HandbookTooltip
+            tooltipText={HANDBOOK_TOOLTIPS.creatureSpectrum.text}
+            handbookSection={HANDBOOK_TOOLTIPS.creatureSpectrum.section}
+          />
+        </div>
+      }>
         <Input name="creature_spectrum" value={contract.creature_spectrum} onChange={handleChange} />
       </FormItem>
       <FormItem top="Описание Существа">
         <Textarea name="creature_description" value={contract.creature_description} onChange={handleChange} />
       </FormItem>
-      <FormItem top="Дар (Пассивный эффект)">
+      <FormItem top={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          Дар (Пассивный эффект)
+          <HandbookTooltip
+            tooltipText={HANDBOOK_TOOLTIPS.gift.text}
+            handbookSection={HANDBOOK_TOOLTIPS.gift.section}
+          />
+        </div>
+      }>
         <Textarea name="gift" value={contract.gift} onChange={handleChange} />
       </FormItem>
-      <FormItem top="Уровень Синхронизации (%)">
+      <FormItem top={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          Уровень Синхронизации (%)
+          <HandbookTooltip
+            tooltipText={HANDBOOK_TOOLTIPS.syncLevel.text}
+            handbookSection={HANDBOOK_TOOLTIPS.syncLevel.section}
+          />
+        </div>
+      }>
         <Input
           name="sync_level"
           type="number"
@@ -254,7 +306,13 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
         />
       )}
 
-      <Header>Способности Контракта</Header>
+      <Header style={{ display: 'flex', alignItems: 'center' }}>
+        Способности Контракта
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.abilities.text}
+          handbookSection={HANDBOOK_TOOLTIPS.abilities.section}
+        />
+      </Header>
       {contract.abilities.map((ability, abilityIndex) => {
         const isSummon = ability.is_summon;
         const requiredTags = ['Пробивающий', 'Защитный', 'Неотвратимый', 'Область'];
@@ -297,6 +355,11 @@ export const ContractForm: FC<ContractFormProps> = ({ contract, index, onChange,
               onChange={(e) => handleAbilityChange(abilityIndex, 'description', e.target.value)}
             />
           </FormItem>
+
+          <ActivationConditions
+            conditions={ability.activation_conditions}
+            onChange={(conditions) => handleAbilityChange(abilityIndex, 'activation_conditions', conditions)}
+          />
           
           <FormItem>
             <Checkbox

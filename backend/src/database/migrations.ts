@@ -39,6 +39,12 @@ export async function runMigrations(db: Database): Promise<void> {
   await createFishingTables(db);
   await createHuntingTables(db);
   
+  // Advanced hunting/fishing systems
+  await createEchoZonesTables(db);
+  await createAdvancedGearTables(db);
+  await createCraftingTables(db);
+  await createHuntingEventsTables(db);
+  
   // Migrations
   await runColumnMigrations(db);
 
@@ -899,6 +905,157 @@ async function createHuntingTables(db: Database): Promise<void> {
       FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
       FOREIGN KEY (gear_id) REFERENCES HuntingGear(id) ON DELETE CASCADE
     );
+  `);
+}
+
+async function createEchoZonesTables(db: Database): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS EchoZones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id INTEGER NOT NULL,
+      activity_type TEXT NOT NULL CHECK(activity_type IN ('fishing', 'hunting_ground', 'hunting_aerial')),
+      intensity INTEGER NOT NULL CHECK(intensity BETWEEN 1 AND 5),
+      residual_aura_level REAL DEFAULT 0.0 CHECK(residual_aura_level BETWEEN 0.0 AND 1.0),
+      last_beast_migration DATETIME,
+      active_until DATETIME,
+      spawned_mutations TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_echo_zones_location ON EchoZones(location_id, activity_type);
+    CREATE INDEX IF NOT EXISTS idx_echo_zones_active ON EchoZones(active_until);
+  `);
+}
+
+async function createAdvancedGearTables(db: Database): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS AdvancedGear (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      gear_type TEXT NOT NULL CHECK(gear_type IN ('rod', 'bait', 'trap', 'weapon', 'armor', 'enhancement')),
+      activity_type TEXT NOT NULL CHECK(activity_type IN ('fishing', 'hunting', 'aerial_hunting', 'universal')),
+      rank_requirement TEXT CHECK(rank_requirement IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+      unique_properties TEXT,
+      synergy_contracts TEXT,
+      durability_max INTEGER DEFAULT 100,
+      price INTEGER DEFAULT 0,
+      craft_recipe TEXT,
+      description TEXT,
+      image_url TEXT,
+      is_craftable BOOLEAN DEFAULT 0,
+      is_active BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS CharacterAdvancedGear (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER NOT NULL,
+      gear_id INTEGER NOT NULL,
+      durability_current INTEGER DEFAULT 100,
+      quantity INTEGER DEFAULT 1,
+      is_equipped BOOLEAN DEFAULT 0,
+      obtained_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+      FOREIGN KEY (gear_id) REFERENCES AdvancedGear(id) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_advanced_gear_type ON AdvancedGear(gear_type, activity_type);
+    CREATE INDEX IF NOT EXISTS idx_char_advanced_gear ON CharacterAdvancedGear(character_id);
+  `);
+}
+
+async function createCraftingTables(db: Database): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS CraftingMaterials (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      material_type TEXT NOT NULL CHECK(material_type IN ('organic', 'essence', 'crystal', 'metal', 'special')),
+      mutation_class TEXT CHECK(mutation_class IN ('Затронутые', 'Искажённые', 'Бестии')),
+      source_species_id INTEGER,
+      aura_property TEXT,
+      rarity_tier INTEGER CHECK(rarity_tier BETWEEN 1 AND 5),
+      credit_value INTEGER DEFAULT 0,
+      description TEXT,
+      image_url TEXT,
+      is_active BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (source_species_id) REFERENCES BestiarySpecies(id) ON DELETE SET NULL
+    );
+    
+    CREATE TABLE IF NOT EXISTS CharacterMaterials (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER NOT NULL,
+      material_id INTEGER NOT NULL,
+      quantity INTEGER DEFAULT 1,
+      quality_modifier REAL DEFAULT 1.0,
+      obtained_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+      FOREIGN KEY (material_id) REFERENCES CraftingMaterials(id) ON DELETE CASCADE
+    );
+    
+    CREATE TABLE IF NOT EXISTS SinkiCraftRecipes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sinki_name TEXT NOT NULL,
+      sinki_rank TEXT NOT NULL CHECK(sinki_rank IN ('F', 'E', 'D', 'C')),
+      sinki_type TEXT NOT NULL CHECK(sinki_type IN ('Осколок', 'Фокус')),
+      required_materials TEXT NOT NULL,
+      success_chance_base REAL DEFAULT 0.7 CHECK(success_chance_base BETWEEN 0.0 AND 1.0),
+      requires_crafter_rank TEXT CHECK(requires_crafter_rank IN ('F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS')),
+      sinki_properties TEXT,
+      description TEXT,
+      is_active BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS CraftingHistory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER NOT NULL,
+      recipe_id INTEGER NOT NULL,
+      success BOOLEAN NOT NULL,
+      materials_used TEXT,
+      sinki_created TEXT,
+      crafted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE,
+      FOREIGN KEY (recipe_id) REFERENCES SinkiCraftRecipes(id) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_materials_type ON CraftingMaterials(material_type, mutation_class);
+    CREATE INDEX IF NOT EXISTS idx_char_materials ON CharacterMaterials(character_id, material_id);
+    CREATE INDEX IF NOT EXISTS idx_recipes_rank ON SinkiCraftRecipes(sinki_rank, sinki_type);
+  `);
+}
+
+async function createHuntingEventsTables(db: Database): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS HuntingEvents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type TEXT NOT NULL CHECK(event_type IN ('migration', 'anomaly', 'rare_spawn', 'weather', 'season')),
+      location_id INTEGER NOT NULL,
+      activity_type TEXT NOT NULL CHECK(activity_type IN ('fishing', 'hunting_ground', 'hunting_aerial')),
+      active_from DATETIME NOT NULL,
+      active_until DATETIME NOT NULL,
+      bonus_creatures TEXT,
+      special_conditions TEXT,
+      rewards_multiplier REAL DEFAULT 1.0,
+      description TEXT,
+      is_active BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS EventParticipation (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER NOT NULL,
+      character_id INTEGER NOT NULL,
+      participated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      rewards_claimed BOOLEAN DEFAULT 0,
+      FOREIGN KEY (event_id) REFERENCES HuntingEvents(id) ON DELETE CASCADE,
+      FOREIGN KEY (character_id) REFERENCES Characters(id) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_events_active ON HuntingEvents(active_until, is_active);
+    CREATE INDEX IF NOT EXISTS idx_events_location ON HuntingEvents(location_id, activity_type);
+    CREATE INDEX IF NOT EXISTS idx_event_participation ON EventParticipation(event_id, character_id);
   `);
 }
 

@@ -48,6 +48,11 @@ export const DEFAULT_VIEW_PANELS = {
   FISHING: 'fishing',
   HUNTING: 'hunting',
   ADMIN_ACTIVITIES: 'admin_activities',
+  FISHING_V2: 'fishing_v2',
+  HUNTING_V2: 'hunting_v2',
+  MATERIALS: 'materials',
+  CRAFTING: 'crafting',
+  JOURNAL: 'journal',
 };
 
 export const routes = RoutesConfig.create([
@@ -90,6 +95,11 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.FISHING, `/${DEFAULT_VIEW_PANELS.FISHING}`, []),
       createPanel(DEFAULT_VIEW_PANELS.HUNTING, `/${DEFAULT_VIEW_PANELS.HUNTING}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ADMIN_ACTIVITIES, `/${DEFAULT_VIEW_PANELS.ADMIN_ACTIVITIES}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.FISHING_V2, `/${DEFAULT_VIEW_PANELS.FISHING_V2}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.HUNTING_V2, `/${DEFAULT_VIEW_PANELS.HUNTING_V2}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.MATERIALS, `/${DEFAULT_VIEW_PANELS.MATERIALS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.CRAFTING, `/${DEFAULT_VIEW_PANELS.CRAFTING}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.JOURNAL, `/${DEFAULT_VIEW_PANELS.JOURNAL}`, []),
     ]),
   ]),
 ]);

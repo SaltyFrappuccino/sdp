@@ -517,6 +517,14 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
                                                     ))}
                                                 </Div>
                                             )}
+                                            {(ability as any).activation_conditions && ((ability as any).activation_conditions.verbal || (ability as any).activation_conditions.gesture || (ability as any).activation_conditions.general) && (
+                                                <Div style={{ marginTop: 8, background: 'var(--vkui--color_background_secondary)', padding: 8, borderRadius: 4 }}>
+                                                    <Subhead weight="1">Условия активации:</Subhead>
+                                                    {(ability as any).activation_conditions.verbal && <Text>🗣️ Вербальное: "{(ability as any).activation_conditions.verbal}"</Text>}
+                                                    {(ability as any).activation_conditions.gesture && <Text>✋ Жест: {(ability as any).activation_conditions.gesture}</Text>}
+                                                    {(ability as any).activation_conditions.general && <Text>⚙️ Условие: {(ability as any).activation_conditions.general}</Text>}
+                                                </Div>
+                                            )}
                                         </RichCell>
                                     ))}
                                 </Accordion.Content>
@@ -576,6 +584,14 @@ export const AnketaDetail: FC<AnketaDetailProps> = ({ id, fetchedUser }) => {
                                                                     {Object.entries(ability.tags).map(([tag, rank]) => (
                                                                         <Text key={tag}>{tag}: {rank}</Text>
                                                                     ))}
+                                                                </Div>
+                                                            )}
+                                                            {(ability as any).activation_conditions && ((ability as any).activation_conditions.verbal || (ability as any).activation_conditions.gesture || (ability as any).activation_conditions.general) && (
+                                                                <Div style={{ marginTop: 8, background: 'var(--vkui--color_background_secondary)', padding: 8, borderRadius: 4 }}>
+                                                                    <Subhead weight="1">Условия активации:</Subhead>
+                                                                    {(ability as any).activation_conditions.verbal && <Text>🗣️ Вербальное: "{(ability as any).activation_conditions.verbal}"</Text>}
+                                                                    {(ability as any).activation_conditions.gesture && <Text>✋ Жест: {(ability as any).activation_conditions.gesture}</Text>}
+                                                                    {(ability as any).activation_conditions.general && <Text>⚙️ Условие: {(ability as any).activation_conditions.general}</Text>}
                                                                 </Div>
                                                             )}
                                                         </RichCell>

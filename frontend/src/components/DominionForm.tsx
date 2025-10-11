@@ -1,5 +1,7 @@
 import { FC } from 'react';
 import { FormItem, Input, Textarea, Header, Div, Card, Separator } from '@vkontakte/vkui';
+import { HandbookTooltip } from './HandbookTooltip';
+import { HANDBOOK_TOOLTIPS } from '../utils/handbookHelpers';
 
 interface DominionData {
   name: string;
@@ -17,8 +19,12 @@ interface DominionFormProps {
 export const DominionForm: FC<DominionFormProps> = ({ dominion, onChange }) => {
   return (
     <Card mode="shadow" style={{ marginTop: '12px' }}>
-      <Header style={{ backgroundColor: 'var(--vkui--color_background_accent_alpha)', color: 'var(--vkui--color_text_primary)', padding: '12px' }}>
+      <Header style={{ backgroundColor: 'var(--vkui--color_background_accent_alpha)', color: 'var(--vkui--color_text_primary)', padding: '12px', display: 'flex', alignItems: 'center' }}>
         🌌 Доминион (100% Синхронизации)
+        <HandbookTooltip
+          tooltipText={HANDBOOK_TOOLTIPS.dominion.text}
+          handbookSection={HANDBOOK_TOOLTIPS.dominion.section}
+        />
       </Header>
       <Div>
         <FormItem top="Название Доминиона">

@@ -3,7 +3,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { View, SplitLayout, SplitCol, ScreenSpinner, ModalRoot, ModalPage, ModalPageHeader, Div, Group, Panel } from '@vkontakte/vkui';
 import { useActiveVkuiLocation } from '@vkontakte/vk-mini-apps-router';
 
-import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, UserAnketaEditor, AdminAnketaEditor, Calculator, MarketPanel, MyAnketasPanel, ActivityRequestsPanel, AdminActivityRequestsPanel, Handbook, MarketExchangePanel, AdminMarketPanel, CasinoPanel, PokerPanel, HorseStatsPanel, NewEventsPanel, NewAdminEventsPanel, BulkCharacterManagement, CryptoExchangePanel, PurchasesPanel, CollectionsPanel, FactionsList, FactionsCreate, AdminFactions, AdminCryptoPanel, AdminPurchasesPanel, AdminCollectionsPanel, BestiaryPanel, AdminBestiaryPanel, FishingPanel, HuntingPanel, AdminActivitiesPanel } from './panels';
+import { Home, Anketa, AnketaList, AnketaDetail, AdminLogin, AdminPanel, UserAnketaEditor, AdminAnketaEditor, Calculator, MarketPanel, MyAnketasPanel, ActivityRequestsPanel, AdminActivityRequestsPanel, Handbook, MarketExchangePanel, AdminMarketPanel, CasinoPanel, PokerPanel, HorseStatsPanel, NewEventsPanel, NewAdminEventsPanel, BulkCharacterManagement, CryptoExchangePanel, PurchasesPanel, CollectionsPanel, FactionsList, FactionsCreate, AdminFactions, AdminCryptoPanel, AdminPurchasesPanel, AdminCollectionsPanel, BestiaryPanel, AdminBestiaryPanel, FishingPanel, HuntingPanel, AdminActivitiesPanel, FishingPanelV2, HuntingPanelV2, MaterialsPanel, CraftingPanel, JournalPanel } from './panels';
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { API_URL } from './api';
 import UpdateViewer from './panels/UpdateViewer';
@@ -102,6 +102,11 @@ export const App = () => {
             <FishingPanel id="fishing" fetchedUser={fetchedUser} />
             <HuntingPanel id="hunting" fetchedUser={fetchedUser} />
             <AdminActivitiesPanel id="admin_activities" />
+            <FishingPanelV2 id="fishing_v2" fetchedUser={fetchedUser} />
+            <HuntingPanelV2 id="hunting_v2" fetchedUser={fetchedUser} />
+            <MaterialsPanel id="materials" fetchedUser={fetchedUser} />
+            <CraftingPanel id="crafting" fetchedUser={fetchedUser} />
+            <JournalPanel id="journal" fetchedUser={fetchedUser} />
         <UpdateViewer id="update_viewer" />
           </View>
         ) : (

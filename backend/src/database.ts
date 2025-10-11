@@ -1275,6 +1275,13 @@ export async function initDB() {
     await seedFishingData(db);
     await seedHuntingData(db);
     
+    // Заполняем данные для продвинутых систем
+    console.log('Seeding advanced systems data...');
+    await seedEchoZones(db);
+    await seedAdvancedGear(db);
+    await seedSinkiCraftRecipes(db);
+    await seedHuntingEvents(db);
+    
     // Примечание: Связи между локациями и существами теперь через BestiaryLocations
       
       console.log('Migration completed successfully');
@@ -2710,6 +2717,276 @@ export async function giveBasicGear(db: any, characterId: number) {
     console.log(`Basic gear given to character ${characterId}`);
   } catch (error) {
     console.error('Error giving basic gear:', error);
+    throw error;
+  }
+}
+
+// Seed для Эхо-Зон
+export async function seedEchoZones(db: any) {
+  try {
+    const count = await db.get('SELECT COUNT(*) as count FROM EchoZones');
+    if (count.count > 0) {
+      console.log('EchoZones already exist, skipping seed');
+      return;
+    }
+
+    console.log('Seeding Echo Zones...');
+
+    // Эхо-Зоны для рыбалки
+    await db.run(`
+      INSERT INTO EchoZones (location_id, activity_type, intensity, residual_aura_level, active_until, spawned_mutations)
+      VALUES (4, 'fishing', 4, 0.65, datetime('now', '+30 days'), 
+        JSON('["Увеличенный размер", "Электрическая аура", "Агрессивность"]'))
+    `);
+
+    await db.run(`
+      INSERT INTO EchoZones (location_id, activity_type, intensity, residual_aura_level, active_until, spawned_mutations)
+      VALUES (7, 'fishing', 5, 0.85, datetime('now', '+30 days'),
+        JSON('["Элементальная аура", "Ускоренная регенерация", "Улучшенные чувства"]'))
+    `);
+
+    // Эхо-Зоны для наземной охоты
+    await db.run(`
+      INSERT INTO EchoZones (location_id, activity_type, intensity, residual_aura_level, active_until)
+      VALUES (3, 'hunting_ground', 3, 0.45, datetime('now', '+30 days'))
+    `);
+
+    await db.run(`
+      INSERT INTO EchoZones (location_id, activity_type, intensity, residual_aura_level, active_until)
+      VALUES (5, 'hunting_ground', 5, 0.90, datetime('now', '+30 days'))
+    `);
+
+    // Эхо-Зоны для воздушной охоты
+    await db.run(`
+      INSERT INTO EchoZones (location_id, activity_type, intensity, residual_aura_level, active_until)
+      VALUES (2, 'hunting_aerial', 4, 0.60, datetime('now', '+30 days'))
+    `);
+
+    console.log('Echo Zones seeded successfully');
+  } catch (error) {
+    console.error('Error seeding Echo Zones:', error);
+    throw error;
+  }
+}
+
+// Seed для продвинутого снаряжения
+export async function seedAdvancedGear(db: any) {
+  try {
+    const count = await db.get('SELECT COUNT(*) as count FROM AdvancedGear');
+    if (count.count > 0) {
+      console.log('AdvancedGear already exists, skipping seed');
+      return;
+    }
+
+    console.log('Seeding Advanced Gear...');
+
+    // Удочки
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, durability_max, price, description)
+      VALUES ('Углепластиковая удочка "Мидзу"', 'rod', 'fishing', 'E',
+        JSON('{"bonus_depth": 20, "tension_resistance": 1.3}'),
+        100, 50000, 'Прочная удочка из углеволокна, идеальна для глубоководной рыбалки.')
+    `);
+
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, synergy_contracts, durability_max, price, description)
+      VALUES ('Аурическая удочка "Хоши"', 'rod', 'fishing', 'D',
+        JSON('{"aura_detection": true, "mutation_bonus": 1.5}'),
+        JSON('["Контракт Воды", "Контракт Природы"]'),
+        80, 250000, 'Удочка, резонирующая с Аурой. Привлекает мутированных существ.')
+    `);
+
+    // Приманки
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, durability_max, price, description, is_craftable)
+      VALUES ('Светящаяся приманка', 'bait', 'fishing', 'F',
+        JSON('{"rarity_bonus": 0.2}'),
+        1, 5000, 'Биолюминесцентная приманка. Привлекает редкую рыбу.', 1)
+    `);
+
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, durability_max, price, description, is_craftable)
+      VALUES ('Аурическая эссенция-приманка', 'bait', 'fishing', 'C',
+        JSON('{"mutation_class_bonus": "Искажённые", "rarity_bonus": 0.5}'),
+        1, 100000, 'Привлекает Искажённых существ.', 1)
+    `);
+
+    // Оружие для охоты
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, durability_max, price, description)
+      VALUES ('Композитный лук "Охотник"', 'weapon', 'hunting', 'E',
+        JSON('{"accuracy_bonus": 1.3, "silent": true}'),
+        150, 75000, 'Лёгкий и точный лук для скрытной охоты.')
+    `);
+
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, synergy_contracts, durability_max, price, description)
+      VALUES ('Плазменное копьё "Кага"', 'weapon', 'hunting', 'C',
+        JSON('{"damage_bonus": 2.0, "element": "fire"}'),
+        JSON('["Контракт Огня", "Контракт Плазмы"]'),
+        100, 500000, 'Высокотехнологичное копьё с плазменным наконечником.')
+    `);
+
+    // Ловушки
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, durability_max, price, description, is_craftable)
+      VALUES ('Капкан стандартный', 'trap', 'hunting', 'F',
+        JSON('{"capture_chance": 0.7, "damage_multiplier": 1.5}'),
+        1, 15000, 'Стандартный металлический капкан.', 1)
+    `);
+
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, durability_max, price, description, is_craftable)
+      VALUES ('Сеть усиленная', 'trap', 'hunting', 'D',
+        JSON('{"capture_chance": 0.85, "quality_preservation": 1.3}'),
+        1, 50000, 'Сохраняет качество добычи.', 1)
+    `);
+
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, durability_max, price, description, is_craftable)
+      VALUES ('Ядовитые дротики', 'trap', 'hunting', 'D',
+        JSON('{"capture_chance": 0.75, "extra_material": "яд"}'),
+        3, 35000, 'Дополнительно даёт ядовитые железы.', 1)
+    `);
+
+    // Воздушная охота
+    await db.run(`
+      INSERT INTO AdvancedGear (name, gear_type, activity_type, rank_requirement, unique_properties, durability_max, price, description)
+      VALUES ('Баллистическая сеть', 'weapon', 'aerial_hunting', 'E',
+        JSON('{"net_capture": true, "quality_preservation": 1.5}'),
+        20, 100000, 'Выстреливает сеть для захвата птиц.')
+    `);
+
+    console.log('Advanced Gear seeded successfully');
+  } catch (error) {
+    console.error('Error seeding Advanced Gear:', error);
+    throw error;
+  }
+}
+
+// Seed для рецептов крафта Синки
+export async function seedSinkiCraftRecipes(db: any) {
+  try {
+    const count = await db.get('SELECT COUNT(*) as count FROM SinkiCraftRecipes');
+    if (count.count > 0) {
+      console.log('SinkiCraftRecipes already exist, skipping seed');
+      return;
+    }
+
+    console.log('Seeding Sinki Craft Recipes...');
+
+    // Осколки F ранга
+    await db.run(`
+      INSERT INTO SinkiCraftRecipes (sinki_name, sinki_rank, sinki_type, required_materials, success_chance_base, requires_crafter_rank, sinki_properties, description)
+      VALUES ('Осколок Электростатики', 'F', 'Осколок',
+        JSON('[{"material_name": "Электричество компонент", "quantity": 5}]'),
+        0.80, 'E',
+        JSON('{"element": "electricity", "bonus": 5, "ability": "Слабый электрический разряд"}'),
+        'Базовый Осколок с электрическим свойством')
+    `);
+
+    await db.run(`
+      INSERT INTO SinkiCraftRecipes (sinki_name, sinki_rank, sinki_type, required_materials, success_chance_base, requires_crafter_rank, sinki_properties, description)
+      VALUES ('Осколок Каменной Кожи', 'F', 'Осколок',
+        JSON('[{"material_name": "Шкура Каменный Кабан", "quantity": 10}, {"material_name": "Кости Каменный Кабан", "quantity": 5}]'),
+        0.75, 'E',
+        JSON('{"element": "earth", "bonus": 8, "ability": "Укрепление защиты"}'),
+        'Увеличивает физическую защиту')
+    `);
+
+    // Осколки E ранга
+    await db.run(`
+      INSERT INTO SinkiCraftRecipes (sinki_name, sinki_rank, sinki_type, required_materials, success_chance_base, requires_crafter_rank, sinki_properties, description)
+      VALUES ('Осколок Вольт-Лисы', 'E', 'Осколок',
+        JSON('[{"material_name": "Электричество компонент", "quantity": 10}, {"material_name": "Эссенция Ауры: Вольт-Лиса", "quantity": 1}]'),
+        0.70, 'D',
+        JSON('{"element": "electricity", "bonus": 15, "ability": "Электрический щит"}'),
+        'Создаёт электрический щит вокруг владельца')
+    `);
+
+    // Осколки D ранга
+    await db.run(`
+      INSERT INTO SinkiCraftRecipes (sinki_name, sinki_rank, sinki_type, required_materials, success_chance_base, requires_crafter_rank, sinki_properties, description)
+      VALUES ('Осколок Невидимости', 'D', 'Осколок',
+        JSON('[{"material_name": "Кристалл Ауры (Бестии)", "quantity": 1}, {"material_name": "Эссенция Ауры: Кристальный Волк", "quantity": 2}]'),
+        0.60, 'D',
+        JSON('{"element": "light", "bonus": 25, "ability": "Временная невидимость"}'),
+        'Даёт способность к невидимости на короткое время')
+    `);
+
+    // Фокусы
+    await db.run(`
+      INSERT INTO SinkiCraftRecipes (sinki_name, sinki_rank, sinki_type, required_materials, success_chance_base, requires_crafter_rank, sinki_properties, description)
+      VALUES ('Фокус Глубоководного Хищника', 'D', 'Фокус',
+        JSON('[{"material_name": "Сердце Бестии: Глубоководная Щука", "quantity": 1}, {"material_name": "Кристалл Ауры (Бестии)", "quantity": 2}]'),
+        0.50, 'C',
+        JSON('{"element": "water", "bonus": 35, "ability": "Водное дыхание и скорость"}'),
+        'Усиливает способности в воде')
+    `);
+
+    await db.run(`
+      INSERT INTO SinkiCraftRecipes (sinki_name, sinki_rank, sinki_type, required_materials, success_chance_base, requires_crafter_rank, sinki_properties, description)
+      VALUES ('Фокус Небесного Охотника', 'C', 'Фокус',
+        JSON('[{"material_name": "Перья Бритвенный Сокол", "quantity": 20}, {"material_name": "Сердце Бестии: Бритвенный Сокол", "quantity": 1}, {"material_name": "Кристалл Ауры (Бестии)", "quantity": 3}]'),
+        0.45, 'C',
+        JSON('{"element": "wind", "bonus": 45, "ability": "Полёт и усиленное зрение"}'),
+        'Даёт способность к парению и орлиное зрение')
+    `);
+
+    console.log('Sinki Craft Recipes seeded successfully');
+  } catch (error) {
+    console.error('Error seeding Sinki Craft Recipes:', error);
+    throw error;
+  }
+}
+
+// Seed для событий охоты
+export async function seedHuntingEvents(db: any) {
+  try {
+    const count = await db.get('SELECT COUNT(*) as count FROM HuntingEvents');
+    if (count.count > 0) {
+      console.log('HuntingEvents already exist, skipping seed');
+      return;
+    }
+
+    console.log('Seeding Hunting Events...');
+
+    // Миграция Бестий
+    await db.run(`
+      INSERT INTO HuntingEvents (event_type, location_id, activity_type, active_from, active_until, bonus_creatures, special_conditions, rewards_multiplier, description)
+      VALUES ('migration', 5, 'hunting_ground',
+        datetime('now'), datetime('now', '+7 days'),
+        JSON('["Кристальный Волк", "Каменный Кабан"]'),
+        JSON('{"beast_spawn_rate": 2.0}'),
+        2.0,
+        'Миграция Бестий через Тёмный Континент! Повышенные награды!')
+    `);
+
+    // Аномалия
+    await db.run(`
+      INSERT INTO HuntingEvents (event_type, location_id, activity_type, active_from, active_until, bonus_creatures, special_conditions, rewards_multiplier, description)
+      VALUES ('anomaly', 4, 'fishing',
+        datetime('now'), datetime('now', '+3 days'),
+        JSON('["Туманный Угорь", "Вольт-Угорь"]'),
+        JSON('{"echo_intensity_bonus": 2}'),
+        1.5,
+        'Аномальная активность Ауры! Искажённые существа появляются чаще.')
+    `);
+
+    // Редкий спавн
+    await db.run(`
+      INSERT INTO HuntingEvents (event_type, location_id, activity_type, active_from, active_until, bonus_creatures, special_conditions, rewards_multiplier, description)
+      VALUES ('rare_spawn', 2, 'hunting_aerial',
+        datetime('now'), datetime('now', '+1 day'),
+        JSON('["Бритвенный Сокол"]'),
+        JSON('{"legendary_spawn": true}'),
+        3.0,
+        'Легендарный Бритвенный Сокол замечен в небе Хоши!')
+    `);
+
+    console.log('Hunting Events seeded successfully');
+  } catch (error) {
+    console.error('Error seeding Hunting Events:', error);
     throw error;
   }
 }
