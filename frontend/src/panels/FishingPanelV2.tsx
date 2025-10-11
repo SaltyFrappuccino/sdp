@@ -104,9 +104,8 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/fishing/gear/${characterId}`);
       const data = await response.json();
       
-      if (data.success) {
-        setAvailableGear(data.gear || []);
-      }
+      // API возвращает массив напрямую
+      setAvailableGear(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Ошибка загрузки снаряжения:', error);
     }
@@ -119,9 +118,8 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/fishing/inventory/${characterId}`);
       const data = await response.json();
       
-      if (data.success) {
-        setCatchHistory(data.fish || []);
-      }
+      // API возвращает массив напрямую
+      setCatchHistory(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Ошибка загрузки улова:', error);
     }
@@ -206,7 +204,9 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/fishing/gear`);
       const data = await response.json();
-      setShopGear(data || []);
+      
+      // API возвращает массив напрямую
+      setShopGear(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Ошибка загрузки магазина:', error);
     }
@@ -407,17 +407,17 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             size="l"
             mode="secondary"
             stretched
-            onClick={() => routeNavigator.push('/materials')}
+            onClick={() => setActiveTab('shop')}
           >
-            📦 Материалы
+            🏪 Магазин
           </Button>
           <Button
             size="l"
             mode="secondary"
             stretched
-            onClick={() => routeNavigator.push('/crafting')}
+            onClick={() => routeNavigator.push('/materials')}
           >
-            🔨 Крафт
+            📦 Материалы
           </Button>
         </ButtonGroup>
       </Div>

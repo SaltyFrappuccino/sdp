@@ -44,7 +44,9 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
       setLoading(true);
       const response = await fetch(`${API_URL}/crafting/recipes/${characterId}`);
       const data = await response.json();
-      setRecipes(data);
+      
+      // API возвращает массив напрямую
+      setRecipes(Array.isArray(data) ? data : []);
     } catch (err) {
       setError('Ошибка загрузки рецептов');
       console.error(err);
@@ -57,7 +59,9 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
     try {
       const response = await fetch(`${API_URL}/crafting/history/${characterId}`);
       const data = await response.json();
-      setCraftHistory(data);
+      
+      // API возвращает массив напрямую
+      setCraftHistory(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     }
@@ -67,7 +71,9 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
     try {
       const response = await fetch(`${API_URL}/crafting/stats/${characterId}`);
       const data = await response.json();
-      setCraftStats(data);
+      
+      // API возвращает объект напрямую
+      setCraftStats(data || null);
     } catch (err) {
       console.error(err);
     }
@@ -350,7 +356,7 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
               <Text style={{ fontSize: 12, color: 'var(--text_secondary)' }}>Успешно</Text>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <Text style={{ fontSize: 24, fontWeight: 'bold' }}>{craftStats.successRate.toFixed(0)}%</Text>
+              <Text style={{ fontSize: 24, fontWeight: 'bold' }}>{(craftStats?.successRate || 0).toFixed(0)}%</Text>
               <Text style={{ fontSize: 12, color: 'var(--text_secondary)' }}>Успешность</Text>
             </div>
           </div>

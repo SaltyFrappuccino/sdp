@@ -110,9 +110,8 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/hunting/gear/${characterId}`);
       const data = await response.json();
       
-      if (data.success) {
-        setAvailableGear(data.gear || []);
-      }
+      // API возвращает массив напрямую
+      setAvailableGear(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Ошибка загрузки снаряжения:', error);
     }
@@ -125,9 +124,8 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/hunting/stats/${characterId}`);
       const data = await response.json();
       
-      if (data.success) {
-        setHuntStats(data.stats);
-      }
+      // API возвращает объект напрямую
+      setHuntStats(data || null);
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
     }
@@ -139,7 +137,9 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/hunting/inventory/${characterId}`);
       const data = await response.json();
-      setHuntInventory(data || []);
+      
+      // API возвращает массив напрямую
+      setHuntInventory(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Ошибка загрузки добычи:', error);
     }
@@ -149,7 +149,9 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     try {
       const response = await fetch(`${API_URL}/hunting/gear`);
       const data = await response.json();
-      setShopGear(data || []);
+      
+      // API возвращает массив напрямую
+      setShopGear(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Ошибка загрузки магазина:', error);
     }
@@ -448,17 +450,17 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             size="l"
             mode="secondary"
             stretched
-            onClick={() => routeNavigator.push('/journal')}
+            onClick={() => setActiveTab('shop')}
           >
-            📖 Журнал
+            🏪 Магазин
           </Button>
           <Button
             size="l"
             mode="secondary"
             stretched
-            onClick={() => routeNavigator.push('/crafting')}
+            onClick={() => routeNavigator.push('/journal')}
           >
-            🔨 Крафт
+            📖 Журнал
           </Button>
         </ButtonGroup>
       </Div>
