@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { IconButton, Tooltip } from '@vkontakte/vkui';
+import { IconButton } from '@vkontakte/vkui';
 import { Icon16InfoCircle } from '@vkontakte/icons';
 import { navigateToHandbookSection } from '../utils/handbookHelpers';
 
@@ -15,15 +15,12 @@ export const HandbookTooltip: FC<HandbookTooltipProps> = ({ tooltipText, handboo
     }
   };
 
-  const tooltipContent = handbookSection 
+  const fullTooltipText = handbookSection 
     ? `${tooltipText}\n\n📖 Нажмите, чтобы открыть справочник`
     : tooltipText;
 
   return (
-    <Tooltip
-      content={tooltipContent}
-      placement="top"
-    >
+    <span title={fullTooltipText}>
       <IconButton
         onClick={handleClick}
         style={{
@@ -34,7 +31,7 @@ export const HandbookTooltip: FC<HandbookTooltipProps> = ({ tooltipText, handboo
       >
         <Icon16InfoCircle style={{ color: 'var(--vkui--color_icon_accent)' }} />
       </IconButton>
-    </Tooltip>
+    </span>
   );
 };
 

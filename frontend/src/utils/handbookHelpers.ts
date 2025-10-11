@@ -187,26 +187,25 @@ export const HANDBOOK_TOOLTIPS = {
 } as const;
 
 // Функция для навигации к разделу справочника
+// Note: Использует hash navigation для VK Mini Apps
 export const navigateToHandbookSection = (sectionId: string) => {
-  // Проверяем, находимся ли мы в VK Mini App
   if (typeof window !== 'undefined') {
-    // Получаем текущий путь
-    const currentHash = window.location.hash;
+    const currentPath = window.location.hash;
     
-    // Если мы уже на странице справочника, просто скроллим
-    if (currentHash.includes('handbook')) {
+    // Если мы уже на странице справочника, просто скроллим к нужному разделу
+    if (currentPath.includes('/handbook')) {
       setTimeout(() => {
         const element = document.getElementById(sectionId);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          // Сохраняем позицию для восстановления
           localStorage.setItem('handbook_scroll_position', sectionId);
         }
       }, 100);
     } else {
-      // Сохраняем целевую секцию для автоматического перехода после загрузки
+      // Сохраняем целевую секцию для автоматического перехода после загрузки справочника
       localStorage.setItem('handbook_target_section', sectionId);
-      // Переходим на страницу справочника
+      // Используем hash navigation для VK Mini Apps роутера
+      // Warning о POP navigation не критично в production для VK Mini Apps
       window.location.hash = '#/handbook';
     }
   }

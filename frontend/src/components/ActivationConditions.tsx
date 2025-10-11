@@ -19,13 +19,15 @@ export const ActivationConditions: FC<ActivationConditionsProps> = ({ conditions
   const [gestureText, setGestureText] = useState(conditions?.gesture || '');
   const [generalText, setGeneralText] = useState(conditions?.general || '');
 
-  // Синхронизация с внешними изменениями
+  // Синхронизация с внешними изменениями только при первой загрузке
   useEffect(() => {
-    setHasVerbal(!!conditions?.verbal);
-    setHasGesture(!!conditions?.gesture);
-    setVerbalText(conditions?.verbal || '');
-    setGestureText(conditions?.gesture || '');
-    setGeneralText(conditions?.general || '');
+    if (conditions?.verbal !== undefined || conditions?.gesture !== undefined || conditions?.general !== undefined) {
+      setHasVerbal(!!conditions?.verbal);
+      setHasGesture(!!conditions?.gesture);
+      setVerbalText(conditions?.verbal || '');
+      setGestureText(conditions?.gesture || '');
+      setGeneralText(conditions?.general || '');
+    }
   }, [conditions]);
 
   const updateConditions = (
@@ -58,9 +60,8 @@ export const ActivationConditions: FC<ActivationConditionsProps> = ({ conditions
     if (!checked) {
       setVerbalText('');
       updateConditions('', gestureText, generalText, false, hasGesture);
-    } else {
-      updateConditions(verbalText, gestureText, generalText, true, hasGesture);
     }
+    // Если включаем чекбокс, просто устанавливаем флаг, onChange сработает когда пользователь введет текст
   };
 
   const handleGestureCheckbox = (checked: boolean) => {
@@ -68,9 +69,8 @@ export const ActivationConditions: FC<ActivationConditionsProps> = ({ conditions
     if (!checked) {
       setGestureText('');
       updateConditions(verbalText, '', generalText, hasVerbal, false);
-    } else {
-      updateConditions(verbalText, gestureText, generalText, hasVerbal, true);
     }
+    // Если включаем чекбокс, просто устанавливаем флаг, onChange сработает когда пользователь введет текст
   };
 
   const handleVerbalTextChange = (value: string) => {
