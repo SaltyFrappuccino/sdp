@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Title, Text, Div, Button, Spinner, Group, Header, SimpleCell, Tabs, TabsItem, Progress, Badge } from '@vkontakte/vkui';
+import { API_URL } from '../api';
 
 interface EncounteredCreature {
   species_id: number;
@@ -68,7 +69,7 @@ const HunterJournal: React.FC<HunterJournalProps> = ({ characterId, onClose }) =
   const fetchEncounteredCreatures = async () => {
     try {
       // Симулируем данные из BestiaryResearchNotes + статистика
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/bestiary/encountered/${characterId}`);
+      const response = await fetch(`${API_URL}/bestiary/encountered/${characterId}`);
       const data = await response.json();
       setCreatures(data || []);
     } catch (error) {
@@ -94,7 +95,7 @@ const HunterJournal: React.FC<HunterJournalProps> = ({ characterId, onClose }) =
 
   const fetchHuntingStats = async () => {
     try {
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/hunting/stats/${characterId}`);
+      const response = await fetch(`${API_URL}/hunting/stats/${characterId}`);
       const data = await response.json();
       setStats(data || {
         totalAttempts: 25,

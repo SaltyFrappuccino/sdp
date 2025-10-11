@@ -38,7 +38,7 @@ interface NavIdProps {
 
 const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
-  const [activeTab, setActiveTab] = useState<'game' | 'gear' | 'stats'>('game');
+  const [activeTab, setActiveTab] = useState<'game' | 'gear' | 'catch' | 'shop'>('game');
   const [huntingType, setHuntingType] = useState<'ground' | 'aerial'>('ground');
   const [characters, setCharacters] = useState<any[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
@@ -51,14 +51,17 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [availableGear, setAvailableGear] = useState<any[]>([]);
   const [selectedGearIds, setSelectedGearIds] = useState<number[]>([]);
   const [selectedTraps, setSelectedTraps] = useState<any[]>([]);
+  const [shopGear, setShopGear] = useState<any[]>([]);
   
   // Session state
   const [sessionData, setSessionData] = useState<any>(null);
   const [minigameActive, setMinigameActive] = useState(false);
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   
-  // Hunt stats
+  // Hunt stats and catch
   const [huntStats, setHuntStats] = useState<any>(null);
+  const [huntInventory, setHuntInventory] = useState<any[]>([]);
+  const [selectedPrey, setSelectedPrey] = useState<number[]>([]);
 
   useEffect(() => {
     loadCharacters();
@@ -68,6 +71,8 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     if (characterId) {
       loadGear();
       loadHuntStats();
+      loadHuntInventory();
+      loadShopGear();
     }
   }, [characterId]);
 
@@ -126,6 +131,96 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
     }
+  };
+
+  const loadHuntInventory = async () => {
+    if (!characterId) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/hunting/inventory/${characterId}`);
+      const data = await response.json();
+      setHuntInventory(data || []);
+    } catch (error) {
+      console.error('Ошибка загрузки добычи:', error);
+    }
+  };
+
+  const loadShopGear = async () => {
+    try {
+      const response = await fetch(`${API_URL}/hunting/gear`);
+      const data = await response.json();
+      setShopGear(data || []);
+    } catch (error) {
+      console.error('Ошибка загрузки магазина:', error);
+    }
+  };
+
+  const handleBuyGear = async (gearId: number, price: number) => {
+    if (!characterId || credits < price) {
+      showSnackbar('Недостаточно кредитов', false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/hunting/gear/buy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ character_id: characterId, gear_id: gearId })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        showSnackbar('Снаряжение куплено!', true);
+        setCredits(credits - price);
+        await loadGear();
+        await loadShopGear();
+      } else {
+        showSnackbar(result.message || 'Ошибка покупки', false);
+      }
+    } catch (error) {
+      console.error('Ошибка покупки:', error);
+      showSnackbar('Ошибка сервера', false);
+    }
+  };
+
+  const sellPrey = async (preyIds?: number[]) => {
+    if (!characterId) return;
+
+    const idsToSell = preyIds || huntInventory.map(p => p.id);
+    if (idsToSell.length === 0) {
+      showSnackbar('Нечего продавать', false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/hunting/sell`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ character_id: characterId, prey_ids: idsToSell })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        showSnackbar(`Продано за ${result.credits?.toLocaleString() || 0} кредитов!`, true);
+        setCredits(prevCredits => prevCredits + (result.credits || 0));
+        setSelectedPrey([]);
+        await loadHuntInventory();
+        await loadCharacters();
+      } else {
+        showSnackbar(result.message || 'Ошибка продажи', false);
+      }
+    } catch (error) {
+      console.error('Ошибка продажи:', error);
+      showSnackbar('Ошибка сервера', false);
+    }
+  };
+
+  const togglePrey = (preyId: number) => {
+    setSelectedPrey(prev => 
+      prev.includes(preyId) 
+        ? prev.filter(id => id !== preyId)
+        : [...prev, preyId]
+    );
   };
 
   const startHunting = async (locationId: number) => {
@@ -256,7 +351,7 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     return (
       <Panel id={id}>
         <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
-          🏹 Охота V2
+          🏹 Охота
         </PanelHeader>
         <Div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
           <Spinner size="l" />
@@ -269,7 +364,7 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     return (
       <Panel id={id}>
         <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
-          🏹 Охота V2
+          🏹 Охота
         </PanelHeader>
         <Div>
           <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
@@ -376,8 +471,11 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
         <TabsItem selected={activeTab === 'gear'} onClick={() => setActiveTab('gear')}>
           Снаряжение
         </TabsItem>
-        <TabsItem selected={activeTab === 'stats'} onClick={() => setActiveTab('stats')}>
-          Статистика
+        <TabsItem selected={activeTab === 'catch'} onClick={() => setActiveTab('catch')}>
+          Добыча
+        </TabsItem>
+        <TabsItem selected={activeTab === 'shop'} onClick={() => setActiveTab('shop')}>
+          Магазин
         </TabsItem>
       </Tabs>
 
@@ -451,44 +549,139 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
         </Div>
       )}
 
-      {/* Stats Tab */}
-      {activeTab === 'stats' && (
+      {/* Catch Tab */}
+      {activeTab === 'catch' && (
         <Div>
           <Card mode="shadow" style={{ padding: 16, marginBottom: 12 }}>
-            <Title level="2">📊 Статистика охоты</Title>
+            <Title level="2">🎯 Добыча</Title>
+            <Text style={{ color: 'var(--text_secondary)' }}>
+              Всего добыто: {huntInventory.length}
+            </Text>
           </Card>
 
-          {huntStats ? (
-            <>
-              <Card mode="shadow" style={{ padding: 16, marginBottom: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <Text style={{ fontSize: 32, fontWeight: 'bold' }}>{huntStats.total_hunts || 0}</Text>
-                    <Text style={{ color: 'var(--text_secondary)' }}>Всего охот</Text>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <Text style={{ fontSize: 32, fontWeight: 'bold' }}>{huntStats.successful_hunts || 0}</Text>
-                    <Text style={{ color: 'var(--text_secondary)' }}>Успешных</Text>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <Text style={{ fontSize: 32, fontWeight: 'bold' }}>{huntStats.beasts_caught || 0}</Text>
-                    <Text style={{ color: 'var(--text_secondary)' }}>Бестий</Text>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <Text style={{ fontSize: 32, fontWeight: 'bold' }}>{huntStats.materials_collected || 0}</Text>
-                    <Text style={{ color: 'var(--text_secondary)' }}>Материалов</Text>
-                  </div>
-                </div>
-              </Card>
+          {huntInventory.length > 0 && (
+            <Div>
+              <ButtonGroup mode="horizontal" gap="m" stretched>
+                <Button
+                  size="m"
+                  mode="primary"
+                  stretched
+                  onClick={() => sellPrey(selectedPrey)}
+                  disabled={selectedPrey.length === 0}
+                >
+                  Продать выбранное ({selectedPrey.length})
+                </Button>
+                <Button
+                  size="m"
+                  mode="secondary"
+                  stretched
+                  onClick={() => sellPrey()}
+                >
+                  Продать всё
+                </Button>
+              </ButtonGroup>
+            </Div>
+          )}
 
-              <Button size="l" mode="secondary" stretched onClick={() => routeNavigator.push('/journal')}>
-                📖 Открыть полный журнал
-              </Button>
-            </>
+          {huntInventory.length === 0 ? (
+            <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
+              <Text>Вы еще ничего не добыли</Text>
+            </Card>
           ) : (
+            <Group header={<Header>Последняя добыча</Header>}>
+              {huntInventory.slice(0, 20).map((prey, index) => (
+                <SimpleCell
+                  key={index}
+                  before={
+                    <Checkbox
+                      checked={selectedPrey.includes(prey.id)}
+                      onChange={() => togglePrey(prey.id)}
+                    />
+                  }
+                  subtitle={`${prey.location_name} • ${new Date(prey.hunted_at).toLocaleDateString()}`}
+                  after={
+                    <div style={{ textAlign: 'right' }}>
+                      <Text style={{ fontWeight: 'bold' }}>💰 {prey.base_price?.toLocaleString()}</Text>
+                      <Text style={{ fontSize: 12, color: 'var(--text_secondary)' }}>{prey.rarity || 'Обычная'}</Text>
+                    </div>
+                  }
+                  indicator={
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 8,
+                      background: 'var(--vkui--color_background_accent)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 20
+                    }}>
+                      🦌
+                    </div>
+                  }
+                >
+                  {prey.name}
+                </SimpleCell>
+              ))}
+            </Group>
+          )}
+        </Div>
+      )}
+
+      {/* Shop Tab */}
+      {activeTab === 'shop' && (
+        <Div>
+          <Card mode="shadow" style={{ padding: 16, marginBottom: 12 }}>
+            <Title level="2">🏪 Магазин снаряжения</Title>
+            <Text style={{ color: 'var(--text_secondary)' }}>
+              Покупайте снаряжение для эффективной охоты
+            </Text>
+          </Card>
+
+          {shopGear.length === 0 ? (
             <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
               <Spinner size="l" />
             </Card>
+          ) : (
+            <Group header={<Header>Доступное снаряжение</Header>}>
+              {shopGear.map(gear => (
+                <SimpleCell
+                  key={gear.id}
+                  subtitle={gear.description}
+                  after={
+                    <Button
+                      size="s"
+                      mode="primary"
+                      onClick={() => handleBuyGear(gear.id, gear.price)}
+                      disabled={credits < gear.price}
+                    >
+                      {gear.price.toLocaleString()} ₭
+                    </Button>
+                  }
+                  before={
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 8,
+                      background: 'var(--vkui--color_background_tertiary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 20
+                    }}>
+                      {gear.type === 'weapon' ? '🏹' : gear.type === 'trap' ? '🪤' : '📦'}
+                    </div>
+                  }
+                  indicator={
+                    <Text style={{ fontSize: 12, color: 'var(--text_secondary)' }}>
+                      {gear.quality}
+                    </Text>
+                  }
+                >
+                  {gear.name}
+                </SimpleCell>
+              ))}
+            </Group>
           )}
         </Div>
       )}

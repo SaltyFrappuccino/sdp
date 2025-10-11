@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Title, Text, Div, Button, Spinner, Group, Header, SimpleCell, Avatar, NativeSelect } from '@vkontakte/vkui';
 import bridge from '@vkontakte/vk-bridge';
+import { API_URL } from '../api';
 
 interface Material {
   id: number;
@@ -35,7 +36,7 @@ const MaterialsInventory: React.FC<MaterialsInventoryProps> = ({ characterId, on
   const fetchMaterials = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/materials/${characterId}`);
+      const response = await fetch(`${API_URL}/materials/${characterId}`);
       const data = await response.json();
       setMaterials(data);
     } catch (err) {

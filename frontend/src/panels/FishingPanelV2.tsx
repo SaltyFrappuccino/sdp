@@ -36,7 +36,7 @@ interface NavIdProps {
 
 const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const routeNavigator = useRouteNavigator();
-  const [activeTab, setActiveTab] = useState<'game' | 'gear' | 'catch'>('game');
+  const [activeTab, setActiveTab] = useState<'game' | 'gear' | 'catch' | 'shop'>('game');
   const [characters, setCharacters] = useState<any[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
   const [characterId, setCharacterId] = useState<number | null>(null);
@@ -47,6 +47,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   // Gear state
   const [availableGear, setAvailableGear] = useState<any[]>([]);
   const [selectedGearIds, setSelectedGearIds] = useState<number[]>([]);
+  const [shopGear, setShopGear] = useState<any[]>([]);
   
   // Session state
   const [sessionData, setSessionData] = useState<any>(null);
@@ -55,6 +56,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   
   // Catch history
   const [catchHistory, setCatchHistory] = useState<any[]>([]);
+  const [selectedFish, setSelectedFish] = useState<number[]>([]);
 
   useEffect(() => {
     loadCharacters();
@@ -64,6 +66,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     if (characterId) {
       loadGear();
       loadCatchHistory();
+      loadShopGear();
     }
   }, [characterId]);
 
@@ -199,6 +202,84 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     setLoading(false);
   };
 
+  const loadShopGear = async () => {
+    try {
+      const response = await fetch(`${API_URL}/fishing/gear`);
+      const data = await response.json();
+      setShopGear(data || []);
+    } catch (error) {
+      console.error('Ошибка загрузки магазина:', error);
+    }
+  };
+
+  const handleBuyGear = async (gearId: number, price: number) => {
+    if (!characterId || credits < price) {
+      showSnackbar('Недостаточно кредитов', false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/fishing/gear/buy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ character_id: characterId, gear_id: gearId })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        showSnackbar('Снаряжение куплено!', true);
+        setCredits(credits - price);
+        await loadGear();
+        await loadShopGear();
+      } else {
+        showSnackbar(result.message || 'Ошибка покупки', false);
+      }
+    } catch (error) {
+      console.error('Ошибка покупки:', error);
+      showSnackbar('Ошибка сервера', false);
+    }
+  };
+
+  const sellFish = async (fishIds?: number[]) => {
+    if (!characterId) return;
+
+    const idsToSell = fishIds || catchHistory.map(f => f.id);
+    if (idsToSell.length === 0) {
+      showSnackbar('Нечего продавать', false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/fishing/sell`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ character_id: characterId, fish_ids: idsToSell })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        showSnackbar(`Продано за ${result.credits?.toLocaleString() || 0} кредитов!`, true);
+        setCredits(prevCredits => prevCredits + (result.credits || 0));
+        setSelectedFish([]);
+        await loadCatchHistory();
+        await loadCharacters();
+      } else {
+        showSnackbar(result.message || 'Ошибка продажи', false);
+      }
+    } catch (error) {
+      console.error('Ошибка продажи:', error);
+      showSnackbar('Ошибка сервера', false);
+    }
+  };
+
+  const toggleFish = (fishId: number) => {
+    setSelectedFish(prev => 
+      prev.includes(fishId) 
+        ? prev.filter(id => id !== fishId)
+        : [...prev, fishId]
+    );
+  };
+
   const toggleGear = (gearId: number) => {
     setSelectedGearIds(prev => 
       prev.includes(gearId) 
@@ -241,7 +322,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     return (
       <Panel id={id}>
         <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
-          🎣 Рыбалка V2
+          🎣 Рыбалка
         </PanelHeader>
         <Div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
           <Spinner size="l" />
@@ -254,7 +335,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     return (
       <Panel id={id}>
         <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
-          🎣 Рыбалка V2
+          🎣 Рыбалка
         </PanelHeader>
         <Div>
           <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
@@ -271,7 +352,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   return (
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
-        🎣 Рыбалка V2
+        🎣 Рыбалка
       </PanelHeader>
 
       {/* Character Info */}
@@ -352,6 +433,9 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
         <TabsItem selected={activeTab === 'catch'} onClick={() => setActiveTab('catch')}>
           Улов
         </TabsItem>
+        <TabsItem selected={activeTab === 'shop'} onClick={() => setActiveTab('shop')}>
+          Магазин
+        </TabsItem>
       </Tabs>
 
       {/* Game Tab */}
@@ -365,7 +449,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
           </Card>
 
           <Card mode="shadow" style={{ padding: 16 }}>
-            <Title level="3">🎯 Преимущества V2 системы</Title>
+            <Title level="3">🎯 Особенности системы</Title>
             <ul style={{ paddingLeft: 20, color: 'var(--text_secondary)' }}>
               <li>Echo-зоны с повышенной сложностью и наградами</li>
               <li>Классы мутаций: Затронутые, Искажённые, Бестии</li>
@@ -430,6 +514,30 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             </Text>
           </Card>
 
+          {catchHistory.length > 0 && (
+            <Div>
+              <ButtonGroup mode="horizontal" gap="m" stretched>
+                <Button
+                  size="m"
+                  mode="primary"
+                  stretched
+                  onClick={() => sellFish(selectedFish)}
+                  disabled={selectedFish.length === 0}
+                >
+                  Продать выбранное ({selectedFish.length})
+                </Button>
+                <Button
+                  size="m"
+                  mode="secondary"
+                  stretched
+                  onClick={() => sellFish()}
+                >
+                  Продать всё
+                </Button>
+              </ButtonGroup>
+            </Div>
+          )}
+
           {catchHistory.length === 0 ? (
             <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
               <Text>Вы еще ничего не поймали</Text>
@@ -439,6 +547,12 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
               {catchHistory.slice(0, 20).map((fish, index) => (
                 <SimpleCell
                   key={index}
+                  before={
+                    <Checkbox
+                      checked={selectedFish.includes(fish.id)}
+                      onChange={() => toggleFish(fish.id)}
+                    />
+                  }
                   subtitle={`${fish.location_name} • ${new Date(fish.caught_at).toLocaleDateString()}`}
                   after={
                     <div style={{ textAlign: 'right' }}>
@@ -446,7 +560,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                       <Text style={{ fontSize: 12, color: 'var(--text_secondary)' }}>{fish.weight}кг</Text>
                     </div>
                   }
-                  before={
+                  indicator={
                     <div style={{
                       width: 40,
                       height: 40,
@@ -462,6 +576,64 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
                   }
                 >
                   {fish.name}
+                </SimpleCell>
+              ))}
+            </Group>
+          )}
+        </Div>
+      )}
+
+      {/* Shop Tab */}
+      {activeTab === 'shop' && (
+        <Div>
+          <Card mode="shadow" style={{ padding: 16, marginBottom: 12 }}>
+            <Title level="2">🏪 Магазин снаряжения</Title>
+            <Text style={{ color: 'var(--text_secondary)' }}>
+              Покупайте снаряжение для эффективной рыбалки
+            </Text>
+          </Card>
+
+          {shopGear.length === 0 ? (
+            <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
+              <Spinner size="l" />
+            </Card>
+          ) : (
+            <Group header={<Header>Доступное снаряжение</Header>}>
+              {shopGear.map(gear => (
+                <SimpleCell
+                  key={gear.id}
+                  subtitle={gear.description}
+                  after={
+                    <Button
+                      size="s"
+                      mode="primary"
+                      onClick={() => handleBuyGear(gear.id, gear.price)}
+                      disabled={credits < gear.price}
+                    >
+                      {gear.price.toLocaleString()} ₭
+                    </Button>
+                  }
+                  before={
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 8,
+                      background: 'var(--vkui--color_background_tertiary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 20
+                    }}>
+                      {gear.type === 'rod' ? '🎣' : gear.type === 'bait' ? '🪱' : '📦'}
+                    </div>
+                  }
+                  indicator={
+                    <Text style={{ fontSize: 12, color: 'var(--text_secondary)' }}>
+                      {gear.quality}
+                    </Text>
+                  }
+                >
+                  {gear.name}
                 </SimpleCell>
               ))}
             </Group>

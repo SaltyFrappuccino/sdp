@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Title, Text, Div, Button, Spinner, Group, Header, SimpleCell, ModalCard, ModalRoot, Progress, ModalPage, ModalPageHeader } from '@vkontakte/vkui';
 import bridge from '@vkontakte/vk-bridge';
+import { API_URL } from '../api';
 
 interface CraftRecipe {
   id: number;
@@ -41,7 +42,7 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
   const fetchRecipes = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/crafting/recipes/${characterId}`);
+      const response = await fetch(`${API_URL}/crafting/recipes/${characterId}`);
       const data = await response.json();
       setRecipes(data);
     } catch (err) {
@@ -54,7 +55,7 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
 
   const fetchCraftHistory = async () => {
     try {
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/crafting/history/${characterId}`);
+      const response = await fetch(`${API_URL}/crafting/history/${characterId}`);
       const data = await response.json();
       setCraftHistory(data);
     } catch (err) {
@@ -64,7 +65,7 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
 
   const fetchCraftStats = async () => {
     try {
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/crafting/stats/${characterId}`);
+      const response = await fetch(`${API_URL}/crafting/stats/${characterId}`);
       const data = await response.json();
       setCraftStats(data);
     } catch (err) {
@@ -74,7 +75,7 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
 
   const checkMaterials = async (recipeId: number) => {
     try {
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/crafting/check-materials`, {
+      const response = await fetch(`${API_URL}/crafting/check-materials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ character_id: characterId, recipe_id: recipeId })
@@ -91,7 +92,7 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
 
     try {
       setCrafting(true);
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/crafting/craft`, {
+      const response = await fetch(`${API_URL}/crafting/craft`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ character_id: characterId, recipe_id: selectedRecipe.id })
