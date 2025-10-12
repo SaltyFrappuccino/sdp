@@ -1,6 +1,6 @@
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
-import { runMigrations } from './database/migrations';
+import { runMigrations } from './database/migrations.js';
 
 export async function initDB() {
   try {
