@@ -48,6 +48,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
   const [availableGear, setAvailableGear] = useState<any[]>([]);
   const [selectedGearIds, setSelectedGearIds] = useState<number[]>([]);
   const [shopGear, setShopGear] = useState<any[]>([]);
+  const [loadingShop, setLoadingShop] = useState(false);
   
   // Session state
   const [sessionData, setSessionData] = useState<any>(null);
@@ -208,6 +209,7 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
 
   const loadShopGear = async () => {
     try {
+      setLoadingShop(true);
       const response = await fetch(`${API_URL}/fishing/gear`);
       const data = await response.json();
       
@@ -216,6 +218,8 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
     } catch (error) {
       console.error('Ошибка загрузки магазина:', error);
       setShopGear([]);
+    } finally {
+      setLoadingShop(false);
     }
   };
 
@@ -600,9 +604,13 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             </Text>
           </Card>
 
-          {shopGear.length === 0 ? (
+          {loadingShop ? (
             <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
               <Spinner size="l" />
+            </Card>
+          ) : shopGear.length === 0 ? (
+            <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
+              <Text>Магазин пуст или временно недоступен</Text>
             </Card>
           ) : (
             <Group header={<Header>Доступное снаряжение</Header>}>

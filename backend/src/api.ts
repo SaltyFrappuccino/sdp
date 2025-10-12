@@ -8705,4 +8705,76 @@ router.get('/hunting/stats/:character_id', async (req: Request, res: Response) =
   }
 });
 
+// ============================================================================
+// V2 API Endpoints - Locations, Echo Zones, Events
+// ============================================================================
+
+// Fishing locations
+router.get('/fishing-locations', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const locations = await db.all(`
+      SELECT * FROM Locations 
+      WHERE activity_type = 'fishing'
+      ORDER BY min_rank, name
+    `);
+    await db.close();
+    res.json(locations);
+  } catch (error) {
+    console.error('Error fetching fishing locations:', error);
+    res.status(500).json({ error: 'Failed to fetch fishing locations' });
+  }
+});
+
+// Hunting locations
+router.get('/hunting-locations', async (req: Request, res: Response) => {
+  try {
+    const db = await initDB();
+    const locations = await db.all(`
+      SELECT * FROM Locations 
+      WHERE activity_type IN ('hunting_ground', 'hunting_aerial')
+      ORDER BY min_rank, name
+    `);
+    await db.close();
+    res.json(locations);
+  } catch (error) {
+    console.error('Error fetching hunting locations:', error);
+    res.status(500).json({ error: 'Failed to fetch hunting locations' });
+  }
+});
+
+// Echo zones by activity type
+router.get('/echo-zones/:activity_type', async (req: Request, res: Response) => {
+  try {
+    const { activity_type } = req.params;
+    const db = await initDB();
+    const zones = await db.all(`
+      SELECT * FROM EchoZones 
+      WHERE activity_type = ? AND is_active = 1
+    `, activity_type);
+    await db.close();
+    res.json(zones);
+  } catch (error) {
+    console.error('Error fetching echo zones:', error);
+    res.status(500).json({ error: 'Failed to fetch echo zones' });
+  }
+});
+
+// Active events
+router.get('/events/active', async (req: Request, res: Response) => {
+  try {
+    const now = new Date().toISOString();
+    const db = await initDB();
+    const events = await db.all(`
+      SELECT * FROM HuntingEvents 
+      WHERE is_active = 1 AND active_until > ?
+    `, now);
+    await db.close();
+    res.json(events);
+  } catch (error) {
+    console.error('Error fetching active events:', error);
+    res.status(500).json({ error: 'Failed to fetch active events' });
+  }
+});
+
 export default router;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Title, Text, Div, Button, Spinner, Group, Header, SimpleCell, Badge, Chip } from '@vkontakte/vkui';
+import { API_URL } from '../api';
 
 interface Location {
   id: number;
@@ -54,7 +55,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     try {
       setLoading(true);
       const endpoint = activityType === 'fishing' ? 'fishing-locations' : 'hunting-locations';
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/${endpoint}`);
+      const response = await fetch(`${API_URL}/${endpoint}`);
       const data = await response.json();
       setLocations(data);
     } catch (error) {
@@ -66,7 +67,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   const fetchEchoZones = async () => {
     try {
-      const response = await fetch(`https://sdp-back-production.up.railway.app/api/echo-zones/${activityType}`);
+      const response = await fetch(`${API_URL}/echo-zones/${activityType}`);
       const data = await response.json();
       
       const zonesMap = new Map<number, EchoZone>();
@@ -84,7 +85,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   const fetchActiveEvents = async () => {
     try {
-      const response = await fetch('https://sdp-back-production.up.railway.app/api/events/active');
+      const response = await fetch(`${API_URL}/events/active`);
       const data = await response.json();
       
       const eventsMap = new Map<number, ActiveEvent[]>();
