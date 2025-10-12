@@ -8714,8 +8714,8 @@ router.get('/fishing-locations', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
     const locations = await db.all(`
-      SELECT * FROM Locations 
-      WHERE activity_type = 'fishing'
+      SELECT * FROM FishingLocations 
+      WHERE is_active = 1
       ORDER BY min_rank, name
     `);
     await db.close();
@@ -8731,8 +8731,8 @@ router.get('/hunting-locations', async (req: Request, res: Response) => {
   try {
     const db = await initDB();
     const locations = await db.all(`
-      SELECT * FROM Locations 
-      WHERE activity_type IN ('hunting_ground', 'hunting_aerial')
+      SELECT * FROM HuntingLocations 
+      WHERE is_active = 1
       ORDER BY min_rank, name
     `);
     await db.close();

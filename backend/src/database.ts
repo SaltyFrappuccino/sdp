@@ -1,5 +1,6 @@
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
+import { runMigrations } from './database/migrations';
 
 export async function initDB() {
   try {
@@ -1500,6 +1501,11 @@ export async function initDB() {
     }
 
     console.log('All migrations completed successfully!');
+    
+    // Run V2 migrations for advanced systems
+    console.log('Running V2 migrations for advanced hunting/fishing systems...');
+    await runMigrations(db);
+    console.log('V2 migrations completed!');
 
     return db;
 
