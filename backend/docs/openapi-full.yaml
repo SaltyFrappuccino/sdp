@@ -1,0 +1,1203 @@
+openapi: 3.0.3
+info:
+  title: Salty's Dream Project - VK Mini App API
+  description: |
+    # Полная REST API спецификация для ролевой системы VK Mini App
+    
+    ## Основные модули
+    - **Characters** - Управление персонажами и контрактами
+    - **Admin** - Административные функции
+    - **Market** - Торговля акциями
+    - **Crypto** - Криптовалютная биржа
+    - **Casino & Poker** - Азартные игры
+    - **Fishing & Hunting** - Игровые активности
+    - **Collections & Purchases** - Коллекционирование и покупки
+    - **Bestiary & Events** - Существа и игровые события
+    - **Crafting** - Система крафта
+    
+    ## Аутентификация
+    - **x-admin-id** - Административные операции (значение: "1")
+    - **x-user-vk-id** - Пользовательские операции (VK ID пользователя)
+    
+  version: 1.0.0
+  contact:
+    name: SaltyFrappuccino
+    
+servers:
+  - url: http://localhost:3000/api
+    description: Development
+  - url: https://production.com/api
+    description: Production
+
+tags:
+  - name: Health
+  - name: Characters
+  - name: Admin
+  - name: Market
+  - name: Crypto
+  - name: Casino
+  - name: Poker
+  - name: Fishing
+  - name: Hunting
+  - name: Collections
+  - name: Purchases
+  - name: Bestiary
+  - name: Events
+  - name: Crafting
+  - name: Echo Zones
+
+components:
+  securitySchemes:
+    AdminAuth:
+      type: apiKey
+      in: header
+      name: x-admin-id
+    UserAuth:
+      type: apiKey
+      in: header
+      name: x-user-vk-id
+
+  schemas:
+    Rank:
+      type: string
+      enum: [F, E, D, C, B, A, S, SS, SSS]
+      
+    Contract:
+      type: object
+      properties:
+        id:
+          type: integer
+        contract_name:
+          type: string
+        creature_name:
+          type: string
+        creature_rank:
+          $ref: '#/components/schemas/Rank'
+        creature_spectrum:
+          type: string
+        sync_level:
+          type: integer
+          minimum: 0
+          maximum: 100
+        gift:
+          type: string
+        abilities:
+          type: object
+          
+    Character:
+      type: object
+      properties:
+        id:
+          type: integer
+        vk_id:
+          type: integer
+        status:
+          type: string
+          enum: [на рассмотрении, Принято, Отклонено]
+        character_name:
+          type: string
+        age:
+          type: integer
+        rank:
+          $ref: '#/components/schemas/Rank'
+        faction:
+          type: string
+        home_island:
+          type: string
+        personality:
+          type: string
+        biography:
+          type: string
+        attributes:
+          type: object
+        currency:
+          type: integer
+        contracts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contract'
+            
+    Stock:
+      type: object
+      properties:
+        id:
+          type: integer
+        ticker_symbol:
+          type: string
+        company_name:
+          type: string
+        current_price:
+          type: number
+        base_volatility:
+          type: number
+          
+    CryptoCurrency:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        ticker_symbol:
+          type: string
+        current_price:
+          type: number
+        total_supply:
+          type: number
+          
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+
+paths:
+  /health-check:
+    get:
+      tags: [Health]
+      summary: Проверка работоспособности
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                status: ok
+                
+  # ============================================
+  # CHARACTERS
+  # ============================================
+  
+  /characters:
+    get:
+      tags: [Characters]
+      summary: Получить список персонажей
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: rank
+          in: query
+          schema:
+            $ref: '#/components/schemas/Rank'
+      responses:
+        '200':
+          description: Список персонажей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    character_name:
+                      type: string
+                    rank:
+                      type: string
+                    
+    post:
+      tags: [Characters]
+      summary: Создать персонажа
+      description: |
+        Создаёт нового персонажа. Статус автоматически "на рассмотрении".
+        
+        **Обязательные поля**: vk_id, character_name, age, rank, faction, faction_position, home_island, contracts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Character'
+            example:
+              vk_id: 123456789
+              character_name: "Дмитрий Волков"
+              age: 25
+              rank: "C"
+              faction: "Гильдия Проводников"
+              faction_position: "Проводник 3-го класса"
+              home_island: "Новый Эдем"
+              personality: "Спокойный и рассудительный"
+              biography: "Родился в Новом Эдеме..."
+              attributes:
+                Сила: "Опытный"
+                Ловкость: "Эксперт"
+              contracts:
+                - contract_name: "Теневой страж"
+                  creature_name: "Умбра"
+                  creature_rank: "B"
+                  creature_spectrum: "Тень"
+                  sync_level: 45
+                  gift: "Слияние с тенями"
+                  abilities:
+                    main: "Теневой шаг"
+      responses:
+        '201':
+          description: Персонаж создан
+          content:
+            application/json:
+              example:
+                message: "Character created successfully"
+                characterId: 42
+        '400':
+          description: Validation error
+          
+  /characters/{id}:
+    get:
+      tags: [Characters]
+      summary: Получить персонажа по ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Полная информация о персонаже
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Character'
+        '404':
+          description: Персонаж не найден
+          
+    put:
+      tags: [Characters]
+      summary: Обновить персонажа
+      description: |
+        Обновляет данные персонажа. Требует авторизации.
+        
+        - **Админ**: Может обновлять напрямую (с паролем)
+        - **Владелец**: Создаётся запрос на обновление (для принятых персонажей)
+      security:
+        - AdminAuth: []
+        - UserAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              personality: "Обновлённое описание"
+              admin_password: "heartattack"
+      responses:
+        '200':
+          description: Обновлено или создан запрос на обновление
+        '401':
+          description: Не авторизован
+          
+    delete:
+      tags: [Characters]
+      summary: Удалить персонажа
+      security:
+        - AdminAuth: []
+        - UserAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Персонаж удалён
+          
+  /characters/by-vk/{vk_id}:
+    get:
+      tags: [Characters]
+      summary: Получить принятых персонажей пользователя
+      parameters:
+        - name: vk_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список персонажей
+          
+  /my-anketas/{vk_id}:
+    get:
+      tags: [Characters]
+      summary: Получить все анкеты пользователя (полные данные)
+      parameters:
+        - name: vk_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Полные анкеты с контрактами
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Character'
+                  
+  /characters/{id}/status:
+    post:
+      tags: [Characters]
+      summary: Обновить статус персонажа (админ)
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              status: "Принято"
+              admin_password: "heartattack"
+      responses:
+        '200':
+          description: Статус обновлён
+          
+  /characters/{id}/updates:
+    post:
+      tags: [Characters]
+      summary: Создать запрос на обновление персонажа
+      security:
+        - UserAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              updated_data:
+                personality: "Новое описание"
+      responses:
+        '201':
+          description: Запрос создан
+          
+  # ============================================
+  # ADMIN
+  # ============================================
+  
+  /admin/login:
+    post:
+      tags: [Admin]
+      summary: Авторизация администратора
+      requestBody:
+        content:
+          application/json:
+            example:
+              password: "heartattack"
+      responses:
+        '200':
+          description: Успешная авторизация
+          content:
+            application/json:
+              example:
+                success: true
+                adminId: "1"
+                
+  /admin/characters/pending:
+    get:
+      tags: [Admin]
+      summary: Получить персонажей на рассмотрении
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Список персонажей на рассмотрении
+          
+  /admin/characters/{id}/approve:
+    post:
+      tags: [Admin]
+      summary: Одобрить анкету
+      description: Меняет статус на "Принято" и выдаёт 10000 кредитов
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              admin_password: "heartattack"
+      responses:
+        '200':
+          description: Анкета одобрена
+          
+  /admin/characters/{id}/reject:
+    post:
+      tags: [Admin]
+      summary: Отклонить анкету
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              admin_password: "heartattack"
+              reason: "Недостаточно проработана биография"
+      responses:
+        '200':
+          description: Анкета отклонена
+          
+  /updates:
+    get:
+      tags: [Admin]
+      summary: Получить все запросы на обновление
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Список запросов
+          
+  /updates/{update_id}:
+    get:
+      tags: [Admin]
+      summary: Получить детали запроса на обновление
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: update_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Детали запроса
+          
+  /updates/{update_id}/approve:
+    post:
+      tags: [Admin]
+      summary: Одобрить запрос на обновление
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: update_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              admin_password: "heartattack"
+      responses:
+        '200':
+          description: Обновление одобрено
+          
+  /updates/{update_id}/reject:
+    post:
+      tags: [Admin]
+      summary: Отклонить запрос на обновление
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: update_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Обновление отклонено
+          
+  /admin/stats:
+    get:
+      tags: [Admin]
+      summary: Получить статистику системы
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Статистика
+          content:
+            application/json:
+              example:
+                total_characters: 150
+                pending_characters: 12
+                approved_characters: 130
+                
+  /admin/backup:
+    get:
+      tags: [Admin]
+      summary: Создать backup базы данных
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: SQL backup файл
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                
+  # ============================================
+  # MARKET (STOCKS)
+  # ============================================
+  
+  /market/stocks:
+    get:
+      tags: [Market]
+      summary: Получить список всех акций
+      responses:
+        '200':
+          description: Список акций
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Stock'
+              example:
+                - id: 1
+                  ticker_symbol: "NRGCORP"
+                  company_name: "Энергетическая Корпорация"
+                  current_price: 150.50
+                  base_volatility: 0.05
+                  
+  /market/stocks/{ticker}:
+    get:
+      tags: [Market]
+      summary: Получить информацию об акции
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Информация об акции
+          
+  /market/trade:
+    post:
+      tags: [Market]
+      summary: Купить/продать акции
+      description: |
+        Торговля акциями.
+        
+        **Типы операций**:
+        - `buy` - Покупка акций
+        - `sell` - Продажа акций
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              ticker: "NRGCORP"
+              action: "buy"
+              quantity: 10
+      responses:
+        '200':
+          description: Операция выполнена
+          content:
+            application/json:
+              example:
+                success: true
+                message: "Bought 10 shares of NRGCORP"
+                new_balance: 4500
+                
+  /market/portfolio/{character_id}:
+    get:
+      tags: [Market]
+      summary: Получить портфолио персонажа
+      parameters:
+        - name: character_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Портфолио с активами
+          content:
+            application/json:
+              example:
+                cash_balance: 5000
+                total_value: 12500
+                assets:
+                  - ticker: "NRGCORP"
+                    quantity: 10
+                    average_price: 145
+                    current_price: 150.50
+                    profit_loss: 55
+                    
+  /market/order:
+    post:
+      tags: [Market]
+      summary: Создать лимитный ордер
+      description: Создаёт лимитный ордер на покупку/продажу по указанной цене
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              ticker: "NRGCORP"
+              order_type: "buy"
+              quantity: 10
+              price: 140
+      responses:
+        '201':
+          description: Ордер создан
+          
+  /market/leaderboard:
+    get:
+      tags: [Market]
+      summary: Получить топ трейдеров
+      responses:
+        '200':
+          description: Лидерборд по общей стоимости портфелей
+          
+  # ============================================
+  # CRYPTO
+  # ============================================
+  
+  /crypto/currencies:
+    get:
+      tags: [Crypto]
+      summary: Получить список криптовалют
+      responses:
+        '200':
+          description: Список криптовалют
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CryptoCurrency'
+                  
+  /crypto/buy:
+    post:
+      tags: [Crypto]
+      summary: Купить криптовалюту
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              crypto_id: 1
+              amount: 1000
+      responses:
+        '200':
+          description: Криптовалюта куплена
+          
+  /crypto/sell:
+    post:
+      tags: [Crypto]
+      summary: Продать криптовалюту
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              crypto_id: 1
+              amount: 500
+      responses:
+        '200':
+          description: Криптовалюта продана
+          
+  /crypto/portfolio/{character_id}:
+    get:
+      tags: [Crypto]
+      summary: Получить крипто-портфолио
+      parameters:
+        - name: character_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Крипто-портфолио персонажа
+          
+  # ============================================
+  # CASINO
+  # ============================================
+  
+  /casino/blackjack/start:
+    post:
+      tags: [Casino]
+      summary: Начать игру в блэкджек
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              bet_amount: 100
+      responses:
+        '200':
+          description: Игра началась
+          
+  /casino/slots/start:
+    post:
+      tags: [Casino]
+      summary: Крутить слоты
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              bet_amount: 50
+      responses:
+        '200':
+          description: Результат игры
+          content:
+            application/json:
+              example:
+                symbols: ["🍒", "🍒", "🍒"]
+                winnings: 150
+                multiplier: 3
+                
+  /casino/roulette/start:
+    post:
+      tags: [Casino]
+      summary: Играть в рулетку
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              bet_amount: 100
+              bet_type: "red"
+      responses:
+        '200':
+          description: Результат рулетки
+          
+  /casino/horseracing/horses:
+    get:
+      tags: [Casino]
+      summary: Получить список лошадей
+      responses:
+        '200':
+          description: Список лошадей для скачек
+          
+  /casino/horseracing/start:
+    post:
+      tags: [Casino]
+      summary: Начать скачки
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              bet_amount: 200
+              horse_id: 3
+              bet_type: "win"
+      responses:
+        '200':
+          description: Результат скачек
+          
+  # ============================================
+  # POKER
+  # ============================================
+  
+  /poker/rooms:
+    get:
+      tags: [Poker]
+      summary: Получить список покерных комнат
+      responses:
+        '200':
+          description: Список активных комнат
+          
+    post:
+      tags: [Poker]
+      summary: Создать покерную комнату
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              room_name: "High Stakes"
+              buy_in: 1000
+              small_blind: 10
+              big_blind: 20
+      responses:
+        '201':
+          description: Комната создана
+          
+  /poker/rooms/{id}/join:
+    post:
+      tags: [Poker]
+      summary: Присоединиться к комнате
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+      responses:
+        '200':
+          description: Присоединились к комнате
+          
+  /poker/rooms/{id}/start:
+    post:
+      tags: [Poker]
+      summary: Начать игру в комнате
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Игра началась
+          
+  # ============================================
+  # FISHING
+  # ============================================
+  
+  /games/fishing/locations:
+    get:
+      tags: [Fishing]
+      summary: Получить локации для рыбалки
+      responses:
+        '200':
+          description: Список локаций
+          
+  /games/fishing/gear:
+    get:
+      tags: [Fishing]
+      summary: Получить доступное снаряжение для рыбалки
+      responses:
+        '200':
+          description: Список снаряжения
+          
+  # ============================================
+  # HUNTING
+  # ============================================
+  
+  /games/hunting/locations:
+    get:
+      tags: [Hunting]
+      summary: Получить локации для охоты
+      responses:
+        '200':
+          description: Список локаций
+          
+  /games/hunting/gear:
+    get:
+      tags: [Hunting]
+      summary: Получить доступное снаряжение для охоты
+      responses:
+        '200':
+          description: Список снаряжения
+          
+  # ============================================
+  # COLLECTIONS
+  # ============================================
+  
+  /collections/series:
+    get:
+      tags: [Collections]
+      summary: Получить все серии коллекций
+      responses:
+        '200':
+          description: Список серий
+          
+  /collections/packs:
+    get:
+      tags: [Collections]
+      summary: Получить доступные паки
+      responses:
+        '200':
+          description: Список паков
+          
+  /collections/buy-pack:
+    post:
+      tags: [Collections]
+      summary: Купить пак коллекции
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              pack_id: 1
+      responses:
+        '200':
+          description: Пак куплен
+          
+  /collections/open-pack/{pack_id}:
+    post:
+      tags: [Collections]
+      summary: Открыть пак
+      parameters:
+        - name: pack_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+      responses:
+        '200':
+          description: Пак открыт, получены карточки
+          
+  # ============================================
+  # PURCHASES
+  # ============================================
+  
+  /purchases/categories:
+    get:
+      tags: [Purchases]
+      summary: Получить категории покупок
+      responses:
+        '200':
+          description: Список категорий
+          
+  /purchases/items:
+    get:
+      tags: [Purchases]
+      summary: Получить предметы для покупки
+      parameters:
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список предметов
+          
+  /purchases/buy:
+    post:
+      tags: [Purchases]
+      summary: Купить предмет
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              item_id: 10
+      responses:
+        '200':
+          description: Предмет куплен
+          
+  # ============================================
+  # BESTIARY
+  # ============================================
+  
+  /bestiary/taxonomy:
+    get:
+      tags: [Bestiary]
+      summary: Получить таксономию существ
+      responses:
+        '200':
+          description: Иерархия существ
+          
+  /bestiary/species:
+    get:
+      tags: [Bestiary]
+      summary: Получить все виды существ
+      responses:
+        '200':
+          description: Список существ
+          
+  /bestiary/species/{id}:
+    get:
+      tags: [Bestiary]
+      summary: Получить информацию о существе
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Детальная информация о существе
+          
+  # ============================================
+  # EVENTS
+  # ============================================
+  
+  /events:
+    get:
+      tags: [Events]
+      summary: Получить список событий
+      responses:
+        '200':
+          description: Список событий
+          
+    post:
+      tags: [Events]
+      summary: Создать событие
+      requestBody:
+        content:
+          application/json:
+            example:
+              event_name: "Турнир проводников"
+              description: "Ежегодный турнир"
+              event_type: "tournament"
+      responses:
+        '201':
+          description: Событие создано
+          
+  /events/{id}/join:
+    post:
+      tags: [Events]
+      summary: Присоединиться к событию
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+      responses:
+        '200':
+          description: Присоединились к событию
+          
+  /events/{id}/bets:
+    get:
+      tags: [Events]
+      summary: Получить ставки события
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список ставок
+          
+    post:
+      tags: [Events]
+      summary: Создать ставку на событие
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              bet_name: "Победа Команды А"
+              description: "Ставка на победу"
+      responses:
+        '201':
+          description: Ставка создана
+          
+  /bets/{bet_id}/place:
+    post:
+      tags: [Events]
+      summary: Сделать ставку
+      parameters:
+        - name: bet_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              amount: 500
+              position: "believer"
+      responses:
+        '200':
+          description: Ставка принята
+          
+  # ============================================
+  # CRAFTING
+  # ============================================
+  
+  /crafting/recipes:
+    get:
+      tags: [Crafting]
+      summary: Получить доступные рецепты крафта
+      parameters:
+        - name: character_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список рецептов
+          
+  /crafting/craft:
+    post:
+      tags: [Crafting]
+      summary: Скрафтить синки
+      requestBody:
+        content:
+          application/json:
+            example:
+              character_id: 5
+              recipe_id: 3
+      responses:
+        '200':
+          description: Результат крафта
+          content:
+            application/json:
+              example:
+                success: true
+                sinki:
+                  name: "Теневой Клинок"
+                  rank: "B"
+                  type: "weapon"
+                message: "Crafting successful!"
+                
+  # ============================================
+  # ECHO ZONES
+  # ============================================
+  
+  /echo-zones/{activity_type}:
+    get:
+      tags: [Echo Zones]
+      summary: Получить активные эхо-зоны
+      parameters:
+        - name: activity_type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [fishing, hunting]
+      responses:
+        '200':
+          description: Список активных зон
+

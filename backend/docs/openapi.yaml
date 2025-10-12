@@ -1,0 +1,1719 @@
+openapi: 3.0.3
+info:
+  title: Salty's Dream Project - VK Mini App API
+  description: |
+    Полная спецификация REST API для ролевой игры VK Mini App.
+    
+    ## Обзор системы
+    
+    Данное API поддерживает комплексную ролевую систему с элементами:
+    - Создания и управления персонажами
+    - Контрактами с существами
+    - Торговлей акциями и криптовалютой
+    - Азартными играми (казино, покер)
+    - Активностями (рыбалка, охота)
+    - Коллекционированием и крафтом
+    - Системой событий и ставок
+    
+    ## Аутентификация
+    
+    Большинство endpoints требуют передачи идентификаторов пользователя через headers:
+    - `x-admin-id` - для административных операций
+    - `x-user-vk-id` - для пользовательских операций
+    
+    ## Базовый URL
+    
+    Все endpoints начинаются с `/api/`
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://production-server.com/api
+    description: Production server
+
+tags:
+  - name: Health
+    description: Проверка работоспособности сервиса
+  - name: Characters
+    description: Управление персонажами - создание, обновление, получение информации
+  - name: Admin
+    description: Административные функции - одобрение анкет, управление обновлениями, статистика
+  - name: Market
+    description: Биржа акций - покупка, продажа, портфолио, ордера
+  - name: Crypto
+    description: Криптовалюты - торговля, портфолио, события
+  - name: Casino
+    description: Азартные игры - блэкджек, рулетка, слоты, кости, скачки
+  - name: Poker
+    description: Покерные комнаты и игры
+  - name: Fishing
+    description: Рыбалка - локации, снаряжение, инвентарь
+  - name: Hunting
+    description: Охота - локации, снаряжение, инвентарь
+  - name: Collections
+    description: Коллекции - серии, паки, предметы
+  - name: Purchases
+    description: Расширенный маркетплейс покупок
+  - name: Bestiary
+    description: Бестиарий - существа и таксономия
+  - name: Events
+    description: Игровые события и система ставок
+  - name: Crafting
+    description: Система крафта предметов
+  - name: Echo Zones
+    description: Эхо-зоны с особыми условиями
+  - name: Advanced Gear
+    description: Продвинутое снаряжение
+
+components:
+  securitySchemes:
+    AdminId:
+      type: apiKey
+      in: header
+      name: x-admin-id
+      description: ID администратора для доступа к административным функциям
+    UserVkId:
+      type: apiKey
+      in: header
+      name: x-user-vk-id
+      description: VK ID пользователя для пользовательских операций
+
+  schemas:
+    # ============================================
+    # Core Schemas - Основные схемы данных
+    # ============================================
+    
+    Rank:
+      type: string
+      enum: [F, E, D, C, B, A, S, SS, SSS]
+      description: Ранг персонажа или существа
+      
+    Status:
+      type: string
+      enum: [на рассмотрении, Принято, Отклонено]
+      description: Статус анкеты персонажа
+      
+    LifeStatus:
+      type: string
+      enum: [Жив, Мёртв, Неизвестно]
+      description: Жизненный статус персонажа
+      
+    Appearance:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Текстовое описание внешности
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: URL изображений персонажа
+      required:
+        - text
+        - images
+        
+    Attributes:
+      type: object
+      additionalProperties:
+        type: string
+        enum: [Дилетант, Новичок, Опытный, Эксперт, Мастер]
+      description: Атрибуты персонажа с их уровнями
+      example:
+        Сила: Новичок
+        Ловкость: Опытный
+        Интеллект: Эксперт
+        
+    AuraCells:
+      type: object
+      properties:
+        Малые (I):
+          oneOf:
+            - type: number
+            - type: string
+              enum: [Infinity]
+          description: Количество малых ячеек ауры
+        Значительные (II):
+          oneOf:
+            - type: number
+            - type: string
+              enum: [Infinity]
+          description: Количество значительных ячеек ауры
+        Предельные (III):
+          type: number
+          description: Количество предельных ячеек ауры
+      required:
+        - Малые (I)
+        - Значительные (II)
+        - Предельные (III)
+        
+    Contract:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        character_id:
+          type: integer
+          description: ID персонажа-владельца контракта
+        contract_name:
+          type: string
+          description: Название контракта
+        creature_name:
+          type: string
+          description: Имя существа
+        creature_rank:
+          $ref: '#/components/schemas/Rank'
+        creature_spectrum:
+          type: string
+          description: Спектр существа
+        creature_description:
+          type: string
+          description: Описание существа
+        creature_images:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Изображения существа
+        gift:
+          type: string
+          description: Дар, предоставляемый контрактом
+        sync_level:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Уровень синхронизации с существом
+        unity_stage:
+          type: string
+          description: Стадия единства
+        abilities:
+          type: object
+          additionalProperties: true
+          description: Способности, предоставляемые контрактом
+        manifestation:
+          type: object
+          nullable: true
+          description: Манифестация контракта
+        dominion:
+          type: object
+          nullable: true
+          description: Доминион контракта
+      required:
+        - contract_name
+        - creature_name
+        - creature_rank
+        - creature_spectrum
+        - sync_level
+        
+    Character:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        vk_id:
+          type: integer
+          description: VK ID пользователя-владельца
+        status:
+          $ref: '#/components/schemas/Status'
+        character_name:
+          type: string
+          minLength: 1
+          description: Имя персонажа
+        nickname:
+          type: string
+          nullable: true
+          description: Прозвище персонажа
+        age:
+          type: integer
+          minimum: 1
+          description: Возраст персонажа
+        rank:
+          $ref: '#/components/schemas/Rank'
+        faction:
+          type: string
+          description: Фракция персонажа
+        faction_position:
+          type: string
+          description: Должность во фракции
+        home_island:
+          type: string
+          description: Родной остров
+        appearance:
+          $ref: '#/components/schemas/Appearance'
+        character_images:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Изображения персонажа
+        personality:
+          type: string
+          description: Описание личности
+        biography:
+          type: string
+          description: Биография персонажа
+        life_status:
+          $ref: '#/components/schemas/LifeStatus'
+        archetypes:
+          type: array
+          items:
+            type: string
+          description: Архетипы персонажа
+        attributes:
+          $ref: '#/components/schemas/Attributes'
+        attribute_points_total:
+          type: integer
+          readOnly: true
+          description: Всего очков атрибутов
+        attribute_points_spent:
+          type: integer
+          readOnly: true
+          description: Потрачено очков атрибутов
+        aura_cells:
+          $ref: '#/components/schemas/AuraCells'
+        inventory:
+          type: array
+          items:
+            type: object
+          description: Инвентарь персонажа
+        currency:
+          type: integer
+          minimum: 0
+          description: Валюта персонажа (кредиты)
+        admin_note:
+          type: string
+          nullable: true
+          description: Заметка администратора
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        contracts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contract'
+          description: Контракты персонажа с существами
+      required:
+        - vk_id
+        - character_name
+        - age
+        - rank
+        - faction
+        - faction_position
+        - home_island
+        - contracts
+        
+    CharacterUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        character_id:
+          type: integer
+          description: ID персонажа
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        updated_data:
+          type: object
+          description: Обновляемые данные персонажа
+        admin_note:
+          type: string
+          nullable: true
+          description: Заметка администратора по обновлению
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+        - character_id
+        - updated_data
+        
+    # ============================================
+    # Market & Economy Schemas
+    # ============================================
+    
+    Stock:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ticker_symbol:
+          type: string
+          description: Тикер акции
+        company_name:
+          type: string
+          description: Название компании
+        current_price:
+          type: number
+          format: float
+          description: Текущая цена
+        base_volatility:
+          type: number
+          format: float
+          description: Базовая волатильность
+        market_cap:
+          type: number
+          format: float
+          description: Рыночная капитализация
+        sector:
+          type: string
+          description: Сектор экономики
+        description:
+          type: string
+          description: Описание компании
+      required:
+        - ticker_symbol
+        - company_name
+        - current_price
+        
+    CryptoCurrency:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          description: Название криптовалюты
+        ticker_symbol:
+          type: string
+          description: Тикер криптовалюты
+        current_price:
+          type: number
+          format: float
+          description: Текущая цена
+        base_volatility:
+          type: number
+          format: float
+          description: Базовая волатильность
+        total_supply:
+          type: number
+          description: Общее предложение
+        circulating_supply:
+          type: number
+          description: В обращении
+        description:
+          type: string
+          description: Описание криптовалюты
+      required:
+        - name
+        - ticker_symbol
+        - current_price
+        
+    Portfolio:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        character_id:
+          type: integer
+        cash_balance:
+          type: number
+          format: float
+          description: Денежный баланс
+        total_value:
+          type: number
+          format: float
+          readOnly: true
+          description: Общая стоимость портфеля
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortfolioAsset'
+          
+    PortfolioAsset:
+      type: object
+      properties:
+        stock_id:
+          type: integer
+        ticker_symbol:
+          type: string
+        quantity:
+          type: number
+        average_price:
+          type: number
+          format: float
+          description: Средняя цена покупки
+        current_price:
+          type: number
+          format: float
+          description: Текущая цена
+        total_value:
+          type: number
+          format: float
+          readOnly: true
+        profit_loss:
+          type: number
+          format: float
+          readOnly: true
+          description: Прибыль/убыток
+          
+    # ============================================
+    # Gaming Schemas
+    # ============================================
+    
+    CasinoGame:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        character_id:
+          type: integer
+        game_type:
+          type: string
+          enum: [blackjack, slots, roulette, dice, horseracing]
+        bet_amount:
+          type: number
+          minimum: 1
+        result:
+          type: number
+          description: Результат игры (выигрыш)
+        game_data:
+          type: object
+          description: Дополнительные данные игры
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          
+    Horse:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        emoji:
+          type: string
+        baseSpeed:
+          type: integer
+          minimum: 1
+          maximum: 10
+        baseStamina:
+          type: integer
+          minimum: 1
+          maximum: 10
+        baseLuck:
+          type: integer
+          minimum: 1
+          maximum: 10
+        description:
+          type: string
+        total_races:
+          type: integer
+          readOnly: true
+        wins:
+          type: integer
+          readOnly: true
+        total_earnings:
+          type: number
+          readOnly: true
+          
+    PokerRoom:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        buy_in:
+          type: number
+          minimum: 100
+          description: Взнос для входа
+        small_blind:
+          type: number
+        big_blind:
+          type: number
+        max_players:
+          type: integer
+          minimum: 2
+          maximum: 10
+        status:
+          type: string
+          enum: [waiting, in_progress, finished]
+        current_players:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          
+    # ============================================
+    # Activity Schemas
+    # ============================================
+    
+    FishingLocation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        location_name:
+          type: string
+        island:
+          type: string
+        region:
+          type: string
+        min_rank:
+          $ref: '#/components/schemas/Rank'
+        description:
+          type: string
+        difficulty:
+          type: integer
+          minimum: 1
+          maximum: 10
+        available_species:
+          type: array
+          items:
+            type: string
+            
+    HuntingLocation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        location_name:
+          type: string
+        island:
+          type: string
+        region:
+          type: string
+        min_rank:
+          $ref: '#/components/schemas/Rank'
+        description:
+          type: string
+        danger_level:
+          type: integer
+          minimum: 1
+          maximum: 10
+        available_creatures:
+          type: array
+          items:
+            type: string
+            
+    FishingGear:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        gear_name:
+          type: string
+        gear_type:
+          type: string
+          enum: [rod, reel, bait, accessory]
+        quality_bonus:
+          type: number
+          format: float
+        rarity:
+          type: string
+        price:
+          type: integer
+        description:
+          type: string
+        is_active:
+          type: boolean
+          
+    HuntingGear:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        gear_name:
+          type: string
+        gear_type:
+          type: string
+          enum: [weapon, trap, bait, accessory]
+        damage_bonus:
+          type: number
+          format: float
+        accuracy_bonus:
+          type: number
+          format: float
+        rarity:
+          type: string
+        price:
+          type: integer
+        description:
+          type: string
+        is_active:
+          type: boolean
+          
+    # ============================================
+    # Collections & Purchases
+    # ============================================
+    
+    CollectionSeries:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        season:
+          type: integer
+        description:
+          type: string
+        total_items:
+          type: integer
+        rarity_distribution:
+          type: object
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          
+    CollectionItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        series_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        rarity:
+          type: string
+          enum: [common, uncommon, rare, epic, legendary]
+        image_url:
+          type: string
+          format: uri
+        number_in_series:
+          type: integer
+          
+    CollectionPack:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        series_id:
+          type: integer
+        pack_name:
+          type: string
+        pack_type:
+          type: string
+        price:
+          type: integer
+        guaranteed_rarity:
+          type: string
+        cards_count:
+          type: integer
+        active:
+          type: boolean
+          
+    PurchaseCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        description:
+          type: string
+        emoji:
+          type: string
+        display_order:
+          type: integer
+          
+    PurchaseItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        category_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: integer
+        rarity:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        is_limited:
+          type: boolean
+        stock_quantity:
+          type: integer
+          nullable: true
+        
+    # ============================================
+    # Bestiary & Creatures
+    # ============================================
+    
+    BestiaryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        latin_name:
+          type: string
+        mutation_class:
+          type: string
+          enum: [Затронутые, Искажённые, Бестии]
+        danger_rank:
+          $ref: '#/components/schemas/Rank'
+        habitat_type:
+          type: string
+        description:
+          type: string
+        appearance:
+          type: string
+        behavior:
+          type: string
+        abilities:
+          type: array
+          items:
+            type: string
+        drop_items:
+          type: object
+          description: Предметы, выпадающие с существа
+        credit_value_min:
+          type: integer
+        credit_value_max:
+          type: integer
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+            
+    EchoZone:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        location_id:
+          type: integer
+        activity_type:
+          type: string
+          enum: [fishing, hunting]
+        intensity:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Интенсивность зоны
+        residual_aura_level:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        active_until:
+          type: string
+          format: date-time
+          nullable: true
+        description:
+          type: string
+          
+    # ============================================
+    # Events & Betting
+    # ============================================
+    
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event_name:
+          type: string
+        description:
+          type: string
+        event_type:
+          type: string
+        status:
+          type: string
+          enum: [upcoming, active, completed, cancelled]
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        max_participants:
+          type: integer
+          nullable: true
+        current_participants:
+          type: integer
+          readOnly: true
+        created_by:
+          type: integer
+          description: VK ID создателя
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          
+    Bet:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event_id:
+          type: integer
+        bet_name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, closed, settled]
+        result:
+          type: string
+          nullable: true
+        total_believers_pool:
+          type: number
+          readOnly: true
+        total_unbelievers_pool:
+          type: number
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          
+    # ============================================
+    # Crafting
+    # ============================================
+    
+    CraftRecipe:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        sinki_name:
+          type: string
+          description: Название создаваемого синки
+        sinki_rank:
+          $ref: '#/components/schemas/Rank'
+        sinki_type:
+          type: string
+        required_materials:
+          type: object
+          description: Требуемые материалы (JSON)
+        success_chance_base:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        requires_crafter_rank:
+          $ref: '#/components/schemas/Rank'
+        sinki_properties:
+          type: object
+        description:
+          type: string
+          
+    Material:
+      type: object
+      properties:
+        material_id:
+          type: integer
+        name:
+          type: string
+        material_type:
+          type: string
+          enum: [organic, essence, crystal, metal, special]
+        mutation_class:
+          type: string
+          enum: [Затронутые, Искажённые, Бестии]
+        rarity_tier:
+          type: integer
+          minimum: 1
+          maximum: 5
+        quantity:
+          type: integer
+          minimum: 1
+        quality_modifier:
+          type: number
+          format: float
+          minimum: 0.5
+          maximum: 2.0
+        credit_value:
+          type: integer
+          
+    # ============================================
+    # Error Responses
+    # ============================================
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Описание ошибки
+        details:
+          type: string
+          description: Детали ошибки
+        missing:
+          type: array
+          items:
+            type: string
+          description: Отсутствующие поля (для 400 ошибок)
+      required:
+        - error
+        
+    SuccessMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Сообщение об успехе
+        data:
+          type: object
+          description: Дополнительные данные
+          
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Отсутствуют обязательные поля"
+            missing: ["character_name", "age"]
+            
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Admin authentication required"
+            
+    Forbidden:
+      description: Доступ запрещен
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Insufficient permissions"
+            
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Character not found"
+            
+    InternalServerError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Не удалось выполнить операцию"
+            details: "Database connection error"
+
+paths:
+  # ============================================
+  # Health Endpoints
+  # ============================================
+  
+  /health-check:
+    get:
+      tags:
+        - Health
+      summary: Проверка работоспособности API
+      description: Простой endpoint для проверки, что сервер работает
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Сервер работает нормально
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+              example:
+                status: ok
+                
+  # ============================================
+  # Characters Endpoints
+  # ============================================
+  
+  /characters:
+    get:
+      tags:
+        - Characters
+      summary: Получить список всех персонажей
+      description: |
+        Возвращает список персонажей с возможностью фильтрации по статусу, рангу, фракции и родному острову.
+        Возвращает только базовую информацию о персонажах (без полных деталей и контрактов).
+      operationId: getAllCharacters
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/Status'
+          description: Фильтр по статусу анкеты
+        - name: rank
+          in: query
+          schema:
+            $ref: '#/components/schemas/Rank'
+          description: Фильтр по рангу
+        - name: faction
+          in: query
+          schema:
+            type: string
+          description: Фильтр по фракции
+        - name: home_island
+          in: query
+          schema:
+            type: string
+          description: Фильтр по родному острову
+      responses:
+        '200':
+          description: Список персонажей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    character_name:
+                      type: string
+                    vk_id:
+                      type: integer
+                    status:
+                      type: string
+                    rank:
+                      type: string
+                    faction:
+                      type: string
+                    faction_position:
+                      type: string
+              examples:
+                default:
+                  value:
+                    - id: 1
+                      character_name: "Алексей Громов"
+                      vk_id: 123456
+                      status: "Принято"
+                      rank: "C"
+                      faction: "Гильдия Проводников"
+                      faction_position: "Младший проводник"
+                    - id: 2
+                      character_name: "Мария Светлова"
+                      vk_id: 789012
+                      status: "на рассмотрении"
+                      rank: "D"
+                      faction: "Академия"
+                      faction_position: "Студент"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+    post:
+      tags:
+        - Characters
+      summary: Создать нового персонажа
+      description: |
+        Создаёт нового персонажа с контрактами. Анкета автоматически получает статус "на рассмотрении".
+        
+        **Бизнес-правила:**
+        - Валидация обязательных полей
+        - Автоматический расчёт ячеек ауры на основе ранга и контрактов
+        - Автоматический расчёт потраченных очков атрибутов
+        - Sync level контрактов должен быть 0-100
+        - Валюта по умолчанию = 0
+        - Life status по умолчанию = "Жив"
+      operationId: createCharacter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vk_id:
+                  type: integer
+                character_name:
+                  type: string
+                nickname:
+                  type: string
+                age:
+                  type: integer
+                rank:
+                  $ref: '#/components/schemas/Rank'
+                faction:
+                  type: string
+                faction_position:
+                  type: string
+                home_island:
+                  type: string
+                appearance:
+                  $ref: '#/components/schemas/Appearance'
+                character_images:
+                  type: array
+                  items:
+                    type: string
+                personality:
+                  type: string
+                biography:
+                  type: string
+                archetypes:
+                  type: array
+                  items:
+                    type: string
+                attributes:
+                  $ref: '#/components/schemas/Attributes'
+                inventory:
+                  type: array
+                  items:
+                    type: object
+                contracts:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Contract'
+              required:
+                - vk_id
+                - character_name
+                - age
+                - rank
+                - faction
+                - faction_position
+                - home_island
+                - contracts
+            examples:
+              full_character:
+                summary: Полный пример создания персонажа
+                value:
+                  vk_id: 123456789
+                  character_name: "Дмитрий Волков"
+                  nickname: "Серый"
+                  age: 25
+                  rank: "C"
+                  faction: "Гильдия Проводников"
+                  faction_position: "Проводник 3-го класса"
+                  home_island: "Новый Эдем"
+                  appearance:
+                    text: "Высокий мужчина с седыми волосами и пронзительными серыми глазами"
+                    images: ["https://example.com/image1.jpg"]
+                  character_images: ["https://example.com/char1.jpg"]
+                  personality: "Спокойный и рассудительный, но может быть безжалостным"
+                  biography: "Родился в Новом Эдеме, стал проводником в 20 лет"
+                  archetypes: ["Охотник", "Защитник"]
+                  attributes:
+                    Сила: "Опытный"
+                    Ловкость: "Эксперт"
+                    Интеллект: "Новичок"
+                    Выносливость: "Опытный"
+                  inventory: []
+                  contracts:
+                    - contract_name: "Теневой страж"
+                      creature_name: "Умбра"
+                      creature_rank: "B"
+                      creature_spectrum: "Тень"
+                      creature_description: "Существо из теней"
+                      creature_images: ["https://example.com/creature1.jpg"]
+                      gift: "Слияние с тенями"
+                      sync_level: 45
+                      unity_stage: "Синхронизация"
+                      abilities:
+                        main: "Теневой шаг"
+                        passive: "Ночное зрение"
+                      manifestation: null
+                      dominion: null
+      responses:
+        '201':
+          description: Персонаж успешно создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  characterId:
+                    type: integer
+              example:
+                message: "Character created successfully"
+                characterId: 42
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+  /characters/by-vk/{vk_id}:
+    get:
+      tags:
+        - Characters
+      summary: Получить персонажей пользователя по VK ID (только принятые)
+      description: Возвращает только принятых персонажей пользователя с базовой информацией
+      operationId: getCharactersByVkId
+      parameters:
+        - name: vk_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: VK ID пользователя
+      responses:
+        '200':
+          description: Список персонажей пользователя
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    character_name:
+                      type: string
+                    currency:
+                      type: integer
+              example:
+                - id: 1
+                  character_name: "Алексей Громов"
+                  currency: 5000
+                - id: 3
+                  character_name: "Екатерина Морозова"
+                  currency: 12000
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+  /characters/my/{vk_id}:
+    get:
+      tags:
+        - Characters
+      summary: Получить все анкеты пользователя (любой статус)
+      description: Возвращает все анкеты пользователя независимо от статуса, только базовая информация
+      operationId: getMyCharacters
+      parameters:
+        - name: vk_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: VK ID пользователя
+      responses:
+        '200':
+          description: Список всех анкет пользователя
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    character_name:
+                      type: string
+                    status:
+                      type: string
+              example:
+                - id: 1
+                  character_name: "Алексей Громов"
+                  status: "Принято"
+                - id: 2
+                  character_name: "Иван Петров"
+                  status: "на рассмотрении"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+  /my-anketas/{vk_id}:
+    get:
+      tags:
+        - Characters
+      summary: Получить полные анкеты пользователя
+      description: |
+        Возвращает все анкеты пользователя с полной информацией включая контракты.
+        JSON поля автоматически парсятся.
+      operationId: getMyFullAnketas
+      parameters:
+        - name: vk_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: VK ID пользователя
+      responses:
+        '200':
+          description: Полные анкеты пользователя
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Character'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+  /characters/{id}:
+    get:
+      tags:
+        - Characters
+      summary: Получить персонажа по ID
+      description: Возвращает полную информацию о персонаже включая все контракты
+      operationId: getCharacterById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID персонажа
+      responses:
+        '200':
+          description: Полная информация о персонаже
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Character'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+    put:
+      tags:
+        - Characters
+      summary: Обновить персонажа
+      description: |
+        Обновляет данные персонажа. Требует либо admin права, либо владельца персонажа.
+        
+        **Авторизация:**
+        - Админ: передать `x-admin-id: 1` и пароль в теле запроса
+        - Владелец: передать `x-user-vk-id` соответствующий vk_id персонажа
+        
+        **Бизнес-правила:**
+        - Если персонаж имеет статус "Принято", создаётся запрос на обновление
+        - Если персонаж "на рассмотрении", обновление происходит напрямую
+        - Админ может обновлять любого персонажа напрямую
+      operationId: updateCharacter
+      security:
+        - AdminId: []
+        - UserVkId: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID персонажа
+        - name: x-admin-id
+          in: header
+          schema:
+            type: string
+          description: ID администратора (опционально)
+        - name: x-user-vk-id
+          in: header
+          schema:
+            type: integer
+          description: VK ID пользователя (опционально)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin_password:
+                  type: string
+                  description: Пароль администратора (если админ)
+                character_name:
+                  type: string
+                nickname:
+                  type: string
+                personality:
+                  type: string
+                biography:
+                  type: string
+                appearance:
+                  $ref: '#/components/schemas/Appearance'
+                attributes:
+                  $ref: '#/components/schemas/Attributes'
+                inventory:
+                  type: array
+                  items:
+                    type: object
+                contracts:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Contract'
+            example:
+              personality: "Обновлённое описание личности"
+              biography: "Дополненная биография персонажа"
+      responses:
+        '200':
+          description: Персонаж успешно обновлён (или создан запрос на обновление)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  updateId:
+                    type: integer
+                    description: ID запроса на обновление (если создан)
+              examples:
+                direct_update:
+                  value:
+                    message: "Character updated successfully"
+                update_request:
+                  value:
+                    message: "Update request created and pending approval"
+                    updateId: 15
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+    delete:
+      tags:
+        - Characters
+      summary: Удалить персонажа
+      description: |
+        Удаляет персонажа и все связанные контракты.
+        Требует admin права или владельца персонажа.
+      operationId: deleteCharacter
+      security:
+        - AdminId: []
+        - UserVkId: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID персонажа
+        - name: x-admin-id
+          in: header
+          schema:
+            type: string
+        - name: x-user-vk-id
+          in: header
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin_password:
+                  type: string
+            example:
+              admin_password: "admin_secret"
+      responses:
+        '200':
+          description: Персонаж успешно удалён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+              example:
+                message: "Character deleted successfully"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+  /characters/{id}/versions:
+    get:
+      tags:
+        - Characters
+      summary: Получить историю версий персонажа
+      description: Возвращает все сохранённые версии персонажа в порядке убывания номера версии
+      operationId: getCharacterVersions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID персонажа
+      responses:
+        '200':
+          description: История версий персонажа
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    version_id:
+                      type: integer
+                    version_number:
+                      type: integer
+                    created_at:
+                      type: string
+                      format: date-time
+                    data:
+                      type: object
+                      description: Данные версии персонажа
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+  /characters/{id}/status:
+    post:
+      tags:
+        - Characters
+      summary: Обновить статус персонажа
+      description: Изменяет статус анкеты персонажа. Доступно только для админа.
+      operationId: updateCharacterStatus
+      security:
+        - AdminId: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID персонажа
+        - name: x-admin-id
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: '#/components/schemas/Status'
+                admin_password:
+                  type: string
+              required:
+                - status
+                - admin_password
+            example:
+              status: "Принято"
+              admin_password: "admin_secret"
+      responses:
+        '200':
+          description: Статус успешно обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+              example:
+                message: "Character status updated successfully"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+          
+  /characters/{id}/life-status:
+    post:
+      tags:
+        - Characters
+      summary: Обновить жизненный статус персонажа
+      description: Изменяет жизненный статус персонажа (Жив/Мёртв). Только для админа.
+      operationId: updateCharacterLifeStatus
+      security:
+        - AdminId: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: x-admin-id
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                life_status:
+                  $ref: '#/components/schemas/LifeStatus'
+                admin_password:
+                  type: string
+              required:
+                - life_status
+                - admin_password
+            example:
+              life_status: "Мёртв"
+              admin_password: "admin_secret"
+      responses:
+        '200':
+          description: Жизненный статус обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+

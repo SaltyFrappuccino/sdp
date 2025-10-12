@@ -104,8 +104,9 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/fishing/gear/${characterId}`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setAvailableGear(Array.isArray(data) ? data : []);
+      if (data.success) {
+        setAvailableGear(data.gear || []);
+      }
     } catch (error) {
       console.error('Ошибка загрузки снаряжения:', error);
     }
@@ -118,10 +119,15 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/fishing/inventory/${characterId}`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setCatchHistory(Array.isArray(data) ? data : []);
+      // API может возвращать массив напрямую или объект с полем fish/catch/items
+      if (data.success) {
+        setCatchHistory(data.fish || data.catch || data.items || []);
+      } else {
+        setCatchHistory(Array.isArray(data) ? data : []);
+      }
     } catch (error) {
       console.error('Ошибка загрузки улова:', error);
+      setCatchHistory([]);
     }
   };
 
@@ -205,10 +211,11 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/fishing/gear`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setShopGear(Array.isArray(data) ? data : []);
+      // API может возвращать массив напрямую или объект с полем gear/items
+      setShopGear(Array.isArray(data) ? data : (data.gear || data.items || []));
     } catch (error) {
       console.error('Ошибка загрузки магазина:', error);
+      setShopGear([]);
     }
   };
 
@@ -407,17 +414,17 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             size="l"
             mode="secondary"
             stretched
-            onClick={() => setActiveTab('shop')}
+            onClick={() => routeNavigator.push('/materials')}
           >
-            🏪 Магазин
+            📦 Материалы
           </Button>
           <Button
             size="l"
             mode="secondary"
             stretched
-            onClick={() => routeNavigator.push('/materials')}
+            onClick={() => routeNavigator.push('/crafting')}
           >
-            📦 Материалы
+            🔨 Крафт
           </Button>
         </ButtonGroup>
       </Div>
@@ -471,13 +478,13 @@ const FishingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             </Text>
           </Card>
 
-          {availableGear.length === 0 ? (
-            <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
-              <Text>У вас пока нет снаряжения</Text>
-              <Button size="m" mode="primary" onClick={() => routeNavigator.push('/market')} style={{ marginTop: 12 }}>
-                Магазин
-              </Button>
-            </Card>
+           {availableGear.length === 0 ? (
+             <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
+               <Text>У вас пока нет снаряжения</Text>
+               <Button size="m" mode="primary" onClick={() => setActiveTab('shop')} style={{ marginTop: 12 }}>
+                 Перейти в магазин
+               </Button>
+             </Card>
           ) : (
             <Group header={<Header>Доступное снаряжение</Header>}>
               {availableGear.map(gear => (

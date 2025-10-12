@@ -110,8 +110,9 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/hunting/gear/${characterId}`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setAvailableGear(Array.isArray(data) ? data : []);
+      if (data.success) {
+        setAvailableGear(data.gear || []);
+      }
     } catch (error) {
       console.error('Ошибка загрузки снаряжения:', error);
     }
@@ -124,8 +125,9 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/hunting/stats/${characterId}`);
       const data = await response.json();
       
-      // API возвращает объект напрямую
-      setHuntStats(data || null);
+      if (data.success) {
+        setHuntStats(data.stats);
+      }
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
     }
@@ -138,10 +140,11 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/hunting/inventory/${characterId}`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setHuntInventory(Array.isArray(data) ? data : []);
+      // API может возвращать массив напрямую или объект с полем prey/catch/items
+      setHuntInventory(Array.isArray(data) ? data : (data.prey || data.catch || data.items || []));
     } catch (error) {
       console.error('Ошибка загрузки добычи:', error);
+      setHuntInventory([]);
     }
   };
 
@@ -150,10 +153,11 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
       const response = await fetch(`${API_URL}/hunting/gear`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setShopGear(Array.isArray(data) ? data : []);
+      // API может возвращать массив напрямую или объект с полем gear/items
+      setShopGear(Array.isArray(data) ? data : (data.gear || data.items || []));
     } catch (error) {
       console.error('Ошибка загрузки магазина:', error);
+      setShopGear([]);
     }
   };
 
@@ -450,17 +454,17 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             size="l"
             mode="secondary"
             stretched
-            onClick={() => setActiveTab('shop')}
+            onClick={() => routeNavigator.push('/journal')}
           >
-            🏪 Магазин
+            📖 Журнал
           </Button>
           <Button
             size="l"
             mode="secondary"
             stretched
-            onClick={() => routeNavigator.push('/journal')}
+            onClick={() => routeNavigator.push('/crafting')}
           >
-            📖 Журнал
+            🔨 Крафт
           </Button>
         </ButtonGroup>
       </Div>
@@ -518,13 +522,13 @@ const HuntingPanelV2: React.FC<NavIdProps> = ({ id, fetchedUser }) => {
             </Text>
           </Card>
 
-          {availableGear.length === 0 ? (
-            <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
-              <Text>У вас пока нет снаряжения для охоты</Text>
-              <Button size="m" mode="primary" onClick={() => routeNavigator.push('/market')} style={{ marginTop: 12 }}>
-                Магазин
-              </Button>
-            </Card>
+           {availableGear.length === 0 ? (
+             <Card mode="shadow" style={{ padding: 24, textAlign: 'center' }}>
+               <Text>У вас пока нет снаряжения для охоты</Text>
+               <Button size="m" mode="primary" onClick={() => setActiveTab('shop')} style={{ marginTop: 12 }}>
+                 Перейти в магазин
+               </Button>
+             </Card>
           ) : (
             <Group header={<Header>Доступное снаряжение</Header>}>
               {availableGear.map(gear => (

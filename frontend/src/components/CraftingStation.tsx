@@ -45,8 +45,8 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
       const response = await fetch(`${API_URL}/crafting/recipes/${characterId}`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setRecipes(Array.isArray(data) ? data : []);
+      // API может возвращать массив напрямую или объект с полем recipes
+      setRecipes(Array.isArray(data) ? data : (data.recipes || []));
     } catch (err) {
       setError('Ошибка загрузки рецептов');
       console.error(err);
@@ -60,8 +60,8 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
       const response = await fetch(`${API_URL}/crafting/history/${characterId}`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setCraftHistory(Array.isArray(data) ? data : []);
+      // API может возвращать массив напрямую или объект с полем history
+      setCraftHistory(Array.isArray(data) ? data : (data.history || []));
     } catch (err) {
       console.error(err);
     }
@@ -72,8 +72,8 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
       const response = await fetch(`${API_URL}/crafting/stats/${characterId}`);
       const data = await response.json();
       
-      // API возвращает объект напрямую
-      setCraftStats(data || null);
+      // API может возвращать объект напрямую или вложенный
+      setCraftStats(data.stats || data || null);
     } catch (err) {
       console.error(err);
     }
@@ -356,7 +356,7 @@ const CraftingStation: React.FC<CraftingStationProps> = ({ characterId, characte
               <Text style={{ fontSize: 12, color: 'var(--text_secondary)' }}>Успешно</Text>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <Text style={{ fontSize: 24, fontWeight: 'bold' }}>{(craftStats?.successRate || 0).toFixed(0)}%</Text>
+              <Text style={{ fontSize: 24, fontWeight: 'bold' }}>{craftStats?.successRate?.toFixed(0) || 0}%</Text>
               <Text style={{ fontSize: 12, color: 'var(--text_secondary)' }}>Успешность</Text>
             </div>
           </div>

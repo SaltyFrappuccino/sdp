@@ -39,8 +39,8 @@ const MaterialsInventory: React.FC<MaterialsInventoryProps> = ({ characterId, on
       const response = await fetch(`${API_URL}/materials/${characterId}`);
       const data = await response.json();
       
-      // API возвращает массив напрямую
-      setMaterials(Array.isArray(data) ? data : []);
+      // API может возвращать массив напрямую или объект с полем materials
+      setMaterials(Array.isArray(data) ? data : (data.materials || []));
     } catch (err) {
       setError('Ошибка загрузки материалов');
       console.error(err);
