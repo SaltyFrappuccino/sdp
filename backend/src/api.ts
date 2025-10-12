@@ -8582,26 +8582,6 @@ router.get('/materials/:character_id', async (req: Request, res: Response) => {
   }
 });
 
-// EVENTS - Активные события
-router.get('/events/active', async (req: Request, res: Response) => {
-  try {
-    const db = await initDB();
-    
-    const events = await db.all(
-      `SELECT * FROM HuntingEvents 
-       WHERE is_active = 1 
-       AND datetime('now') BETWEEN active_from AND active_until
-       ORDER BY active_until ASC`
-    );
-    
-    await db.close();
-    res.json(events);
-  } catch (error) {
-    console.error('Ошибка при получении событий:', error);
-    res.status(500).json({ message: 'Ошибка сервера', error: String(error) });
-  }
-});
-
 router.get('/events/location/:location_id/:activity_type', async (req: Request, res: Response) => {
   try {
     const { location_id, activity_type } = req.params;

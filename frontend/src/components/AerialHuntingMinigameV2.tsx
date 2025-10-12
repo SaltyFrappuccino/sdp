@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Button, Progress, Card, Title, Text, Div } from '@vkontakte/vkui';
+import { Button, Progress, Card, Title, Text, Div, ModalRoot } from '@vkontakte/vkui';
+import TutorialModal from './TutorialModal';
 
 interface Position {
   x: number;
@@ -50,21 +51,22 @@ const AerialHuntingMinigameV2: React.FC<AerialHuntingMinigameV2Props> = ({
   const [score, setScore] = useState(0);
   const [hits, setHits] = useState(0);
   const [perfectHits, setPerfectHits] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(60);
+  const [timeRemaining, setTimeRemaining] = useState(90); // Было 60
   const [message, setMessage] = useState('Прицельтесь и стреляйте!');
   const [isReloading, setIsReloading] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Генерация начальных целей
   useEffect(() => {
     const initialTargets: FlyingTarget[] = [];
-    const flockSize = Math.floor(3 + difficulty * 2);
+    const flockSize = Math.floor(2 + difficulty * 1.5); // Было 3 + difficulty * 2
     const isLeaderIndex = Math.floor(Math.random() * flockSize);
 
     for (let i = 0; i < flockSize; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 1.5 + Math.random() * (difficulty * 0.5);
+      const speed = 1.0 + Math.random() * (difficulty * 0.3); // Было 1.5 + difficulty * 0.5
 
       initialTargets.push({
         id: i,
@@ -102,8 +104,8 @@ const AerialHuntingMinigameV2: React.FC<AerialHuntingMinigameV2Props> = ({
 
           // Турбулентность в Эхо-Зонах
           if (echoZone && Math.random() < windConditions.turbulence) {
-            newX += (Math.random() - 0.5) * 4;
-            newY += (Math.random() - 0.5) * 4;
+            newX += (Math.random() - 0.5) * 2; // Было * 4
+            newY += (Math.random() - 0.5) * 2; // Было * 4
           }
 
           // Отскок от границ
@@ -219,12 +221,12 @@ const AerialHuntingMinigameV2: React.FC<AerialHuntingMinigameV2Props> = ({
       return prevTargets.filter(target => {
         const distance = Math.sqrt(
           Math.pow(target.position.x - aimPosition.x, 2) +
-          Math.pow(target.position.y - aimPosition.y, 2)
-        );
+        Math.pow(target.position.y - aimPosition.y, 2)
+      );
 
-        const hitRadius = 8 + (difficulty * 2);
+      const hitRadius = 12 + (difficulty * 1.5); // Было 8 + difficulty * 2
 
-        if (distance < hitRadius) {
+      if (distance < hitRadius) {
           hit = true;
           targetHit = target;
           return false; // Удаляем цель
@@ -463,9 +465,27 @@ const AerialHuntingMinigameV2: React.FC<AerialHuntingMinigameV2Props> = ({
   };
 
   return (
-    <Card mode="shadow" style={{ margin: 16, padding: 16 }}>
-      {renderGame()}
-    </Card>
+    <>
+      <Card mode="shadow" style={{ margin: 16, padding: 16, position: 'relative' }}>
+        <Button 
+          mode="tertiary" 
+          size="s"
+          onClick={() => setShowTutorial(true)}
+          style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
+        >
+          ❓ Обучение
+        </Button>
+        {renderGame()}
+      </Card>
+
+      <ModalRoot activeModal={showTutorial ? 'tutorial' : null}>
+        <TutorialModal 
+          id="tutorial"
+          gameType="hunting_aerial"
+          onClose={() => setShowTutorial(false)}
+        />
+      </ModalRoot>
+    </>
   );
 };
 

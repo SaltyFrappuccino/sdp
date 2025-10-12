@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Button, Progress, Card, Title, Text, Div, Snackbar } from '@vkontakte/vkui';
+import { Button, Progress, Card, Title, Text, Div, Snackbar, ModalRoot } from '@vkontakte/vkui';
+import TutorialModal from './TutorialModal';
 
 type GamePhase = 'cast' | 'wait' | 'hook' | 'reel' | 'fight' | 'result';
 type FishBehavior = 'calm' | 'aggressive' | 'fleeing' | 'mutated';
@@ -41,6 +42,7 @@ const FishingMinigameV2: React.FC<FishingMinigameV2Props> = ({
   const [message, setMessage] = useState('');
   const [fishPosition, setFishPosition] = useState(50);
   const [reelSpeed, setReelSpeed] = useState(0);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const phaseTimer = useRef<number>(0);
   const hookWindow = useRef<number>(0);
@@ -59,7 +61,7 @@ const FishingMinigameV2: React.FC<FishingMinigameV2Props> = ({
     setTimeout(() => {
       // Переход к подсечке
       setGamePhase('hook');
-      hookWindow.current = 800 + Math.random() * 400; // 0.8-1.2 сек
+      hookWindow.current = 1500 + Math.random() * 1000; // 1.5-2.5 сек (было 0.8-1.2)
       setMessage('⚡ ПОДСЕЧКА! Нажмите кнопку!');
       
       setTimeout(() => {
@@ -118,7 +120,7 @@ const FishingMinigameV2: React.FC<FishingMinigameV2Props> = ({
       if (isPulling) {
         // Игрок подматывает
         setFishProgress(prev => {
-          const newProgress = prev + (1.0 - difficulty * 0.3);
+          const newProgress = prev + (1.5 - difficulty * 0.2); // Было 1.0 - difficulty * 0.3
           if (newProgress >= 100) {
             // Победа!
             setGamePhase('result');
@@ -131,7 +133,7 @@ const FishingMinigameV2: React.FC<FishingMinigameV2Props> = ({
 
         // Натяжение увеличивается при подматывании
         setTension(prev => {
-          const newTension = Math.min(100, prev + (fishStrength * 1.5));
+          const newTension = Math.min(100, prev + (fishStrength * 0.8)); // Было 1.5
           if (newTension >= 100) {
             // Леска порвалась!
             setMessage('💔 Леска порвалась!');
@@ -143,7 +145,7 @@ const FishingMinigameV2: React.FC<FishingMinigameV2Props> = ({
 
         // Выносливость уменьшается
         setStamina(prev => {
-          const newStamina = Math.max(0, prev - (0.5 * difficulty));
+          const newStamina = Math.max(0, prev - (0.3 * difficulty)); // Было 0.5
           if (newStamina <= 0) {
             setMessage('😓 Силы кончились...');
             setTimeout(() => onComplete(false, totalScore / 2, perfectHits), 1500);
@@ -156,7 +158,7 @@ const FishingMinigameV2: React.FC<FishingMinigameV2Props> = ({
       } else {
         // Игрок отпустил - натяжение падает, но рыба уходит
         setTension(prev => Math.max(0, prev - 1.5));
-        setFishProgress(prev => Math.max(0, prev - (fishStrength * 0.3)));
+        setFishProgress(prev => Math.max(0, prev - (fishStrength * 0.15))); // Было 0.3
         setReelSpeed(0);
 
         // Небольшое восстановление выносливости
@@ -421,9 +423,27 @@ const FishingMinigameV2: React.FC<FishingMinigameV2Props> = ({
   };
 
   return (
-    <Card mode="shadow" style={{ margin: 16, padding: 16 }}>
-      {renderPhase()}
-    </Card>
+    <>
+      <Card mode="shadow" style={{ margin: 16, padding: 16, position: 'relative' }}>
+        <Button 
+          mode="tertiary" 
+          size="s"
+          onClick={() => setShowTutorial(true)}
+          style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
+        >
+          ❓ Обучение
+        </Button>
+        {renderPhase()}
+      </Card>
+
+      <ModalRoot activeModal={showTutorial ? 'tutorial' : null}>
+        <TutorialModal 
+          id="tutorial"
+          gameType="fishing"
+          onClose={() => setShowTutorial(false)}
+        />
+      </ModalRoot>
+    </>
   );
 };
 

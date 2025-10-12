@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Progress, Card, Title, Text, Div } from '@vkontakte/vkui';
+import { Button, Progress, Card, Title, Text, Div, ModalRoot } from '@vkontakte/vkui';
+import TutorialModal from './TutorialModal';
 
 type GamePhase = 'preparation' | 'tracking' | 'approach' | 'engagement' | 'harvest' | 'result';
 type Direction = 'up' | 'down' | 'left' | 'right';
@@ -53,6 +54,7 @@ const GroundHuntingMinigameV2: React.FC<GroundHuntingMinigameV2Props> = ({
   const [trapPlaced, setTrapPlaced] = useState(false);
   const [aimAccuracy, setAimAccuracy] = useState(0);
   const [crosshairPosition, setCrosshairPosition] = useState<Position>({ x: 50, y: 50 });
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // PHASE 1: PREPARATION
   const handleStartTracking = useCallback(() => {
@@ -70,7 +72,7 @@ const GroundHuntingMinigameV2: React.FC<GroundHuntingMinigameV2Props> = ({
 
     if (direction === currentTrack) {
       // Правильное направление
-      const increment = Math.max(10, 20 - difficulty * 3);
+      const increment = Math.max(15, 25 - difficulty * 2); // Было 10, 20 - difficulty * 3
       const newProgress = Math.min(100, trackingProgress + increment);
       setTrackingProgress(newProgress);
       setTotalScore(prev => prev + 5);
@@ -96,7 +98,7 @@ const GroundHuntingMinigameV2: React.FC<GroundHuntingMinigameV2Props> = ({
       setCurrentTrack(directions[Math.floor(Math.random() * directions.length)]);
     } else {
       // Неправильное направление
-      setTrackingProgress(prev => Math.max(0, prev - 10));
+      setTrackingProgress(prev => Math.max(0, prev - 5)); // Было -10
       setMessage('✗ Неверный след...');
     }
   }, [gamePhase, currentTrack, trackingProgress, difficulty]);
@@ -122,7 +124,7 @@ const GroundHuntingMinigameV2: React.FC<GroundHuntingMinigameV2Props> = ({
       // Уровень тревоги добычи
       let alertIncrease = noiseLevel * 0.5;
       if (playerDownwind) alertIncrease += windEffect;
-      if (distance < 20) alertIncrease += 2;
+      if (distance < 20) alertIncrease += 1; // Было +2
 
       setPreyAlert(prev => {
         const newAlert = Math.min(100, prev + alertIncrease);
@@ -175,7 +177,7 @@ const GroundHuntingMinigameV2: React.FC<GroundHuntingMinigameV2Props> = ({
     });
 
     // Движение создаёт шум
-    setNoiseLevel(prev => Math.min(100, prev + 5));
+    setNoiseLevel(prev => Math.min(100, prev + 2)); // Было +5
   }, [gamePhase]);
 
   const placeTrap = useCallback(() => {
@@ -242,8 +244,8 @@ const GroundHuntingMinigameV2: React.FC<GroundHuntingMinigameV2Props> = ({
 
       // Добыча движется
       setPreyPosition(prev => ({
-        x: Math.max(40, Math.min(100, prev.x + (Math.random() - 0.5) * (difficulty * 2))),
-        y: Math.max(20, Math.min(80, prev.y + (Math.random() - 0.5) * (difficulty * 2)))
+        x: Math.max(40, Math.min(100, prev.x + (Math.random() - 0.5) * (difficulty * 1))), // Было * 2
+        y: Math.max(20, Math.min(80, prev.y + (Math.random() - 0.5) * (difficulty * 1))) // Было * 2
       }));
     }, 100);
 
@@ -258,7 +260,7 @@ const GroundHuntingMinigameV2: React.FC<GroundHuntingMinigameV2Props> = ({
       Math.pow(preyPosition.y - crosshairPosition.y, 2)
     );
 
-    const hitThreshold = 10 + difficulty * 3;
+    const hitThreshold = 15 + difficulty * 2; // Было 10 + difficulty * 3
     const hit = distance < hitThreshold;
 
     if (hit) {
@@ -567,9 +569,27 @@ const GroundHuntingMinigameV2: React.FC<GroundHuntingMinigameV2Props> = ({
   };
 
   return (
-    <Card mode="shadow" style={{ margin: 16, padding: 16 }}>
-      {renderPhase()}
-    </Card>
+    <>
+      <Card mode="shadow" style={{ margin: 16, padding: 16, position: 'relative' }}>
+        <Button 
+          mode="tertiary" 
+          size="s"
+          onClick={() => setShowTutorial(true)}
+          style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
+        >
+          ❓ Обучение
+        </Button>
+        {renderPhase()}
+      </Card>
+
+      <ModalRoot activeModal={showTutorial ? 'tutorial' : null}>
+        <TutorialModal 
+          id="tutorial"
+          gameType="hunting_ground"
+          onClose={() => setShowTutorial(false)}
+        />
+      </ModalRoot>
+    </>
   );
 };
 
